@@ -488,13 +488,17 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// periodicBroadcastLoop refresca el estado que ve el panel.
+//
+// Aquí ya no se comprueban actualizaciones: el propio panel pregunta por
+// /api/update/check cada pocos minutos, así que tener además un reloj en el
+// servidor significaba pedirle a GitHub dos veces lo mismo, y su API solo
+// admite 60 peticiones por hora y por IP.
 func (s *Server) periodicBroadcastLoop() {
 	broadcastTicker := time.NewTicker(1 * time.Second)
 	diskTicker := time.NewTicker(3 * time.Second)
-	updateTicker := time.NewTicker(5 * time.Minute)
 	defer broadcastTicker.Stop()
 	defer diskTicker.Stop()
-	defer updateTicker.Stop()
 
 	for {
 		select {
@@ -509,17 +513,6 @@ func (s *Server) periodicBroadcastLoop() {
 				s.mu.Lock()
 				s.cachedDisk = disk
 				s.mu.Unlock()
-			}
-		case <-updateTicker.C:
-			rel, _, err := s.updater.CheckForUpdate()
-			if err == nil && rel != nil {
-				// Solo disparamos el broadcast si la actualización no ha sido pospuesta en esta sesión
-				if !s.updater.IsPostponed(rel.TagName) {
-					s.mu.Lock()
-					s.latestRel = rel
-					s.mu.Unlock()
-					s.triggerBroadcast()
-				}
 			}
 		case <-broadcastTicker.C:
 			s.triggerBroadcast()

@@ -45,11 +45,11 @@ import {
   SmartPhone01Icon,
   PlayIcon,
   PlusSignIcon,
+  Pulse01Icon,
   RadioTowerIcon,
   Refresh01Icon,
   ArrowReloadHorizontalIcon,
   FloppyDiskIcon,
-  ScrollTextIcon,
   Search01Icon,
   Settings02Icon,
   ShieldCheckIcon,
@@ -114,7 +114,7 @@ export const Radio = icono(RadioTowerIcon) // entrada "Escucha" del menú
 export const RefreshCw = icono(Refresh01Icon) // regenerar o recargar
 export const RotateCcw = icono(ArrowReloadHorizontalIcon) // reintentar una descarga
 export const Save = icono(FloppyDiskIcon) // guardar ajustes
-export const ScrollText = icono(ScrollTextIcon) // entrada "Logs" del menú
+export const ScrollText = icono(Pulse01Icon) // entrada "Logs" del menú
 export const Search = icono(Search01Icon) // buscar dentro del registro
 export const Settings2 = icono(Settings02Icon) // entrada "Ajustes" del menú
 export const ShieldCheck = icono(ShieldCheckIcon) // verificación en dos pasos

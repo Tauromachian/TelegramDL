@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -56,6 +57,10 @@ type AppUpdater struct {
 	checkCount       int
 	announcedVersion string
 	lastCheckError   string
+
+	// rateLimitUntil marca hasta cuándo GitHub nos tiene cortados por exceso de
+	// peticiones. Mientras no pase esa hora no tiene sentido volver a preguntar.
+	rateLimitUntil time.Time
 }
 
 func NewAppUpdater() *AppUpdater {
@@ -142,17 +147,26 @@ func (u *AppUpdater) routineLog(first bool, message, detail string) {
 	}
 }
 
-// checkErrorLog evita repetir el mismo fallo de red cada cinco minutos: avisa
-// la primera vez y cada vez que el error cambia, y el resto queda en detalle.
+var (
+	// GitHub añade al error una cuenta atrás ("[rate reset in 23m20s]") que
+	// cambia a cada segundo. Hay que quitarla para comparar errores, o el mismo
+	// fallo parecería distinto cada vez y se avisaría una y otra vez.
+	cuotaCuentaAtras = regexp.MustCompile(`\[rate reset in [^\]]*\]`)
+	cuotaEspera      = regexp.MustCompile(`rate reset in ([0-9hms.]+)`)
+)
+
+// checkErrorLog evita repetir el mismo fallo: avisa la primera vez y cada vez
+// que el error cambia de verdad, y el resto queda en nivel detalle.
 func (u *AppUpdater) checkErrorLog(first bool, message string, err error) {
 	text := ""
 	if err != nil {
 		text = err.Error()
 	}
+	clave := cuotaCuentaAtras.ReplaceAllString(text, "[rate reset]")
 
 	u.mu.Lock()
-	changed := u.lastCheckError != text
-	u.lastCheckError = text
+	changed := u.lastCheckError != clave
+	u.lastCheckError = clave
 	u.mu.Unlock()
 
 	if first || changed {
@@ -162,11 +176,53 @@ func (u *AppUpdater) checkErrorLog(first bool, message string, err error) {
 	logbus.Debug(logbus.CatUpdater, message, text)
 }
 
+// anotarLimiteDeCuota detecta si GitHub rechazó la petición por haber agotado
+// las peticiones por hora y, en ese caso, apunta hasta cuándo no merece la pena
+// volver a preguntar. GitHub dice en el propio error cuánto falta; si no se
+// puede leer, se espera un cuarto de hora.
+func (u *AppUpdater) anotarLimiteDeCuota(err error) bool {
+	if err == nil {
+		return false
+	}
+	texto := err.Error()
+	if !strings.Contains(strings.ToLower(texto), "rate limit") {
+		return false
+	}
+
+	espera := 15 * time.Minute
+	if m := cuotaEspera.FindStringSubmatch(texto); m != nil {
+		if d, perr := time.ParseDuration(m[1]); perr == nil && d > 0 {
+			espera = d + 30*time.Second // un margen por si el reloj va justo
+		}
+	}
+
+	u.mu.Lock()
+	u.rateLimitUntil = time.Now().Add(espera)
+	u.mu.Unlock()
+
+	logbus.Warn(logbus.CatUpdater,
+		"GitHub limitó las comprobaciones de actualización",
+		fmt.Sprintf("Se alcanzó el máximo de peticiones por hora; no se volverá a preguntar hasta dentro de %s",
+			espera.Round(time.Second)))
+	return true
+}
+
 func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 	u.mu.Lock()
 	u.checkCount++
 	first := u.checkCount == 1
+	pausaHasta := u.rateLimitUntil
 	u.mu.Unlock()
+
+	// Si GitHub ya nos dijo que agotamos la cuota, esperamos a que pase el
+	// tiempo que él mismo indicó en vez de seguir insistiendo (y llenando el
+	// registro) cada pocos minutos.
+	if !pausaHasta.IsZero() && time.Now().Before(pausaHasta) {
+		logbus.Debug(logbus.CatUpdater, "Comprobación de actualizaciones en pausa",
+			fmt.Sprintf("GitHub limitó las peticiones; se reintentará en %s",
+				time.Until(pausaHasta).Round(time.Second)))
+		return nil, nil, nil
+	}
 
 	u.routineLog(first, fmt.Sprintf("Comprobando actualizaciones de %s", u.repoURL),
 		fmt.Sprintf("Versión instalada: v%s", u.currentVersion))
@@ -180,7 +236,9 @@ func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 
 	latest, found, err := updater.DetectLatest(context.Background(), goupdate.ParseSlug(u.repoURL))
 	if err != nil {
-		u.checkErrorLog(first, "No se pudo consultar la última versión publicada", err)
+		if !u.anotarLimiteDeCuota(err) {
+			u.checkErrorLog(first, "No se pudo consultar la última versión publicada", err)
+		}
 		return nil, nil, err
 	}
 
@@ -215,6 +273,15 @@ func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 			Filters: filters,
 		})
 		latest, found, err = updater.DetectLatest(context.Background(), goupdate.ParseSlug(u.repoURL))
+		if err != nil {
+			// Este segundo intento también gasta cuota, así que su fallo se
+			// trata igual que el primero en vez de pasar por "no hay versión
+			// compatible", que es lo que parecía antes.
+			if !u.anotarLimiteDeCuota(err) {
+				u.checkErrorLog(first, "No se pudo consultar la última versión publicada", err)
+			}
+			return nil, nil, err
+		}
 	}
 
 	if !found || latest == nil {

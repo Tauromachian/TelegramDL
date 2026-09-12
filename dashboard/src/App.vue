@@ -720,7 +720,9 @@ const startApp = async () => {
 
   // Iniciamos el ciclo de actualizaciones de fondo inmediatamente para evitar esperas
   setTimeout(() => checkForUpdates(false), 1000)
-  updateCheckTimer = setInterval(() => checkForUpdates(false), 2 * 60 * 1000)
+  // Cada 5 minutos: la API de GitHub solo admite 60 peticiones por hora y por
+  // IP, y a 2 minutos se agotaba la cuota sin necesidad.
+  updateCheckTimer = setInterval(() => checkForUpdates(false), 5 * 60 * 1000)
 
   const startBoot = Date.now()
   try {
