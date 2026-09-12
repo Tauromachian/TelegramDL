@@ -237,11 +237,18 @@ func (le *ListenerEngine) GetItems() []ListenerItem {
 	for _, item := range le.items {
 		res = append(res, *item)
 	}
+	// Orden cronológico de llegada: el primero que llega se muestra primero y
+	// los nuevos se van añadiendo debajo. Si dos archivos comparten marca de
+	// tiempo (llegan en el mismo instante), se desempata por el ID de mensaje,
+	// que Telegram asigna de forma creciente dentro de cada chat.
 	sort.SliceStable(res, func(i, j int) bool {
 		if res[i].CreatedAt != res[j].CreatedAt {
-			return res[i].CreatedAt > res[j].CreatedAt
+			return res[i].CreatedAt < res[j].CreatedAt
 		}
-		return res[i].ID > res[j].ID
+		if res[i].ChatID == res[j].ChatID && res[i].MessageID != res[j].MessageID {
+			return res[i].MessageID < res[j].MessageID
+		}
+		return res[i].ID < res[j].ID
 	})
 	return res
 }
@@ -328,7 +335,9 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 	}
 
 	itemID := fmt.Sprintf("listener:%d:%d", peerID, msg.ID)
-	now := float64(time.Now().Unix())
+	// Mayor precisión para evitar colisiones cuando llegan varios archivos en
+	// el mismo segundo: así la bandeja conserva el orden real de llegada.
+	now := float64(time.Now().UnixNano()) / 1e9
 
 	dlItem := storage.DownloadItem{
 		ID:         itemID,
