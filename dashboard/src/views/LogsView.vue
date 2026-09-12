@@ -398,13 +398,19 @@ onUnmounted(() => {
 .level-chip { border: 1px solid var(--user-border-light); background: var(--user-bg-base); color: var(--user-text-dim); border-radius: 20px; padding: 5px 12px; font: 700 10px 'DM Sans'; text-transform: uppercase; letter-spacing: .5px; cursor: pointer; transition: all .2s }
 .level-chip:hover { border-color: var(--user-primary) }
 .level-chip.active { color: #eef7ff; background: var(--user-icon-bg); border-color: var(--user-border-light) }
+/* Cada filtro se tiñe del mismo color que su nivel en la lista, para que el
+   botón y las líneas que enciende se reconozcan como lo mismo. */
 .level-chip.active.error { color: #e58b91; border-color: #4a2b2d; background: #251415 }
 .level-chip.active.warn { color: #f2c14b; border-color: #4a3c1b; background: #221a08 }
 .level-chip.active.success { color: #76c859; border-color: #234a1b; background: #0d220d }
+.level-chip.active.info { color: #5ebcff; border-color: #1b3e5b; background: #0a1926 }
 .level-chip.active.debug { color: #9aa7b4; border-color: #2c3540; background: #141a21 }
 
 .toolbar-right { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; min-width: 0 }
-.cat-select { background: var(--user-bg-base); border: 1px solid var(--user-border-light); color: #dbe7f5; border-radius: 9px; padding: 7px 9px; outline: none; font: inherit; font-size: 12px; max-width: 170px }
+/* Flecha propia en lugar de la del sistema: la nativa se dibuja pegada al borde
+   y el texto largo ("Todos los orígenes") se le echaba encima. */
+.cat-select { appearance: none; -webkit-appearance: none; -moz-appearance: none; background-color: var(--user-bg-base); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238aa0b4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; border: 1px solid var(--user-border-light); color: #dbe7f5; border-radius: 9px; padding: 7px 30px 7px 10px; outline: none; font: inherit; font-size: 12px; max-width: 196px; cursor: pointer }
+.cat-select:focus { border-color: var(--user-primary); box-shadow: 0 0 0 3px var(--user-glow) }
 .search-box { display: flex; align-items: center; gap: 6px; background: var(--user-bg-base); border: 1px solid var(--user-border-light); border-radius: 9px; padding: 0 10px; color: var(--user-text-dim); min-width: 0 }
 .search-box:focus-within { border-color: var(--user-primary); box-shadow: 0 0 0 3px var(--user-glow) }
 .search-box input { background: transparent; border: 0; outline: none; color: #dbe7f5; font: inherit; font-size: 12px; padding: 8px 0; width: 165px; min-width: 0 }
@@ -420,15 +426,21 @@ onUnmounted(() => {
 .logs-list::-webkit-scrollbar-thumb { background: var(--user-border-light); border-radius: 4px }
 .logs-truncated { margin: 4px 14px 8px; font-size: 11px; color: var(--user-text-dim); text-align: center }
 
-.log-row { display: grid; grid-template-columns: 78px 54px 96px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 5px 14px; font: 12px/1.5 'JetBrains Mono', 'Consolas', monospace; border-left: 2px solid transparent }
+.log-row { position: relative; display: grid; grid-template-columns: 78px 54px 96px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 5px 14px 5px 16px; font: 12px/1.5 'JetBrains Mono', 'Consolas', monospace }
+.log-row.error { background: rgba(192, 81, 89, .07) }
+.log-row.debug { opacity: .62 }
 .log-row:hover { background: var(--user-surface) }
+
 /* Cada fila lleva su franja lateral del color de su nivel, incluidas info y
-   detalle, para poder distinguirlas de un vistazo al recorrer el registro. */
-.log-row.error { border-left-color: #c05159; background: rgba(192, 81, 89, .07) }
-.log-row.warn { border-left-color: #c8961f }
-.log-row.success { border-left-color: #479f29 }
-.log-row.info { border-left-color: #38a7ff }
-.log-row.debug { border-left-color: #5c6773; opacity: .62 }
+   detalle, para distinguirlas de un vistazo al recorrer el registro. Va como
+   pseudoelemento y no como borde para poder recortarla por arriba y por abajo:
+   así las franjas de filas seguidas no se tocan y cada color se lee suelto. */
+.log-row::before { content: ''; position: absolute; left: 0; top: 5px; bottom: 5px; width: 2px; border-radius: 2px; background: transparent }
+.log-row.error::before { background: #c05159 }
+.log-row.warn::before { background: #c8961f }
+.log-row.success::before { background: #479f29 }
+.log-row.info::before { background: #38a7ff }
+.log-row.debug::before { background: #5c6773 }
 
 .log-time { color: var(--user-text-dim); font-size: 11px; white-space: nowrap }
 /* Colores fijos por nivel: no dependen del tema elegido, para que ERROR siga
