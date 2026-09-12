@@ -14,7 +14,7 @@ import {
   RotateCcw,
   Trash2,
   X
-} from 'lucide-vue-next'
+} from '../icons'
 
 const props = defineProps({
   downloads: {

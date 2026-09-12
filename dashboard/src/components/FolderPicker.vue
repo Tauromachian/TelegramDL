@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { ArrowLeft, Check, ChevronRight, Folder, HardDrive, X } from 'lucide-vue-next'
+import { ArrowLeft, Check, ChevronRight, Folder, HardDrive, X } from '../icons'
 import { useAuthToken } from '../composables/useAuthToken'
 
 const { authHeaders } = useAuthToken()

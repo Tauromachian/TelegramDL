@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, reactive, watch } from 'vue'
-import { Download, FileText, Image, Inbox, MessageCircle, Music, Plus, Radio, Trash2, Video } from 'lucide-vue-next'
+import { Download, FileText, Image, Inbox, MessageCircle, Music, Plus, Radio, Trash2, Video } from '../icons'
 import ConfirmModal from '../components/ConfirmModal.vue'
 import { useAuthToken } from '../composables/useAuthToken'
 

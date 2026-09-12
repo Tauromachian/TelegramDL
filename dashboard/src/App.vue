@@ -22,7 +22,7 @@ import {
   UserCheck,
   X,
   Zap
-} from 'lucide-vue-next'
+} from './icons'
 
 const { token, initToken, setToken, clearToken, authHeaders, isWailsRuntime } = useAuthToken()
 

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Settings2, Zap, Trash2, Save, Copy, Eye, EyeOff, RefreshCw, Download, Upload } from 'lucide-vue-next'
+import { Settings2, Zap, Trash2, Save, Copy, Eye, EyeOff, RefreshCw, Download, Upload } from '../icons'
 import FolderPicker from '../components/FolderPicker.vue'
 import { useAuthToken } from '../composables/useAuthToken'
 

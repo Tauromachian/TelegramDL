@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ArrowDownToLine, Copy, Download, Pause, Play, ScrollText, Search, Trash2 } from 'lucide-vue-next'
+import { ArrowDownToLine, Copy, Download, Pause, Play, ScrollText, Search, Trash2 } from '../icons'
 import ConfirmModal from '../components/ConfirmModal.vue'
 import { useAuthToken } from '../composables/useAuthToken'
 import { useConfirmModal } from '../composables/useConfirmModal'

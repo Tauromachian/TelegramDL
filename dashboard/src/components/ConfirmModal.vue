@@ -1,5 +1,5 @@
 <script setup>
-import { X, AlertCircle, HelpCircle } from 'lucide-vue-next'
+import { X, AlertCircle, HelpCircle } from '../icons'
 
 const props = defineProps({
   show: Boolean,

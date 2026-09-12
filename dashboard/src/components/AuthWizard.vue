@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { KeyRound, Phone, ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, Loader2, RefreshCw, Info } from 'lucide-vue-next'
+import { KeyRound, Phone, ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, Loader2, RefreshCw, Info } from '../icons'
 import { useAuthToken } from '../composables/useAuthToken'
 
 const { authHeaders } = useAuthToken()

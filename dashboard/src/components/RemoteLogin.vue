@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { KeyRound, ArrowRight, Loader2, AlertCircle, Eye, EyeOff, ShieldCheck } from 'lucide-vue-next'
+import { KeyRound, ArrowRight, Loader2, AlertCircle, Eye, EyeOff, ShieldCheck } from '../icons'
 
 const props = defineProps({
   error: { type: String, default: '' }
