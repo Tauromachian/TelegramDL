@@ -422,17 +422,23 @@ onUnmounted(() => {
 
 .log-row { display: grid; grid-template-columns: 78px 54px 96px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 5px 14px; font: 12px/1.5 'JetBrains Mono', 'Consolas', monospace; border-left: 2px solid transparent }
 .log-row:hover { background: var(--user-surface) }
+/* Cada fila lleva su franja lateral del color de su nivel, incluidas info y
+   detalle, para poder distinguirlas de un vistazo al recorrer el registro. */
 .log-row.error { border-left-color: #c05159; background: rgba(192, 81, 89, .07) }
 .log-row.warn { border-left-color: #c8961f }
 .log-row.success { border-left-color: #479f29 }
-.log-row.debug { opacity: .62 }
+.log-row.info { border-left-color: #38a7ff }
+.log-row.debug { border-left-color: #5c6773; opacity: .62 }
 
 .log-time { color: var(--user-text-dim); font-size: 11px; white-space: nowrap }
+/* Colores fijos por nivel: no dependen del tema elegido, para que ERROR siga
+   siendo rojo e INFO azul aunque el panel esté en una paleta gris o verde. */
 .log-level { font-size: 10px; font-weight: 700; letter-spacing: .5px; color: var(--user-text-dim); white-space: nowrap }
 .log-level.error { color: #e58b91 }
 .log-level.warn { color: #f2c14b }
 .log-level.success { color: #76c859 }
-.log-level.info { color: var(--user-accent) }
+.log-level.info { color: #5ebcff }
+.log-level.debug { color: #9aa7b4 }
 .log-category { font-size: 10px; color: var(--user-text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .log-body { min-width: 0; display: flex; flex-direction: column; gap: 2px }
 .log-message { color: #dbe7f5; word-break: break-word }
