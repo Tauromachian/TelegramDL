@@ -86,6 +86,17 @@ func NewApp(assets fs.FS) *App {
 	})
 	app.server = srv
 
+	// Permitir que el panel abra el diálogo nativo de carpetas aunque se esté
+	// viendo en un navegador del propio equipo, y no solo dentro de la ventana
+	// de la aplicación: así el selector es siempre el mismo en local. El
+	// servidor solo atiende esta llamada desde el propio equipo.
+	srv.SetFolderPicker(func() (string, error) {
+		if app.ctx == nil {
+			return "", fmt.Errorf("la ventana de la aplicación todavía no está lista")
+		}
+		return app.SelectDirectory()
+	})
+
 	// Registrar en el log todo lo que hagan los motores de descarga y escucha.
 	app.attachLogWatchers()
 

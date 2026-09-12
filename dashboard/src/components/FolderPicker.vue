@@ -36,7 +36,20 @@ const browse = async path => {
   } catch (err) { error.value = err.message } finally { loading.value = false }
 }
 
+// isLocalView indica si el panel se está viendo en el propio ordenador, ya sea
+// dentro de la ventana de la aplicación (wails.localhost) o en un navegador
+// apuntando a la dirección local. Es lo que decide qué selector se usa.
+const isLocalView = () => {
+  const host = (window.location.hostname || '').toLowerCase()
+  return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host.includes('wails')
+}
+
+// Selector de carpeta. En el propio equipo se usa siempre el diálogo del
+// sistema, para que se vea igual en la app y en el navegador local. El
+// explorador propio queda reservado al acceso remoto (móvil, otro equipo),
+// donde no existe ninguna ventana del sistema que mostrar.
 const show = async () => {
+  // 1. Dentro de la aplicación de escritorio: puente nativo de Wails.
   if (window.go?.main?.App?.SelectDirectory) {
     try {
       const selected = await window.go.main.App.SelectDirectory()
@@ -48,6 +61,26 @@ const show = async () => {
       console.warn('Wails SelectDirectory fallback:', err)
     }
   }
+
+  // 2. Navegador en el propio equipo: le pedimos a la aplicación que abra ese
+  // mismo diálogo. El servidor rechaza esta llamada si no viene de local.
+  if (isLocalView()) {
+    try {
+      const response = await fetch('/api/fs/pick', { method: 'POST', headers: { ...authHeaders() } })
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}))
+        if (data.path) {
+          emit('update:modelValue', data.path)
+        }
+        // Sin ruta significa que se cerró el diálogo sin elegir: no abrimos nada más.
+        return
+      }
+    } catch (err) {
+      console.warn('Selector nativo no disponible, se usa el explorador interno:', err)
+    }
+  }
+
+  // 3. Acceso remoto (o sin ventana nativa): explorador propio del panel.
   open.value = true
   await browse(null)
 }

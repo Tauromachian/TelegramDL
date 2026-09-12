@@ -52,6 +52,7 @@ type Server struct {
 	broadcastCh  chan struct{}
 	onBroadcast  func(snap map[string]any)
 	apiToken     string
+	folderPicker func() (string, error)
 }
 
 type wsClient struct {
@@ -421,6 +422,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// Filesystem & System
 	mux.HandleFunc("/api/filesystem", s.handleFSBrowse)
 	mux.HandleFunc("/api/fs/browse", s.handleFSBrowse)
+	mux.HandleFunc("/api/fs/pick", s.handleFSPick)
 	mux.HandleFunc("/api/system/disk", s.handleSystemDisk)
 	mux.HandleFunc("/api/system/info", s.handleSystemInfo)
 	mux.HandleFunc("/api/server/info", s.handleSystemInfo)
@@ -1457,6 +1459,74 @@ func (s *Server) handleListenerResolveChatPath(w http.ResponseWriter, r *http.Re
 }
 
 // Filesystem & System
+// SetFolderPicker registra la función que abre el diálogo nativo de selección
+// de carpetas. Solo la aplicación de escritorio puede aportarla: en modo
+// servidor (sin ventana) queda a nil y el panel recurre a su propio explorador.
+func (s *Server) SetFolderPicker(fn func() (string, error)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.folderPicker = fn
+}
+
+// isLocalRequest indica si la petición viene del propio equipo. Exige las dos
+// cosas a la vez —que la dirección del cliente sea de loopback y que el panel
+// se esté viendo en una dirección local— para que un túnel remoto montado en
+// la misma máquina, que llegaría como 127.0.0.1, no cuente como local.
+func isLocalRequest(r *http.Request) bool {
+	host := r.Host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.ToLower(strings.Trim(host, "[]"))
+	if host != "127.0.0.1" && host != "localhost" && host != "::1" &&
+		!strings.HasSuffix(host, "wails.localhost") {
+		return false
+	}
+
+	remote := r.RemoteAddr
+	if h, _, err := net.SplitHostPort(remote); err == nil {
+		remote = h
+	}
+	ip := net.ParseIP(strings.Trim(remote, "[]"))
+	return ip != nil && ip.IsLoopback()
+}
+
+// handleFSPick abre el diálogo nativo de carpetas del sistema y devuelve la
+// ruta elegida. Solo responde a peticiones hechas desde el propio equipo: así
+// el panel se ve igual tanto dentro de la app como en un navegador local, y
+// desde un dispositivo remoto nunca se abre una ventana en el ordenador.
+func (s *Server) handleFSPick(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.errorResponse(w, http.StatusMethodNotAllowed, "Método no permitido")
+		return
+	}
+	if !isLocalRequest(r) {
+		s.errorResponse(w, http.StatusForbidden, "El selector del sistema solo está disponible en el propio equipo")
+		return
+	}
+
+	s.mu.RLock()
+	pick := s.folderPicker
+	s.mu.RUnlock()
+
+	if pick == nil {
+		s.errorResponse(w, http.StatusNotImplemented, "No hay ventana de la aplicación para abrir el selector")
+		return
+	}
+
+	path, err := pick()
+	if err != nil {
+		s.errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Una ruta vacía significa que se cerró el diálogo sin elegir nada.
+	s.jsonResponse(w, http.StatusOK, map[string]any{
+		"status": "ok",
+		"path":   path,
+	})
+}
+
 func (s *Server) handleFSBrowse(w http.ResponseWriter, r *http.Request) {
 	target := r.URL.Query().Get("path")
 	if target == "" {
