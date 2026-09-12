@@ -33,6 +33,10 @@ type UserInfo struct {
 	ColorID   *int   `json:"color_id,omitempty"`
 }
 
+// AuthStatus es lo que el panel necesita saber sobre la sesión. A propósito NO
+// incluye api_id ni api_hash: al panel le basta con HasCredentials para decidir
+// si muestra el formulario de configuración, y devolverlos convertía el token
+// de acceso en una vía para leer las credenciales de Telegram del usuario.
 type AuthStatus struct {
 	Configured     bool      `json:"configured"`
 	HasCredentials bool      `json:"has_credentials"`
@@ -40,8 +44,6 @@ type AuthStatus struct {
 	Authenticated  bool      `json:"authenticated"`
 	State          string    `json:"state"`
 	Phone          string    `json:"phone,omitempty"`
-	APIID          string    `json:"api_id,omitempty"`
-	APIHash        string    `json:"api_hash,omitempty"`
 	User           *UserInfo `json:"user,omitempty"`
 }
 
@@ -600,7 +602,9 @@ func (cm *ClientManager) InitClient(apiIDStr, apiHash string) error {
 	cm.runWg.Add(1)
 	go func() {
 		defer cm.runWg.Done()
-		log.Printf("[TG CLIENT] Iniciando conexión con Telegram MTProto (API_ID: %d)...", id)
+		// Sin el API_ID: el registro se comparte en capturas y el identificador
+		// de la aplicación no aporta nada para diagnosticar.
+		log.Printf("[TG CLIENT] Iniciando conexión con Telegram MTProto...")
 		err := client.Run(ctx, func(runCtx context.Context) error {
 			readyOnce.Do(func() {
 				close(readyChan)
@@ -668,11 +672,6 @@ func (cm *ClientManager) GetAuthStatus(ctx context.Context) AuthStatus {
 	apiHash := cm.apiHash
 	cm.mu.RUnlock()
 
-	var apiIDStr string
-	if apiID != 0 {
-		apiIDStr = strconv.Itoa(apiID)
-	}
-
 	if apiID == 0 || apiHash == "" || client == nil {
 		return AuthStatus{
 			Configured:     false,
@@ -680,8 +679,6 @@ func (cm *ClientManager) GetAuthStatus(ctx context.Context) AuthStatus {
 			Authorized:     false,
 			Authenticated:  false,
 			State:          "UNCONFIGURED",
-			APIID:          apiIDStr,
-			APIHash:        apiHash,
 		}
 	}
 
@@ -702,8 +699,6 @@ func (cm *ClientManager) GetAuthStatus(ctx context.Context) AuthStatus {
 			Authorized:     false,
 			Authenticated:  false,
 			State:          "NEED_PHONE",
-			APIID:          apiIDStr,
-			APIHash:        apiHash,
 		}
 	}
 
@@ -716,8 +711,6 @@ func (cm *ClientManager) GetAuthStatus(ctx context.Context) AuthStatus {
 			Authorized:     false,
 			Authenticated:  false,
 			State:          "NEED_PHONE",
-			APIID:          apiIDStr,
-			APIHash:        apiHash,
 		}
 	}
 
@@ -729,8 +722,6 @@ func (cm *ClientManager) GetAuthStatus(ctx context.Context) AuthStatus {
 			Authorized:     true,
 			Authenticated:  true,
 			State:          "LOGGED_IN",
-			APIID:          apiIDStr,
-			APIHash:        apiHash,
 		}
 	}
 
@@ -748,8 +739,6 @@ func (cm *ClientManager) GetAuthStatus(ctx context.Context) AuthStatus {
 		Authenticated:  true,
 		State:          "LOGGED_IN",
 		Phone:          user.Phone,
-		APIID:          apiIDStr,
-		APIHash:        apiHash,
 		User: &UserInfo{
 			ID:        user.ID,
 			FirstName: user.FirstName,

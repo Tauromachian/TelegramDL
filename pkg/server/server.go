@@ -118,9 +118,18 @@ func NewServer(
 	return s
 }
 
+// publicAPIPath es el único endpoint de la API que no exige token: devuelve
+// solo el color del panel, que la pantalla de acceso remoto necesita para
+// pintarse antes de que nadie se haya autenticado.
+const publicAPIPath = "/api/theme"
+
 func (s *Server) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
+			if r.URL.Path == publicAPIPath {
+				s.corsMiddleware(s.mux).ServeHTTP(w, r)
+				return
+			}
 			s.corsMiddleware(s.authMiddleware(s.mux)).ServeHTTP(w, r)
 			return
 		}
@@ -133,6 +142,10 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) WebHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
+			if r.URL.Path == publicAPIPath {
+				s.corsMiddleware(s.mux).ServeHTTP(w, r)
+				return
+			}
 			s.corsMiddleware(s.authMiddleware(s.mux)).ServeHTTP(w, r)
 			return
 		}
@@ -418,6 +431,9 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/logs", s.handleLogs)
 	mux.HandleFunc("/api/logs/clear", s.handleLogsClear)
 	mux.HandleFunc("/api/logs/export", s.handleLogsExport)
+
+	// Color del panel (sin token; ver publicAPIPath)
+	mux.HandleFunc(publicAPIPath, s.handleTheme)
 
 	// Filesystem & System
 	mux.HandleFunc("/api/filesystem", s.handleFSBrowse)
@@ -1459,6 +1475,28 @@ func (s *Server) handleListenerResolveChatPath(w http.ResponseWriter, r *http.Re
 }
 
 // Filesystem & System
+// handleTheme devuelve únicamente los índices de color del panel. Es el único
+// endpoint que responde sin token (ver publicAPIPath): la pantalla de acceso
+// remoto se pinta antes de que nadie se haya autenticado, y un número de color
+// no dice nada de la cuenta ni de las descargas. Solo lectura, sin efectos.
+func (s *Server) handleTheme(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.errorResponse(w, http.StatusMethodNotAllowed, "Método no permitido")
+		return
+	}
+
+	s.mu.RLock()
+	colorID := s.config.ColorID
+	loaderColorID := s.config.LoaderColorID
+	s.mu.RUnlock()
+
+	s.jsonResponse(w, http.StatusOK, map[string]any{
+		"status":          "ok",
+		"color_id":        colorID,
+		"loader_color_id": loaderColorID,
+	})
+}
+
 // SetFolderPicker registra la función que abre el diálogo nativo de selección
 // de carpetas. Solo la aplicación de escritorio puede aportarla: en modo
 // servidor (sin ventana) queda a nil y el panel recurre a su propio explorador.

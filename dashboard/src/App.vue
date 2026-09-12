@@ -115,6 +115,27 @@ if (storedUser && storedUser.color_id !== undefined) {
   applyLoaderTheme(storedLoaderColor !== null ? parseInt(storedLoaderColor) : 5)
 }
 
+// En un dispositivo nuevo no hay nada guardado, así que la pantalla de acceso
+// remoto saldría con el azul por defecto. El color del panel se puede consultar
+// sin token (es solo un número, no dice nada de la cuenta), así que lo pedimos
+// para que el login ya se vea con el color que el usuario tiene configurado.
+const loadPublicTheme = async () => {
+  try {
+    const response = await fetch('/api/theme')
+    if (!response.ok) return
+    const data = await response.json()
+    if (data.color_id === undefined || data.color_id === null) return
+    applyTheme(data.color_id)
+    applyLoaderTheme(
+      data.loader_color_id === undefined || data.loader_color_id === null
+        ? data.color_id
+        : data.loader_color_id
+    )
+  } catch (e) {
+    // Sin respuesta del servidor se queda el color por defecto.
+  }
+}
+
 const authStatus = ref({
   authenticated: localStorage.getItem('tgdl_auth') === 'true',
   state: localStorage.getItem('tgdl_auth') === 'true' ? 'LOGGED_IN' : 'UNCONFIGURED',
@@ -231,6 +252,7 @@ const api = async (url, options = {}) => {
     if (!isWailsRuntime()) {
       clearToken()
       needsRemoteLogin.value = true
+      loadPublicTheme()
     }
     throw new Error('No autorizado: token de acceso inválido o ausente')
   }
@@ -720,6 +742,7 @@ onMounted(async () => {
   } else {
     bootstrapping.value = false
     needsRemoteLogin.value = true
+    await loadPublicTheme()
   }
 })
 

@@ -23,16 +23,18 @@ const currentStep = computed(() => {
   return 1
 })
 
-const apiId = ref(props.authStatus.api_id || '')
-const apiHash = ref(props.authStatus.api_hash || '')
+// El servidor ya no devuelve api_id ni api_hash (el token de acceso no debe
+// servir para leer las credenciales de Telegram), así que estos campos siempre
+// arrancan vacíos. Este paso solo se muestra cuando todavía no hay credenciales
+// configuradas, que es justo cuando no habría nada que rellenar.
+const apiId = ref('')
+const apiHash = ref('')
 const phoneNumber = ref(props.authStatus.phone_number || '')
 const code = ref('')
 const password = ref('')
 
 watch(() => props.authStatus, (val) => {
   if (val) {
-    if (val.api_id && !apiId.value) apiId.value = val.api_id
-    if (val.api_hash && !apiHash.value) apiHash.value = val.api_hash
     if (val.phone_number && !phoneNumber.value) phoneNumber.value = val.phone_number
   }
 }, { immediate: true })
