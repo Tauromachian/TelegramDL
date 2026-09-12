@@ -7,7 +7,7 @@ import SettingsView from './views/SettingsView.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import AuthWizard from './components/AuthWizard.vue'
 import RemoteLogin from './components/RemoteLogin.vue'
-import { useAuthToken } from './composables/useAuthToken'
+import { hasStoredToken, useAuthToken } from './composables/useAuthToken'
 import { useConfirmModal } from './composables/useConfirmModal'
 import { useUpdater } from './composables/useUpdater'
 import {
@@ -25,6 +25,12 @@ import {
 } from 'lucide-vue-next'
 
 const { token, initToken, setToken, clearToken, authHeaders, isWailsRuntime } = useAuthToken()
+
+// Saber ya en el primer pintado si vamos a cargar la aplicación o a pedir el
+// token: leer el almacenamiento del navegador es inmediato, así que no hay
+// motivo para enseñar la animación de arranque y sustituirla un instante
+// después por la pantalla del token.
+const startsAuthenticated = hasStoredToken()
 const needsRemoteLogin = ref(false)
 const remoteLoginError = ref('')
 
@@ -183,6 +189,24 @@ let syncingSettings = false
 const settingsSavePending = ref(false)
 const websocketConnected = ref(false)
 const bootstrapping = ref(true)
+// La animación de arranque solo se muestra cuando de verdad se va a cargar la
+// aplicación. Si ya sabemos que toca pedir el token, se espera en silencio a
+// conocer el color y se pinta la pantalla del token directamente.
+const showSplash = ref(startsAuthenticated)
+
+// Sin token guardado se pide el color antes de pintar la pantalla del token,
+// para que no aparezca primero en azul y cambie de color un instante después.
+// Si el servidor tardara en responder, se muestra igualmente pasado un margen
+// corto en lugar de dejar la pantalla en blanco.
+if (!startsAuthenticated) {
+  Promise.race([
+    loadPublicTheme(),
+    new Promise(resolve => setTimeout(resolve, 400))
+  ]).finally(() => {
+    bootstrapping.value = false
+    needsRemoteLogin.value = true
+  })
+}
 const resolvedFileNames = new Map()
 const duplicatePrompted = new Set()
 
@@ -724,6 +748,9 @@ const handleRemoteLogin = async (value) => {
   try {
     await api('/api/system/info')
     needsRemoteLogin.value = false
+    // Token aceptado: a partir de aquí sí se carga la aplicación, así que la
+    // animación de arranque vuelve a tener sentido.
+    showSplash.value = true
     bootstrapping.value = true
     await startApp()
   } catch (err) {
@@ -742,7 +769,11 @@ onMounted(async () => {
   } else {
     bootstrapping.value = false
     needsRemoteLogin.value = true
-    await loadPublicTheme()
+    // Solo si creíamos tener token y resultó no haberlo: en el otro caso el
+    // color ya se pidió antes de pintar nada.
+    if (startsAuthenticated) {
+      await loadPublicTheme()
+    }
   }
 })
 
@@ -759,7 +790,7 @@ onUnmounted(() => {
 <template>
   <!-- Pantalla de arranque -->
   <transition name="fade">
-    <div v-if="bootstrapping" class="boot-screen">
+    <div v-if="bootstrapping && showSplash" class="boot-screen">
       <div class="boot-container">
         <svg viewBox="0 0 500 150" class="hello-svg">
           <text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" class="hello-text">

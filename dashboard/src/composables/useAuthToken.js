@@ -16,6 +16,19 @@ export const isWailsRuntime = () =>
 
 const STORAGE_KEY = 'tgdl_api_token'
 
+// hasStoredToken responde en el mismo instante, sin esperar a initToken(). Sirve
+// para decidir en el primer pintado si hay que enseñar la animación de arranque
+// o ir directos a la pantalla del token, en vez de mostrar una y cambiarla un
+// parpadeo después.
+export const hasStoredToken = () => {
+  if (isWailsRuntime()) return true
+  try {
+    return !!localStorage.getItem(STORAGE_KEY)
+  } catch (e) {
+    return false
+  }
+}
+
 export function useAuthToken () {
   const initToken = async () => {
     if (isWailsRuntime()) {
