@@ -14,6 +14,7 @@ import (
 	"tgdown/pkg/config"
 	"tgdown/pkg/downloader"
 	"tgdown/pkg/listener"
+	"tgdown/pkg/logbus"
 	"tgdown/pkg/server"
 	"tgdown/pkg/storage"
 	"tgdown/pkg/telegram"
@@ -35,6 +36,18 @@ type App struct {
 
 func NewApp(assets fs.FS) *App {
 	config.InitPaths()
+
+	// 0. Arrancar el registro antes que nada: a partir de aquí, todo lo que la
+	// aplicación escriba con log.Printf acaba también en la vista de logs del
+	// panel y en ~/.tgdown/logs/tgdown.log.
+	logFileErr := logbus.Init(config.DataDir)
+	logbus.Attach()
+	logbus.Success(logbus.CatSystem, fmt.Sprintf("TelegramDL v%s iniciado", config.AppVersion), "")
+	if logFileErr != nil {
+		logbus.Warn(logbus.CatSystem, "No se pudo abrir el archivo de registro en disco", logFileErr.Error())
+	} else if path := logbus.FilePath(); path != "" {
+		logbus.Info(logbus.CatSystem, "Registro en disco activo", path)
+	}
 
 	// 1. Usar base de datos SQLite original de Python (tgdown.sqlite3)
 	dbPath := filepath.Join(config.DataDir, "tgdown.sqlite3")
@@ -73,16 +86,24 @@ func NewApp(assets fs.FS) *App {
 	})
 	app.server = srv
 
+	// Registrar en el log todo lo que hagan los motores de descarga y escucha.
+	app.attachLogWatchers()
+
 	// Iniciar servidor HTTP/WS INMEDIATAMENTE en el puerto configurado (default 8000)
 	port := config.GetServerPort()
 	if err := srv.Start(port); err != nil {
 		fmt.Fprintf(os.Stderr, "Error al iniciar servidor en puerto %d: %v\n", port, err)
+		logbus.Error(logbus.CatServer, fmt.Sprintf("No se pudo iniciar el servidor en el puerto %d", port), err.Error())
+	} else {
+		logbus.Success(logbus.CatServer, fmt.Sprintf("Servidor escuchando en %s:%d", config.GetServerHost(), port), "")
 	}
 
 	// Cargar credenciales desde la base de datos (con fallback a .env) e inicializar cliente
 	apiID, apiHash, _ := st.GetCredentials()
 	if apiID != "" && apiHash != "" {
 		_ = cm.InitClient(apiID, apiHash)
+	} else {
+		logbus.Warn(logbus.CatTelegram, "Sin credenciales de Telegram configuradas", "Introduce API_ID y API_HASH en Ajustes para poder descargar")
 	}
 
 	return app
@@ -105,6 +126,7 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	logbus.Info(logbus.CatSystem, "Cerrando TelegramDL...", "")
 	if a.clientMgr != nil {
 		a.clientMgr.Stop()
 	}
@@ -117,6 +139,7 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.storage != nil {
 		_ = a.storage.Close()
 	}
+	logbus.CloseFile()
 }
 
 func (a *App) Handler() http.Handler {

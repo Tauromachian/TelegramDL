@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import DownloadsView from './views/DownloadsView.vue'
 import ListenerView from './views/ListenerView.vue'
+import LogsView from './views/LogsView.vue'
 import SettingsView from './views/SettingsView.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import AuthWizard from './components/AuthWizard.vue'
@@ -16,6 +17,7 @@ import {
   LogOut,
   Menu,
   Radio,
+  ScrollText,
   Settings2,
   UserCheck,
   X,
@@ -28,6 +30,9 @@ const remoteLoginError = ref('')
 
 const downloads = ref([])
 const listenerItems = ref([])
+// Último ID del registro conocido por el servidor. Cambia en cada snapshot y
+// es la señal que usa la vista de logs para pedir solo lo nuevo.
+const logsSeq = ref(0)
 const loading = ref(false)
 const message = ref('')
 const error = ref('')
@@ -492,6 +497,13 @@ const {
   checkForUpdates,
 } = useUpdater({ api, showMessage, openConfirm })
 
+const viewTitle = computed(() => ({
+  downloads: 'Descargas',
+  listener: 'Escucha',
+  logs: 'Logs',
+  settings: 'Ajustes'
+}[activeView.value] || 'Descargas'))
+
 const speedText = computed(() => settings.speed_limit.value > 0 ? `${settings.speed_limit.value} ${settings.speed_limit.unit}/s` : 'Sin límite')
 const totalSpeed = computed(() => {
   const totalBytes = downloads.value.reduce((acc, item) =>
@@ -602,6 +614,9 @@ const handleStateUpdate = (data) => {
   }
   if (Array.isArray(data.listener)) {
     listenerItems.value = data.listener
+  }
+  if (typeof data.logs_seq === 'number') {
+    logsSeq.value = data.logs_seq
   }
   if (data.disk) {
     disk.value = data.disk
@@ -827,6 +842,12 @@ onUnmounted(() => {
               <Radio :size="16" /> Escucha
             </button>
             <button
+              :class="{ selected: activeView === 'logs' }"
+              @click="activeView = 'logs'; mobileMenuOpen = false"
+            >
+              <ScrollText :size="16" /> Logs
+            </button>
+            <button
               :class="{ selected: activeView === 'settings' }"
               @click="activeView = 'settings'; mobileMenuOpen = false"
             >
@@ -860,7 +881,7 @@ onUnmounted(() => {
         <header class="topbar">
           <div>
             <span class="eyebrow">PANEL DE CONTROL</span>
-            <h1>{{ activeView === 'downloads' ? 'Descargas' : (activeView === 'listener' ? 'Escucha' : 'Ajustes') }}</h1>
+            <h1>{{ viewTitle }}</h1>
           </div>
           <div class="topbar-meta">Velocidad total: {{ totalSpeed }}</div>
         </header>
@@ -894,6 +915,13 @@ onUnmounted(() => {
             :disk="disk"
             :initialItems="listenerItems"
             :settings="settings"
+          />
+
+          <LogsView
+            v-show="activeView === 'logs'"
+            :notify="showMessage"
+            :logsSeq="logsSeq"
+            :active="activeView === 'logs'"
           />
 
           <SettingsView

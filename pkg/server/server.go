@@ -24,6 +24,7 @@ import (
 	"tgdown/pkg/config"
 	"tgdown/pkg/downloader"
 	"tgdown/pkg/listener"
+	"tgdown/pkg/logbus"
 	"tgdown/pkg/storage"
 	"tgdown/pkg/telegram"
 	"tgdown/pkg/updater"
@@ -412,6 +413,11 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/listener/resolve-chat", s.handleListenerResolveChat)
 	mux.HandleFunc("/api/listener/chat/", s.handleListenerResolveChatPath)
 
+	// Registro de actividad (vista de logs en vivo)
+	mux.HandleFunc("/api/logs", s.handleLogs)
+	mux.HandleFunc("/api/logs/clear", s.handleLogsClear)
+	mux.HandleFunc("/api/logs/export", s.handleLogsExport)
+
 	// Filesystem & System
 	mux.HandleFunc("/api/filesystem", s.handleFSBrowse)
 	mux.HandleFunc("/api/fs/browse", s.handleFSBrowse)
@@ -631,6 +637,7 @@ func (s *Server) buildStateSnapshot() map[string]any {
 		"speed_total":  config.FormatBytes(float64(speedBytes)) + "/s",
 		"speed_bytes":  speedBytes,
 		"disk":         disk,
+		"logs_seq":     logbus.LastID(),
 		"update":       updateInfo,
 		"server_time":  float64(time.Now().Unix()),
 	}
@@ -731,8 +738,12 @@ func (s *Server) handleAuthVerifyCode(w http.ResponseWriter, r *http.Request) {
 
 	status, err := s.clientMgr.VerifyCode(r.Context(), phone, code, body.PhoneCodeHash)
 	if err != nil {
+		logbus.Error(logbus.CatTelegram, "Código de verificación rechazado", err.Error())
 		s.errorResponse(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	if status == "ok" {
+		logbus.Success(logbus.CatTelegram, "Sesión de Telegram iniciada", "")
 	}
 
 	st := s.clientMgr.GetAuthStatus(r.Context())
@@ -759,9 +770,11 @@ func (s *Server) handleAuthVerify2FA(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.clientMgr.Verify2FA(r.Context(), body.Password); err != nil {
+		logbus.Error(logbus.CatTelegram, "Contraseña de dos pasos rechazada", err.Error())
 		s.errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	logbus.Success(logbus.CatTelegram, "Sesión de Telegram iniciada (verificación en dos pasos)", "")
 
 	s.jsonResponse(w, http.StatusOK, s.clientMgr.GetAuthStatus(r.Context()))
 }
@@ -788,6 +801,7 @@ func (s *Server) handleRegenerateToken(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 	_ = s.clientMgr.Logout(r.Context())
+	logbus.Warn(logbus.CatTelegram, "Sesión de Telegram cerrada", "")
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -1030,6 +1044,7 @@ func (s *Server) handleDeleteDownload(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleClearHistory(w http.ResponseWriter, r *http.Request) {
 	removed, _ := s.downloader.ClearHistory()
+	logbus.Info(logbus.CatDownloads, fmt.Sprintf("Historial de descargas limpiado (%d entradas)", removed), "")
 	s.jsonResponse(w, http.StatusOK, map[string]any{"status": "ok", "removed": removed})
 }
 
@@ -1088,6 +1103,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.Lock()
 	cfg := s.config
+	previousCfg := s.config
 
 	if v, ok := raw["max_concurrent_downloads"]; ok && v != nil {
 		cfg.MaxConcurrentDownloads = int(config.ParseInt64(v))
@@ -1151,6 +1167,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	s.config = cfg
 	s.mu.Unlock()
 
+	logConfigChanges(previousCfg, cfg)
 	if err := s.storage.SaveConfig(cfg); err != nil {
 		log.Printf("[SERVER] error guardando configuración en BD: %v", err)
 	}
@@ -1176,6 +1193,7 @@ func (s *Server) handleSpeedLimit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.Lock()
+	previousCfg := s.config
 	if body.Value != nil {
 		body.SpeedLimit.Value = *body.Value
 	}
@@ -1189,6 +1207,7 @@ func (s *Server) handleSpeedLimit(w http.ResponseWriter, r *http.Request) {
 	cfg := s.config
 	s.mu.Unlock()
 
+	logConfigChanges(previousCfg, cfg)
 	if err := s.storage.SaveConfig(cfg); err != nil {
 		log.Printf("[SERVER] error guardando configuración en BD: %v", err)
 	}
@@ -1225,6 +1244,7 @@ func (s *Server) handleListenerSettings(w http.ResponseWriter, r *http.Request) 
 
 	s.mu.Lock()
 	cfg = s.config
+	previousCfg := s.config
 
 	// Enabled: puede venir como "enabled" o "listener_enabled"
 	if v, ok := raw["enabled"]; ok && v != nil {
@@ -1299,6 +1319,7 @@ func (s *Server) handleListenerSettings(w http.ResponseWriter, r *http.Request) 
 	s.config = cfg
 	s.mu.Unlock()
 
+	logListenerConfigChanges(previousCfg, cfg)
 	log.Printf("[SERVER] Configuración de escucha guardada: Activa=%v, %d chats configurados", cfg.ListenerEnabled, len(cfg.ListenerChats))
 	if err := s.storage.SaveConfig(cfg); err != nil {
 		log.Printf("[SERVER] error guardando configuración en BD: %v", err)
@@ -1343,7 +1364,9 @@ func (s *Server) handleListenerDownload(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleListenerClear(w http.ResponseWriter, r *http.Request) {
+	removed := len(s.listener.GetItems())
 	s.listener.ClearItems()
+	logbus.Warn(logbus.CatListener, fmt.Sprintf("Bandeja de escucha vaciada (%d elementos)", removed), "")
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -1572,9 +1595,12 @@ func (s *Server) handleInstallUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.updater.InstallUpdate(rel); err != nil {
+		logbus.Error(logbus.CatUpdater, "No se pudo iniciar la actualización", err.Error())
 		s.errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	logbus.Info(logbus.CatUpdater, fmt.Sprintf("Instalando actualización %s", rel.TagName),
+		fmt.Sprintf("Versión actual: v%s", config.AppVersion))
 
 	s.jsonResponse(w, http.StatusOK, map[string]string{
 		"status":  "ok",
