@@ -15,6 +15,7 @@ import (
 
 	"tgdown/pkg/config"
 	"tgdown/pkg/downloader"
+	"tgdown/pkg/logbus"
 	"tgdown/pkg/storage"
 	"tgdown/pkg/telegram"
 )
@@ -147,7 +148,11 @@ func (le *ListenerEngine) UpdateConfig(cfg config.Config) {
 	defer le.mu.Unlock()
 	le.config = config.NormalizeConfig(cfg)
 	le.updateChatMap(le.config)
-	log.Printf("[LISTENER CONFIG] Actualizada. Escucha activa: %v, Chats vigilados (%d): %+v", le.config.ListenerEnabled, len(le.chatMap), le.chatMap)
+	// El detalle de qué cambió lo registra el servidor (logListenerConfigChanges)
+	// con una línea por chat; volcar aquí el mapa entero solo llenaba el registro.
+	logbus.Debug(logbus.CatListener,
+		fmt.Sprintf("Configuración de escucha aplicada: activa=%v, %d chats vigilados",
+			le.config.ListenerEnabled, len(le.chatMap)), "")
 }
 
 func (le *ListenerEngine) matchChatID(peerID int64, rawChannelID ...int64) (config.ListenerChat, bool) {
@@ -220,6 +225,12 @@ func (le *ListenerEngine) rememberChatName(peerID, rawChannelID int64, name stri
 	cfg := le.config
 	le.mu.Unlock()
 
+	// Alimentamos siempre la caché de títulos: es la que permite que el registro
+	// muestre el nombre del chat en vez de su ID.
+	if le.clientMgr != nil {
+		le.clientMgr.RememberChatName(peerID, name)
+	}
+
 	if updated && le.storage != nil {
 		go func() {
 			if err := le.storage.SaveConfig(cfg); err != nil {
@@ -227,6 +238,20 @@ func (le *ListenerEngine) rememberChatName(peerID, rawChannelID int64, name stri
 			}
 		}()
 	}
+}
+
+// ChatName devuelve el nombre configurado de un chat vigilado, o cadena vacía
+// si ese chat no está en la lista de escucha.
+func (le *ListenerEngine) ChatName(chatID int64) string {
+	le.mu.RLock()
+	defer le.mu.RUnlock()
+	if chat, ok := le.chatMap[chatID]; ok {
+		name := strings.TrimSpace(chat.Name)
+		if name != "" && name != strconv.FormatInt(chatID, 10) {
+			return name
+		}
+	}
+	return ""
 }
 
 func (le *ListenerEngine) GetItems() []ListenerItem {
@@ -292,46 +317,43 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 		return nil
 	}
 
-	log.Printf("[LISTENER] Nuevo mensaje detectado en chat vigilado %d (ID: %d)", peerID, msg.ID)
-
 	if actualName := entityChatName(entities, peerID, rawChannelID); actualName != "" {
 		chatCfg.Name = actualName
 		le.rememberChatName(peerID, rawChannelID, actualName)
 	}
 
-	mediaInfo := downloader.ExtractMediaInfo(msg)
-	if mediaInfo == nil {
-		log.Printf("[LISTENER] Mensaje %d omitido: No contiene multimedia compatible", msg.ID)
-		return nil
-	}
-
-	// Filtros por tipo de medio
-	switch mediaInfo.Kind {
-	case downloader.KindPhoto:
-		if !chatCfg.FPhotos {
-			return nil
-		}
-	case downloader.KindVideo:
-		if !chatCfg.FVideos {
-			return nil
-		}
-	case downloader.KindSong:
-		if !chatCfg.FAudios {
-			return nil
-		}
-	case downloader.KindSticker:
-		if !chatCfg.FStickers {
-			return nil
-		}
-	case downloader.KindFile:
-		if !chatCfg.FDocs {
-			return nil
-		}
-	}
-
 	chatName := chatCfg.Name
 	if chatName == "" {
 		chatName = strconv.FormatInt(peerID, 10)
+	}
+
+	// Un mensaje sin multimedia (texto, encuesta, servicio...) simplemente no
+	// interesa a la escucha: no se registra nada para no llenar el log.
+	mediaInfo := downloader.ExtractMediaInfo(msg)
+	if mediaInfo == nil {
+		return nil
+	}
+
+	// Filtros por tipo de medio. Cuando un archivo se descarta por filtro sí se
+	// deja constancia (en nivel detalle), porque explica por qué no apareció.
+	allowed := true
+	switch mediaInfo.Kind {
+	case downloader.KindPhoto:
+		allowed = chatCfg.FPhotos
+	case downloader.KindVideo:
+		allowed = chatCfg.FVideos
+	case downloader.KindSong:
+		allowed = chatCfg.FAudios
+	case downloader.KindSticker:
+		allowed = chatCfg.FStickers
+	case downloader.KindFile:
+		allowed = chatCfg.FDocs
+	}
+	if !allowed {
+		logbus.Debug(logbus.CatListener,
+			fmt.Sprintf("Archivo omitido por filtros: %s", mediaInfo.FileName),
+			fmt.Sprintf("Chat: %s · Mensaje: %d · Tipo: %s desactivado", chatName, msg.ID, mediaInfo.Kind))
+		return nil
 	}
 
 	itemID := fmt.Sprintf("listener:%d:%d", peerID, msg.ID)
@@ -504,7 +526,18 @@ type ResolvedChatInfo struct {
 	Username string `json:"username,omitempty"`
 }
 
+// ResolveChat consulta a Telegram los datos de un chat y, de paso, guarda su
+// título en la caché del cliente para que el registro de actividad pueda
+// mostrar nombres en lugar de IDs.
 func (le *ListenerEngine) ResolveChat(ctx context.Context, chatID int64) (ResolvedChatInfo, error) {
+	info, err := le.resolveChat(ctx, chatID)
+	if le.clientMgr != nil && info.Name != "" && info.Name != strconv.FormatInt(chatID, 10) {
+		le.clientMgr.RememberChatName(chatID, info.Name)
+	}
+	return info, err
+}
+
+func (le *ListenerEngine) resolveChat(ctx context.Context, chatID int64) (ResolvedChatInfo, error) {
 	raw := le.clientMgr.RawClient()
 	if raw == nil {
 		return ResolvedChatInfo{ID: chatID, Name: strconv.FormatInt(chatID, 10), Type: "chat"}, errors.New("cliente no conectado")

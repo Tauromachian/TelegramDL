@@ -1320,7 +1320,8 @@ func (s *Server) handleListenerSettings(w http.ResponseWriter, r *http.Request) 
 	s.mu.Unlock()
 
 	logListenerConfigChanges(previousCfg, cfg)
-	log.Printf("[SERVER] Configuración de escucha guardada: Activa=%v, %d chats configurados", cfg.ListenerEnabled, len(cfg.ListenerChats))
+	logbus.Debug(logbus.CatListener,
+		fmt.Sprintf("Configuración de escucha guardada: activa=%v, %d chats", cfg.ListenerEnabled, len(cfg.ListenerChats)), "")
 	if err := s.storage.SaveConfig(cfg); err != nil {
 		log.Printf("[SERVER] error guardando configuración en BD: %v", err)
 	}

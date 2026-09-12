@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -379,6 +380,17 @@ func sameFilePath(a, b string) bool {
 		return true
 	}
 	return runtime.GOOS == "windows" && strings.EqualFold(ca, cb)
+}
+
+// chatLabel devuelve el nombre legible de un chat para los mensajes del
+// registro. Si Telegram todavía no ha entregado el título, cae al ID numérico.
+func (e *Engine) chatLabel(chatID int64) string {
+	if e.clientMgr != nil {
+		if name := strings.TrimSpace(e.clientMgr.GetChatName(chatID)); name != "" {
+			return name
+		}
+	}
+	return strconv.FormatInt(chatID, 10)
 }
 
 func (e *Engine) discardDownload(id string) {

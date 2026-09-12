@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"tgdown/pkg/logbus"
 	"tgdown/pkg/storage"
 )
 
@@ -130,7 +131,7 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 	go e.resolveItemMetadata(itemID)
 
 	// Adquirir slot de concurrencia respetando el orden de la cola
-	log.Printf("[DOWNLOAD] Solicitando slot de concurrencia para item %s...", itemID)
+	logbus.Debug(logbus.CatDownloads, fmt.Sprintf("Solicitando turno de descarga para la tarea %s", itemID), "")
 	e.mu.Lock()
 	for (e.runningJobs >= e.config.MaxConcurrentDownloads || !e.isNextInQueue(itemID)) && !e.stopping {
 		e.activeCond.Wait()
@@ -162,7 +163,11 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 	delete(e.lastProgressTimes, itemID)
 	item.Speed = "0 B/s"
 	e.itemSpeeds[itemID] = 0
-	log.Printf("[DOWNLOAD] Iniciando descarga activa para item %s (ChatID: %d, MsgID: %d)", itemID, item.ChatID, item.MessageID)
+	// El aviso visible de "descarga iniciada" lo emite el observador de estados
+	// (applog.go), que sí conoce el nombre del archivo y del chat. Aquí solo
+	// queda la traza interna con el ID de la tarea.
+	logbus.Debug(logbus.CatDownloads,
+		fmt.Sprintf("Tarea %s iniciada (chat %d, mensaje %d)", itemID, item.ChatID, item.MessageID), "")
 	cp := *item
 	e.mu.Unlock()
 	e.notifyState(cp)
@@ -204,9 +209,14 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 	}()
 
 	err := e.executeDownloadWithRetry(ctx, itemID)
-	log.Printf("[DOWNLOAD] Tarea %s finalizó con resultado: err=%v", itemID, err)
+	logbus.Debug(logbus.CatDownloads, fmt.Sprintf("Tarea %s finalizada (err=%v)", itemID, err), "")
 	if err != nil && strings.Contains(err.Error(), "mensaje no encontrado en Telegram") {
-		log.Printf("[DOWNLOAD] Omitiendo item %s porque el mensaje %d no existe", itemID, item.MessageID)
+		// Caso típico al descargar un rango: algunos IDs del intervalo no
+		// corresponden a ningún mensaje (borrados o inexistentes).
+		logbus.Warn(logbus.CatDownloads,
+			fmt.Sprintf("El mensaje %d no existe en Telegram", item.MessageID),
+			fmt.Sprintf("Chat: %s · Se descarta de la cola (borrado o nunca existió)",
+				e.chatLabel(item.ChatID)))
 		e.discardDownload(itemID)
 		return false
 	}

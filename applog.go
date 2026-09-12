@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -36,7 +37,7 @@ func (a *App) attachLogWatchers() {
 			lastStatus[item.ID] = item.Status
 			mu.Unlock()
 
-			logDownloadStatus(item, previous)
+			a.logDownloadStatus(item, previous)
 		})
 	}
 
@@ -61,39 +62,67 @@ func (a *App) attachLogWatchers() {
 
 			logbus.Info(logbus.CatListener,
 				fmt.Sprintf("Nuevo archivo detectado: %s", describeListenerItem(item)),
-				fmt.Sprintf("Chat: %s (%d) · Mensaje: %d · Pendiente de descargar",
-					item.ChatName, item.ChatID, item.MessageID),
+				fmt.Sprintf("Chat: %s · Mensaje: %d · Pendiente de descargar",
+					a.chatLabel(item.ChatID, item.ChatName), item.MessageID),
 			)
 		})
 	}
 }
 
+// chatLabel devuelve el nombre legible de un chat. Prueba primero el nombre que
+// venga con el propio elemento, luego la caché de títulos de Telegram, y solo
+// como último recurso el ID numérico.
+func (a *App) chatLabel(chatID int64, hints ...string) string {
+	for _, hint := range hints {
+		hint = strings.TrimSpace(hint)
+		if hint != "" && hint != strconv.FormatInt(chatID, 10) {
+			return hint
+		}
+	}
+	if a.clientMgr != nil {
+		if name := strings.TrimSpace(a.clientMgr.GetChatName(chatID)); name != "" {
+			return name
+		}
+	}
+	if a.listener != nil {
+		if name := strings.TrimSpace(a.listener.ChatName(chatID)); name != "" {
+			return name
+		}
+	}
+	return strconv.FormatInt(chatID, 10)
+}
+
 // logDownloadStatus emite la línea correspondiente a una transición de estado.
-func logDownloadStatus(item storage.DownloadItem, previous string) {
+//
+// Solo dos estados son visibles por defecto en cada descarga —iniciada y
+// terminada—; el resto de transiciones internas se quedan en nivel detalle para
+// no llenar el registro.
+func (a *App) logDownloadStatus(item storage.DownloadItem, previous string) {
 	name := describeDownload(item)
 	origin := "manual"
 	if item.Source == "listener" {
 		origin = "escucha"
 	}
-	context := fmt.Sprintf("Chat: %d · Mensaje: %d · Origen: %s", item.ChatID, item.MessageID, origin)
+	context := fmt.Sprintf("Chat: %s · Mensaje: %d · Origen: %s",
+		a.chatLabel(item.ChatID), item.MessageID, origin)
 
 	switch item.Status {
 	case "queued":
 		if previous == "" {
-			logbus.Info(logbus.CatDownloads, "En cola: "+name, context)
+			logbus.Debug(logbus.CatDownloads, "En cola: "+name, context)
 		} else {
-			logbus.Info(logbus.CatDownloads, "De vuelta en cola: "+name, context)
+			logbus.Debug(logbus.CatDownloads, "De vuelta en cola: "+name, context)
 		}
 	case "downloading":
 		detail := context
 		if item.TotalStr != "" {
-			detail = fmt.Sprintf("Tamaño: %s · %s", item.TotalStr, context)
+			detail = fmt.Sprintf("%s · Tamaño: %s", context, item.TotalStr)
 		}
-		logbus.Info(logbus.CatDownloads, "Descargando: "+name, detail)
+		logbus.Info(logbus.CatDownloads, "Descarga iniciada: "+name, detail)
 	case "completed":
 		detail := context
 		if item.FilePath != "" {
-			detail = fmt.Sprintf("Guardado en: %s · %s", item.FilePath, context)
+			detail = fmt.Sprintf("%s · Guardado en: %s", context, item.FilePath)
 		}
 		logbus.Success(logbus.CatDownloads, "Descarga completada: "+name, detail)
 	case "failed":

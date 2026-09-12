@@ -36,7 +36,9 @@ const lastId = ref(-1)
 const logFile = ref('')
 const search = ref('')
 const category = ref('all')
-const activeLevels = ref(LEVELS.map(l => l.id))
+// "Detalle" (debug) queda apagado por defecto: son trazas internas útiles para
+// diagnosticar, pero llenan la vista en el uso normal.
+const activeLevels = ref(LEVELS.filter(l => l.id !== 'debug').map(l => l.id))
 const follow = ref(true)
 const unseen = ref(0)
 const error = ref('')

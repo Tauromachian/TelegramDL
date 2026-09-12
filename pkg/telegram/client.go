@@ -61,6 +61,7 @@ type ClientManager struct {
 	dispatcherRegistered bool
 	channelAccessHashes  map[int64]int64
 	userAccessHashes     map[int64]int64
+	chatNames            map[int64]string
 	onGenericMessage     func(ctx context.Context, entities tg.Entities, msg *tg.Message) error
 }
 
@@ -82,6 +83,56 @@ func boundedHashSet(m map[int64]int64, id int64, hash int64) {
 	m[id] = hash
 }
 
+// boundedNameSet guarda el título de un chat con el mismo criterio de tamaño
+// acotado que los access hash. Se usa para poder mostrar nombres legibles en el
+// registro de actividad en lugar de IDs numéricos.
+func boundedNameSet(m map[int64]string, id int64, name string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	if _, exists := m[id]; !exists && len(m) >= maxAccessHashEntries {
+		for k := range m {
+			delete(m, k)
+			break
+		}
+	}
+	m[id] = name
+}
+
+// channelPeerID convierte el ID interno de un canal en el ID canónico con
+// prefijo -100 que usa el resto de la aplicación.
+func channelPeerID(channelID int64) int64 {
+	id, _ := strconv.ParseInt(fmt.Sprintf("-100%d", channelID), 10, 64)
+	return id
+}
+
+// userDisplayName arma el nombre visible de un usuario a partir de sus campos.
+func userDisplayName(u *tg.User) string {
+	name := strings.TrimSpace(u.FirstName + " " + u.LastName)
+	if name == "" {
+		name = strings.TrimSpace(u.Username)
+	}
+	return name
+}
+
+// GetChatName devuelve el título cacheado de un chat a partir de su ID
+// canónico (-100... para canales, -... para grupos básicos, positivo para
+// usuarios). Devuelve cadena vacía si todavía no se conoce.
+func (cm *ClientManager) GetChatName(peerID int64) string {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	return cm.chatNames[peerID]
+}
+
+// RememberChatName permite a otros componentes alimentar la caché de nombres
+// (por ejemplo, la escucha cuando resuelve un chat vigilado).
+func (cm *ClientManager) RememberChatName(peerID int64, name string) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	boundedNameSet(cm.chatNames, peerID, name)
+}
+
 func NewClientManager() *ClientManager {
 	config.InitPaths()
 	sessPath := filepath.Join(config.DataDir, "tg_session.json")
@@ -92,6 +143,7 @@ func NewClientManager() *ClientManager {
 		dispatcher:          tg.NewUpdateDispatcher(),
 		channelAccessHashes: make(map[int64]int64),
 		userAccessHashes:    make(map[int64]int64),
+		chatNames:           make(map[int64]string),
 	}
 	return cm
 }
@@ -219,9 +271,14 @@ func (cm *ClientManager) cacheEntities(entities tg.Entities) {
 	defer cm.mu.Unlock()
 	for id, ch := range entities.Channels {
 		boundedHashSet(cm.channelAccessHashes, id, ch.AccessHash)
+		boundedNameSet(cm.chatNames, channelPeerID(id), ch.Title)
 	}
 	for id, u := range entities.Users {
 		boundedHashSet(cm.userAccessHashes, id, u.AccessHash)
+		boundedNameSet(cm.chatNames, id, userDisplayName(u))
+	}
+	for id, c := range entities.Chats {
+		boundedNameSet(cm.chatNames, -id, c.Title)
 	}
 }
 
@@ -277,13 +334,18 @@ func (cm *ClientManager) FetchDialogs(ctx context.Context) error {
 
 		cm.mu.Lock()
 		for _, c := range chats {
-			if ch, ok := c.(*tg.Channel); ok {
+			switch ch := c.(type) {
+			case *tg.Channel:
 				boundedHashSet(cm.channelAccessHashes, ch.ID, ch.AccessHash)
+				boundedNameSet(cm.chatNames, channelPeerID(ch.ID), ch.Title)
+			case *tg.Chat:
+				boundedNameSet(cm.chatNames, -ch.ID, ch.Title)
 			}
 		}
 		for _, u := range users {
 			if usr, ok := u.(*tg.User); ok {
 				boundedHashSet(cm.userAccessHashes, usr.ID, usr.AccessHash)
+				boundedNameSet(cm.chatNames, usr.ID, userDisplayName(usr))
 			}
 		}
 		cm.mu.Unlock()
@@ -354,13 +416,18 @@ func (cm *ClientManager) ResolveUsername(ctx context.Context, username string) (
 	defer cm.mu.Unlock()
 
 	for _, c := range res.Chats {
-		if ch, ok := c.(*tg.Channel); ok {
+		switch ch := c.(type) {
+		case *tg.Channel:
 			boundedHashSet(cm.channelAccessHashes, ch.ID, ch.AccessHash)
+			boundedNameSet(cm.chatNames, channelPeerID(ch.ID), ch.Title)
+		case *tg.Chat:
+			boundedNameSet(cm.chatNames, -ch.ID, ch.Title)
 		}
 	}
 	for _, u := range res.Users {
 		if usr, ok := u.(*tg.User); ok {
 			boundedHashSet(cm.userAccessHashes, usr.ID, usr.AccessHash)
+			boundedNameSet(cm.chatNames, usr.ID, userDisplayName(usr))
 		}
 	}
 

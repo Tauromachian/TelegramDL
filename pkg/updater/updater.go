@@ -20,6 +20,7 @@ import (
 	goupdate "github.com/creativeprojects/go-selfupdate"
 	"github.com/minio/selfupdate"
 	"tgdown/pkg/config"
+	"tgdown/pkg/logbus"
 )
 
 type Progress struct {
@@ -43,11 +44,18 @@ type ReleaseInfo struct {
 }
 
 type AppUpdater struct {
-	currentVersion string
-	repoURL        string
-	mu             sync.RWMutex
-	progress       Progress
+	currentVersion  string
+	repoURL         string
+	mu              sync.RWMutex
+	progress        Progress
 	postponedUpdate string
+
+	// Estado para no repetir en el registro lo mismo cada 5 minutos: la
+	// comprobación periódica solo se narra la primera vez (al abrir la app) y
+	// cuando el resultado cambia de verdad.
+	checkCount       int
+	announcedVersion string
+	lastCheckError   string
 }
 
 func NewAppUpdater() *AppUpdater {
@@ -123,19 +131,56 @@ func (u *AppUpdater) IsPostponed(version string) bool {
 	return u.postponedUpdate == version
 }
 
+// routineLog registra un paso rutinario de la comprobación de actualizaciones:
+// visible la primera vez (al abrir la aplicación) y en nivel detalle en las
+// comprobaciones periódicas posteriores, que se repiten cada pocos minutos.
+func (u *AppUpdater) routineLog(first bool, message, detail string) {
+	if first {
+		logbus.Info(logbus.CatUpdater, message, detail)
+	} else {
+		logbus.Debug(logbus.CatUpdater, message, detail)
+	}
+}
+
+// checkErrorLog evita repetir el mismo fallo de red cada cinco minutos: avisa
+// la primera vez y cada vez que el error cambia, y el resto queda en detalle.
+func (u *AppUpdater) checkErrorLog(first bool, message string, err error) {
+	text := ""
+	if err != nil {
+		text = err.Error()
+	}
+
+	u.mu.Lock()
+	changed := u.lastCheckError != text
+	u.lastCheckError = text
+	u.mu.Unlock()
+
+	if first || changed {
+		logbus.Warn(logbus.CatUpdater, message, text)
+		return
+	}
+	logbus.Debug(logbus.CatUpdater, message, text)
+}
+
 func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
-	log.Printf("[UPDATER] Comprobando actualizaciones para %s (Versión actual: %s)", u.repoURL, u.currentVersion)
+	u.mu.Lock()
+	u.checkCount++
+	first := u.checkCount == 1
+	u.mu.Unlock()
+
+	u.routineLog(first, fmt.Sprintf("Comprobando actualizaciones de %s", u.repoURL),
+		fmt.Sprintf("Versión instalada: v%s", u.currentVersion))
 
 	// 1. Intentar detección automática primero
 	updater, err := goupdate.NewUpdater(goupdate.Config{})
 	if err != nil {
-		log.Printf("[UPDATER] Error al crear updater: %v", err)
+		u.checkErrorLog(first, "No se pudo preparar el buscador de actualizaciones", err)
 		return nil, nil, err
 	}
 
 	latest, found, err := updater.DetectLatest(context.Background(), goupdate.ParseSlug(u.repoURL))
 	if err != nil {
-		log.Printf("[UPDATER] Error al detectar última versión: %v", err)
+		u.checkErrorLog(first, "No se pudo consultar la última versión publicada", err)
 		return nil, nil, err
 	}
 
@@ -148,7 +193,8 @@ func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 
 		currentOS := runtime.GOOS
 		if (currentOS == "windows" && !isWin) || (currentOS == "linux" && !isLin) || (currentOS == "darwin" && !isMac) {
-			log.Printf("[UPDATER] El asset detectado automáticamente (%s) no parece correcto para %s. Reintentando con filtros...", latest.AssetName, currentOS)
+			logbus.Debug(logbus.CatUpdater,
+				fmt.Sprintf("El archivo detectado (%s) no parece de %s; se reintenta con filtros", latest.AssetName, currentOS), "")
 			found = false
 		}
 	}
@@ -172,20 +218,35 @@ func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 	}
 
 	if !found || latest == nil {
-		log.Printf("[UPDATER] No se encontró ninguna actualización compatible.")
+		u.routineLog(first, "No se encontró ninguna versión compatible con este sistema", "")
 		return nil, nil, nil
 	}
 
-	log.Printf("[UPDATER] Última versión encontrada: %s (Asset: %s)", latest.Version(), latest.AssetName)
+	u.routineLog(first, fmt.Sprintf("Última versión publicada: %s", latest.Version()),
+		"Archivo: "+latest.AssetName)
 
 	// Comparar versiones (normalizando)
 	currV := strings.TrimPrefix(u.currentVersion, "v")
 	if latest.LessOrEqual(currV) {
-		log.Printf("[UPDATER] La versión actual (%s) ya está al día respecto a %s", u.currentVersion, latest.Version())
+		u.routineLog(first, fmt.Sprintf("TelegramDL está al día (v%s)", u.currentVersion), "")
 		return nil, nil, nil
 	}
 
-	log.Printf("[UPDATER] ¡Nueva actualización disponible! %s -> %s", u.currentVersion, latest.Version())
+	// La novedad se anuncia una sola vez por versión: la comprobación se repite
+	// cada pocos minutos y no tiene sentido repetir el aviso en cada ronda.
+	u.mu.Lock()
+	alreadyAnnounced := u.announcedVersion == latest.Version()
+	u.announcedVersion = latest.Version()
+	u.mu.Unlock()
+
+	if alreadyAnnounced {
+		logbus.Debug(logbus.CatUpdater,
+			fmt.Sprintf("Sigue disponible la versión %s", latest.Version()), "")
+	} else {
+		logbus.Success(logbus.CatUpdater,
+			fmt.Sprintf("¡Nueva versión disponible: %s!", latest.Version()),
+			fmt.Sprintf("Tienes la v%s · Puedes actualizar desde Ajustes", u.currentVersion))
+	}
 
 	rel := &ReleaseInfo{
 		TagName: latest.Version(),

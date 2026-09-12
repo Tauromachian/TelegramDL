@@ -17,6 +17,7 @@ import (
 	"github.com/gotd/td/tg"
 
 	"tgdown/pkg/config"
+	"tgdown/pkg/logbus"
 )
 
 func (e *Engine) resolveItemMetadata(itemID string) {
@@ -114,7 +115,8 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	var msg *tg.Message
 	if cachedMsg != nil {
 		msg = cachedMsg
-		log.Printf("[DOWNLOAD] Usando mensaje cacheado para item %s", itemID)
+		logbus.Debug(logbus.CatDownloads,
+			fmt.Sprintf("Reutilizando el mensaje ya descargado de Telegram para la tarea %s", itemID), "")
 	} else {
 		log.Printf("[DOWNLOAD] Obteniendo mensaje %d del chat %d en Telegram...", item.MessageID, item.ChatID)
 		var err error
@@ -131,7 +133,8 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 		return errors.New("el mensaje no contiene multimedia descargable")
 	}
 
-	log.Printf("[DOWNLOAD] Multimedia extraída: %s (%s, %d bytes)", mediaInfo.FileName, mediaInfo.Kind, mediaInfo.FileSize)
+	logbus.Debug(logbus.CatDownloads,
+		fmt.Sprintf("Multimedia extraída: %s (%s, %d bytes)", mediaInfo.FileName, mediaInfo.Kind, mediaInfo.FileSize), "")
 
 	e.mu.Lock()
 	currentFileName := item.FileName
