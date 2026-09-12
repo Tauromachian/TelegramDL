@@ -18,6 +18,13 @@ import (
 const (
 	AppVersion = "2.3.7"
 	GithubRepo = "infinityxgame/tgdown"
+
+	// DefaultBindHost es la dirección en la que escucha el panel cuando el
+	// usuario no ha elegido ninguna. 0.0.0.0 atiende todas las interfaces, de
+	// forma que el panel se puede abrir desde el móvil u otro equipo de la red
+	// local. Para limitarlo a este ordenador basta con poner
+	// TGDL_BIND_HOST=127.0.0.1 en el .env.
+	DefaultBindHost = "0.0.0.0"
 )
 
 var SpeedMultipliers = map[string]float64{
@@ -96,6 +103,11 @@ func InitPaths() {
 			}
 		}
 
+		// Dejar escrito el valor por defecto de TGDL_BIND_HOST antes de cargar
+		// nada, para que el archivo recién creado ya sirva en este mismo
+		// arranque.
+		ensureEnvDefaults()
+
 		// Cargar variables de entorno prioritariamente desde UserEnvPath (.tgdown/.env)
 		if _, err := os.Stat(UserEnvPath); err == nil {
 			_ = godotenv.Overload(UserEnvPath)
@@ -105,6 +117,95 @@ func InitPaths() {
 			_ = godotenv.Overload(".env")
 		}
 	})
+}
+
+// ---------------------------------------------------------------------------
+// Edición del archivo .env
+//
+// El .env del usuario puede tener comentarios y variables que la aplicación no
+// conoce, así que nunca se reescribe entero: se cambia solo la línea que toca y
+// se respeta el resto tal cual estaba.
+// ---------------------------------------------------------------------------
+
+func splitEnvLines(content string) []string {
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	if content == "" {
+		return nil
+	}
+	lines := strings.Split(content, "\n")
+	// El salto final del archivo deja un elemento vacío que no es una línea.
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	return lines
+}
+
+func joinEnvLines(lines []string) string {
+	if len(lines) == 0 {
+		return ""
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+// envKeyLine devuelve el índice de la línea que define una clave, o -1 si esa
+// clave no está definida. Ignora comentarios y líneas en blanco.
+func envKeyLine(lines []string, key string) int {
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		trimmed = strings.TrimPrefix(trimmed, "export ")
+		name, _, found := strings.Cut(trimmed, "=")
+		if !found {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(name), key) {
+			return i
+		}
+	}
+	return -1
+}
+
+// setEnvValue actualiza una clave conservando su posición, o la añade al final
+// si todavía no existía.
+func setEnvValue(content, key, value string) string {
+	lines := splitEnvLines(content)
+	if i := envKeyLine(lines, key); i >= 0 {
+		lines[i] = key + "=" + value
+		return joinEnvLines(lines)
+	}
+	return joinEnvLines(append(lines, key+"="+value))
+}
+
+// ensureEnvDefaults garantiza que el .env del usuario declare en qué dirección
+// escucha el panel. Solo escribe si no hay ninguna elección previa: si ya hay
+// un TGDL_BIND_HOST (o BIND_HOST), se respeta aunque sea 127.0.0.1.
+func ensureEnvDefaults() {
+	content := ""
+	if data, err := os.ReadFile(UserEnvPath); err == nil {
+		content = string(data)
+	}
+
+	lines := splitEnvLines(content)
+	if envKeyLine(lines, "TGDL_BIND_HOST") >= 0 || envKeyLine(lines, "BIND_HOST") >= 0 {
+		return
+	}
+
+	if len(lines) > 0 {
+		lines = append(lines, "")
+	}
+	lines = append(lines,
+		"# Dirección en la que escucha el panel.",
+		"# 0.0.0.0 permite abrirlo desde el móvil u otro equipo de la red local;",
+		"# 127.0.0.1 lo limita únicamente a este ordenador.",
+		"TGDL_BIND_HOST="+DefaultBindHost,
+	)
+
+	if err := os.WriteFile(UserEnvPath, []byte(joinEnvLines(lines)), 0600); err != nil {
+		return
+	}
+	_ = os.Setenv("TGDL_BIND_HOST", DefaultBindHost)
 }
 
 func GetDefaultDownloadFolder() string {
@@ -176,7 +277,19 @@ func SaveEnvCredentials(apiID, apiHash string) error {
 	apiID = strings.TrimSpace(apiID)
 	apiHash = strings.TrimSpace(apiHash)
 
-	content := fmt.Sprintf("API_ID=%s\nAPI_HASH=%s\nTGDL_API_ID=%s\nTGDL_API_HASH=%s\n", apiID, apiHash, apiID, apiHash)
+	// Se conserva lo que ya hubiera en el archivo (TGDL_BIND_HOST, TGDL_PORT,
+	// comentarios...): antes se reescribía entero y cualquier ajuste del
+	// usuario se perdía al volver a guardar las credenciales.
+	existing := ""
+	if data, rerr := os.ReadFile(UserEnvPath); rerr == nil {
+		existing = string(data)
+	}
+
+	content := setEnvValue(existing, "API_ID", apiID)
+	content = setEnvValue(content, "API_HASH", apiHash)
+	content = setEnvValue(content, "TGDL_API_ID", apiID)
+	content = setEnvValue(content, "TGDL_API_HASH", apiHash)
+
 	err := os.WriteFile(UserEnvPath, []byte(content), 0600)
 	if err != nil {
 		return err
@@ -203,12 +316,14 @@ func GetServerPort() int {
 
 func GetServerHost() string {
 	InitPaths()
-	host := os.Getenv("TGDL_BIND_HOST")
+	host := strings.TrimSpace(os.Getenv("TGDL_BIND_HOST"))
 	if host == "" {
-		host = os.Getenv("BIND_HOST")
+		host = strings.TrimSpace(os.Getenv("BIND_HOST"))
 	}
 	if host == "" {
-		return "127.0.0.1"
+		// Mismo valor que se escribe en el .env al crearlo, para que el código y
+		// el archivo nunca digan cosas distintas.
+		return DefaultBindHost
 	}
 	return host
 }
