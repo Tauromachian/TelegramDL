@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { KeyRound, Phone, ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Loader2, Info } from '../icons'
 import { useAuthToken } from '../composables/useAuthToken'
+import { openExternal } from '../composables/useExternalLink'
 
 const { authHeaders } = useAuthToken()
 
@@ -238,7 +239,12 @@ const cancelBack = () => {
           <Info :size="16" />
           <span>
             ¿No las tienes? Consíguelas gratis en 
-            <a href="https://my.telegram.org" target="_blank" rel="noopener">my.telegram.org</a> 
+            <a
+              href="https://my.telegram.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click="openExternal('https://my.telegram.org', $event)"
+            >my.telegram.org</a> 
             (sección <i>API development tools</i>).
           </span>
         </div>
