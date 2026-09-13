@@ -103,6 +103,9 @@ func (u *AppUpdater) CleanOldVersion() {
 			}
 		}
 	}
+
+	// En macOS lo que queda atrás no es un archivo .old sino un bundle .app.old.
+	u.cleanPlatform()
 }
 
 func (u *AppUpdater) GetProgress() Progress {
@@ -351,6 +354,19 @@ func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 
 		if err := u.downloadWithProgress(rel.release.AssetURL, archivePath); err != nil {
 			u.setProgress("error: descarga fallida: "+err.Error(), 0, 0, 0)
+			return
+		}
+
+		// 1.b Instalación propia de la plataforma. En macOS la aplicación es un
+		// bundle .app y hay que sustituirlo entero, no el binario de dentro;
+		// installPlatform se encarga de eso y no regresa si lo consigue. En
+		// Windows y Linux devuelve handled=false y seguimos con el reemplazo
+		// del ejecutable de siempre.
+		if handled, errPlat := u.installPlatform(archivePath, tempDir); handled {
+			if errPlat != nil {
+				u.setProgress("error: "+errPlat.Error(), 0, 0, 0)
+				logbus.Error(logbus.CatUpdater, "No se pudo aplicar la actualización", errPlat.Error())
+			}
 			return
 		}
 
