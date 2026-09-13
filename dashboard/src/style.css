@@ -245,3 +245,48 @@ footer { text-align: center; color: var(--user-text-dim); font-size: 10px; margi
   .row-side { min-width: 56px; }
   .row-side button { font-size: 9px; }
 }
+
+/* --- Comportamiento de ventana nativa ---------------------------------------
+   El panel se pinta dentro de un webview, y por defecto se comporta como una
+   página web: el texto se selecciona al arrastrar, las imágenes se pueden
+   arrastrar fuera y el cursor cambia a barra de texto sobre cualquier etiqueta.
+   Nada de eso ocurre en una aplicación nativa, y es de lo que más delata que
+   hay un navegador debajo.
+
+   La clase .app-nativo la pone main.js en el <html>, y solo cuando estamos
+   dentro de la app de escritorio. Desde un navegador remoto (celular, otra PC)
+   el panel sigue siendo una web normal, donde poder seleccionar y copiar es lo
+   que el usuario espera. */
+.app-nativo {
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.app-nativo img,
+.app-nativo svg,
+.app-nativo a {
+  -webkit-user-drag: none;
+}
+
+/* Excepciones: lo que existe precisamente para ser leído con calma o copiado.
+   Los campos de formulario son obvios; el registro, las rutas de archivo, el
+   token y los mensajes de error se copian a menudo para pegarlos en otro sitio
+   o buscarlos. Para cualquier texto nuevo que deba poder copiarse basta con
+   añadirle la clase .seleccionable. */
+.app-nativo input,
+.app-nativo textarea,
+.app-nativo select,
+.app-nativo [contenteditable="true"],
+.app-nativo code,
+.app-nativo pre,
+.app-nativo .seleccionable,
+.app-nativo .log-message,
+.app-nativo .log-detail,
+.app-nativo .log-path,
+.app-nativo .logs-error,
+.app-nativo .auth-alert {
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: auto;
+}
