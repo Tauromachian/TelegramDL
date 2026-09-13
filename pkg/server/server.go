@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -1316,36 +1315,6 @@ func (s *Server) handleOpenDownload(w http.ResponseWriter, r *http.Request) {
 	go abrirEnElSistema(item.FilePath)
 
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
-// abrirEnElSistema abre un archivo con la aplicación que le corresponda.
-//
-// En Windows esto se hacía con exec.Command("cmd", "/c", "start", "", ruta), y
-// era una inyección de comandos: cmd.exe interpreta «&», «^» y «%», Go solo
-// entrecomilla los argumentos que llevan espacios, y el nombre del archivo lo
-// elige quien lo sube a Telegram. Un archivo llamado «video&calc.mp4» ejecutaba
-// calc al pulsar «abrir». Ahora no se pasa por el shell en ningún sistema:
-// rundll32 recibe la ruta como un único argumento y no la interpreta.
-//
-// SanitizeFileName también filtra ya esos caracteres, así que son dos barreras
-// independientes; esta es la que no depende de acertar con la lista.
-func abrirEnElSistema(target string) {
-	if strings.TrimSpace(target) == "" {
-		return
-	}
-
-	switch runtime.GOOS {
-	case "windows":
-		if _, err := os.Stat(target); err == nil {
-			_ = exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", target).Start()
-		} else {
-			_ = exec.Command("explorer.exe", filepath.Dir(target)).Start()
-		}
-	case "darwin":
-		_ = exec.Command("open", "--", target).Start()
-	default:
-		_ = exec.Command("xdg-open", target).Start()
-	}
 }
 
 // Settings
