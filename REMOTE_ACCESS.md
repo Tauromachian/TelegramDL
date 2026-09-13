@@ -75,6 +75,10 @@ siquiera a TelegramDL, además del token propio de la app.
   falta configurar nada para seguir usándola normalmente en el mismo
   equipo (la propia ventana de escritorio lo obtiene por su cuenta).
 - Se ve y se puede copiar desde **Ajustes → Acceso remoto**.
+- Si estás fuera de casa y no lo llevas encima, la propia pantalla de acceso
+  remoto tiene un botón **Enviármelo a Telegram**: deja el token en tus
+  *Mensajes guardados*, donde solo tú puedes leerlo. Ábrelo en Telegram, toca
+  el token para copiarlo y pégalo en el panel.
 - Si sospechas que se filtró (por ejemplo, lo compartiste sin querer),
   pulsa **Regenerar token** ahí mismo: el anterior deja de funcionar de
   inmediato y tendrás que volver a introducir el nuevo en cada dispositivo
@@ -82,6 +86,22 @@ siquiera a TelegramDL, además del token propio de la app.
 - Nunca lo compartas por canales inseguros (chat sin cifrar, capturas de
   pantalla públicas, etc.): quien lo tenga puede controlar la app por
   completo mientras siga siendo válido.
+
+### El botón «Enviármelo a Telegram»
+
+Ese botón es el único endpoint de la API, junto al color del panel, que
+responde **sin token**: no puede exigirlo, porque el token es justo lo que le
+falta a quien lo pulsa. Lo que sí hace es no devolver nada: el token viaja al
+chat privado de tu cuenta de Telegram, no a la respuesta HTTP.
+
+En la práctica, lo máximo que puede conseguir alguien que alcance el puerto es
+provocar un mensaje en tus *Mensajes guardados*. Para que eso no se convierta
+en una molestia, el servidor solo admite **un envío por minuto** y anota en el
+registro de actividad cada intento con la dirección desde la que llegó.
+
+Contrapartida a tener en cuenta: el token queda guardado en tu historial de
+Telegram. Si prefieres que no sea así, bórralo del chat después de usarlo, o
+regenera el token cuando termines.
 
 ## Qué NO hacer
 

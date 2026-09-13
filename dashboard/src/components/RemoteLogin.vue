@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue'
-import { KeyRound, ArrowRight, Loader2, AlertCircle, Eye, EyeOff, ShieldCheck } from '../icons'
+import { onUnmounted, ref } from 'vue'
+import { KeyRound, ArrowRight, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff, Send, ShieldCheck } from '../icons'
 
 const props = defineProps({
   error: { type: String, default: '' }
@@ -10,6 +10,52 @@ const emit = defineEmits(['submit'])
 const tokenInput = ref('')
 const showToken = ref(false)
 const submitting = ref(false)
+
+// Envío del token a los Mensajes guardados de Telegram, para no tener que ir
+// al ordenador a copiarlo. El endpoint no lleva token (es justo lo que falta
+// aquí) y el servidor solo admite un envío por minuto.
+const sending = ref(false)
+const sendState = ref('')
+const sendMessage = ref('')
+const cooldown = ref(0)
+let cooldownTimer = null
+
+const startCooldown = seconds => {
+  clearInterval(cooldownTimer)
+  cooldown.value = Math.max(0, Math.round(Number(seconds) || 0))
+  if (!cooldown.value) return
+  cooldownTimer = setInterval(() => {
+    cooldown.value -= 1
+    if (cooldown.value <= 0) clearInterval(cooldownTimer)
+  }, 1000)
+}
+
+onUnmounted(() => clearInterval(cooldownTimer))
+
+const sendTokenToTelegram = async () => {
+  if (sending.value || cooldown.value > 0) return
+  sending.value = true
+  sendState.value = ''
+  sendMessage.value = ''
+  try {
+    const response = await fetch('/api/auth/token/send', { method: 'POST' })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      sendState.value = 'error'
+      sendMessage.value = data.detail || data.error || 'No se pudo enviar el token.'
+      startCooldown(data.retry_after)
+      return
+    }
+    sendState.value = 'ok'
+    sendMessage.value = 'Enviado. Abre Telegram → Mensajes guardados, toca el token para copiarlo y pégalo aquí.'
+    startCooldown(data.retry_after || 60)
+  } catch (e) {
+    sendState.value = 'error'
+    sendMessage.value = 'No se pudo contactar con TelegramDL. Comprueba que el ordenador está encendido y accesible.'
+  } finally {
+    sending.value = false
+  }
+}
 
 const handleSubmit = async () => {
   const value = tokenInput.value.trim()
@@ -74,6 +120,23 @@ const handleSubmit = async () => {
           <KeyRound :size="18" />
         </template>
       </button>
+
+      <div class="send-divider"><span>¿No lo tienes a mano?</span></div>
+
+      <button class="auth-button ghost" :disabled="sending || cooldown > 0" @click="sendTokenToTelegram">
+        <Loader2 v-if="sending" class="spin" :size="17" />
+        <Send v-else :size="17" />
+        <span v-if="sending">Enviando…</span>
+        <span v-else-if="cooldown > 0">Podrás repetirlo en {{ cooldown }} s</span>
+        <span v-else>Enviármelo a Telegram</span>
+      </button>
+      <p class="send-hint">Lo recibirás en tus <b>Mensajes guardados</b>, donde solo tú puedes leerlo.</p>
+
+      <div v-if="sendMessage" class="auth-alert send-result" :class="sendState === 'ok' ? 'success' : 'danger'">
+        <CheckCircle2 v-if="sendState === 'ok'" :size="18" />
+        <AlertCircle v-else :size="18" />
+        <span>{{ sendMessage }}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -129,6 +192,25 @@ const handleSubmit = async () => {
   font-size: 13px;
   color: #7d96b0;
   margin: 2px 0 0;
+}
+
+.auth-alert.success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  color: #86efac;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.auth-alert.send-result {
+  margin-top: 14px;
+  margin-bottom: 0;
+  align-items: flex-start;
 }
 
 .auth-alert.danger {
@@ -233,6 +315,58 @@ const handleSubmit = async () => {
 
 .auth-button.primary:not(:disabled):hover {
   transform: translateY(-1px);
+}
+
+.send-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 14px;
+  color: var(--user-text-dim);
+  font-size: 11.5px;
+}
+
+.send-divider::before,
+.send-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--user-border);
+}
+
+.auth-button.ghost {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--user-surface-light);
+  color: #dbe7f5;
+  border: 1px solid var(--user-border);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, opacity 0.2s;
+}
+
+.auth-button.ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.auth-button.ghost:not(:disabled):hover {
+  border-color: var(--user-primary);
+  color: #fff;
+}
+
+.send-hint {
+  margin: 9px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--user-text-dim);
+  text-align: center;
 }
 
 .spin {

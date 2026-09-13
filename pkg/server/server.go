@@ -53,6 +53,9 @@ type Server struct {
 	onBroadcast  func(snap map[string]any)
 	apiToken     string
 	folderPicker func() (string, error)
+	// tokenSendNextAt es el momento a partir del cual se vuelve a admitir un
+	// envío del token a Telegram (ver tokenSendCooldown).
+	tokenSendNextAt time.Time
 }
 
 type wsClient struct {
@@ -118,15 +121,44 @@ func NewServer(
 	return s
 }
 
-// publicAPIPath es el único endpoint de la API que no exige token: devuelve
-// solo el color del panel, que la pantalla de acceso remoto necesita para
-// pintarse antes de que nadie se haya autenticado.
-const publicAPIPath = "/api/theme"
+const (
+	// publicAPIPath devuelve solo el color del panel, que la pantalla de acceso
+	// remoto necesita para pintarse antes de que nadie se haya autenticado.
+	publicAPIPath = "/api/theme"
+
+	// tokenSendAPIPath envía el token de acceso a los Mensajes guardados del
+	// dueño de la cuenta de Telegram. No puede exigir token porque el token es
+	// justo lo que le falta a quien pulsa el botón. Quien llama no recibe el
+	// token: va al chat privado del usuario, que es el único que puede leerlo.
+	// El abuso se contiene con tokenSendCooldown.
+	tokenSendAPIPath = "/api/auth/token/send"
+
+	// tokenSendCooldown es lo que hay que esperar entre dos envíos del token.
+	// Al ser un endpoint abierto, es lo que evita que alguien que alcance el
+	// puerto llene de mensajes los guardados del usuario.
+	tokenSendCooldown = time.Minute
+
+	// tokenSendFailureCooldown es la espera cuando el envío falla. Es corta a
+	// propósito: si la sesión de Telegram estaba caída, el usuario debe poder
+	// reintentar en cuanto la arregle, sin dejar por ello la puerta abierta a
+	// reintentos sin freno.
+	tokenSendFailureCooldown = 10 * time.Second
+)
+
+// publicAPIPaths son los únicos endpoints de la API que responden sin token.
+var publicAPIPaths = map[string]bool{
+	publicAPIPath:    true,
+	tokenSendAPIPath: true,
+}
+
+func isPublicAPIPath(path string) bool {
+	return publicAPIPaths[path]
+}
 
 func (s *Server) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
-			if r.URL.Path == publicAPIPath {
+			if isPublicAPIPath(r.URL.Path) {
 				s.corsMiddleware(s.mux).ServeHTTP(w, r)
 				return
 			}
@@ -142,7 +174,7 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) WebHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
-			if r.URL.Path == publicAPIPath {
+			if isPublicAPIPath(r.URL.Path) {
 				s.corsMiddleware(s.mux).ServeHTTP(w, r)
 				return
 			}
@@ -395,6 +427,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// Token de acceso a la API (acceso remoto)
 	mux.HandleFunc("/api/auth/token", s.handleGetToken)
 	mux.HandleFunc("/api/auth/token/regenerate", s.handleRegenerateToken)
+	// Sin token; ver tokenSendAPIPath.
+	mux.HandleFunc(tokenSendAPIPath, s.handleSendTokenToTelegram)
 
 	// Downloads (Soporta /api/downloads, /api/downloads/history, /api/downloads/open, /api/downloads/{id})
 	mux.HandleFunc("/api/downloads", s.handleDownloadsRoute)
@@ -798,6 +832,110 @@ func (s *Server) handleAuthVerify2FA(w http.ResponseWriter, r *http.Request) {
 // (por ejemplo, para mostrarlo en Ajustes).
 func (s *Server) handleGetToken(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, http.StatusOK, map[string]string{"token": s.APIToken()})
+}
+
+// requestOrigin describe de dónde vino una petición para dejarlo en el
+// registro. Se usa la dirección real de la conexión, no las cabeceras de
+// proxy: esas las escribe quien llama y se pueden falsificar, así que servirían
+// justo para lo contrario de lo que se busca aquí.
+func requestOrigin(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil && strings.TrimSpace(host) != "" {
+		return host
+	}
+	if addr := strings.TrimSpace(r.RemoteAddr); addr != "" {
+		return addr
+	}
+	return "origen desconocido"
+}
+
+// buildTokenMessage redacta la nota que se deja en los Mensajes guardados. El
+// token va en su propia línea para que el formato de código lo abarque entero
+// y baste un toque para copiarlo.
+func buildTokenMessage(token string) string {
+	equipo, err := os.Hostname()
+	if err != nil || strings.TrimSpace(equipo) == "" {
+		equipo = "este equipo"
+	}
+
+	return strings.Join([]string{
+		"🔐 TelegramDL · token de acceso remoto",
+		"",
+		token,
+		"",
+		"Toca el token para copiarlo y pégalo en la pantalla de acceso remoto.",
+		fmt.Sprintf("Equipo: %s · v%s", equipo, config.AppVersion),
+		fmt.Sprintf("Enviado: %s", time.Now().Format("02/01/2006 15:04")),
+	}, "\n")
+}
+
+// handleSendTokenToTelegram manda el token de acceso a los Mensajes guardados
+// del usuario, para no tener que ir al ordenador a copiarlo cuando se entra
+// desde el móvil.
+//
+// Es un endpoint abierto por necesidad: quien lo pulsa es precisamente quien no
+// tiene token. La respuesta nunca incluye el token; solo dice si se envió. Lo
+// único que puede conseguir un extraño que alcance el puerto es provocar un
+// mensaje en el chat privado del usuario, y para eso está el límite de
+// frecuencia.
+func (s *Server) handleSendTokenToTelegram(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.errorResponse(w, http.StatusMethodNotAllowed, "Método no permitido")
+		return
+	}
+
+	origin := requestOrigin(r)
+	now := time.Now()
+
+	s.mu.Lock()
+	if wait := s.tokenSendNextAt.Sub(now); wait > 0 {
+		s.mu.Unlock()
+
+		seconds := int(wait.Seconds()) + 1
+		logbus.Warn(logbus.CatServer,
+			"Petición de envío del token a Telegram rechazada por exceso de intentos",
+			fmt.Sprintf("Origen: %s · Faltan %d s", origin, seconds))
+
+		w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		s.jsonResponse(w, http.StatusTooManyRequests, map[string]any{
+			"status":      "rate_limited",
+			"detail":      fmt.Sprintf("Espera %d segundos antes de volver a pedirlo.", seconds),
+			"retry_after": seconds,
+		})
+		return
+	}
+	// El turno se consume antes de enviar: si Telegram tarda, un botón pulsado
+	// con impaciencia no debe convertirse en cinco mensajes.
+	s.tokenSendNextAt = now.Add(tokenSendCooldown)
+	token := s.apiToken
+	s.mu.Unlock()
+
+	if token == "" {
+		s.errorResponse(w, http.StatusServiceUnavailable, "Todavía no hay ningún token de acceso generado")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	if err := s.clientMgr.SendToSavedMessages(ctx, buildTokenMessage(token), token); err != nil {
+		s.mu.Lock()
+		s.tokenSendNextAt = time.Now().Add(tokenSendFailureCooldown)
+		s.mu.Unlock()
+
+		logbus.Error(logbus.CatServer, "No se pudo enviar el token a Telegram", err.Error())
+		s.errorResponse(w, http.StatusBadGateway, fmt.Sprintf("No se pudo enviar el token a Telegram: %s", err.Error()))
+		return
+	}
+
+	logbus.Success(logbus.CatServer,
+		"Token de acceso enviado a los Mensajes guardados de Telegram",
+		fmt.Sprintf("Pedido desde %s", origin))
+
+	s.jsonResponse(w, http.StatusOK, map[string]any{
+		"status":      "ok",
+		"detail":      "Token enviado a tus Mensajes guardados de Telegram.",
+		"retry_after": int(tokenSendCooldown.Seconds()),
+	})
 }
 
 // handleRegenerateToken rota el token de acceso. Requiere el token vigente

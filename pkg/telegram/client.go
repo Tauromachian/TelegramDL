@@ -2,8 +2,10 @@ package telegram
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha1"
 	"database/sql"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -14,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
@@ -830,6 +833,102 @@ func (cm *ClientManager) Verify2FA(ctx context.Context, password string) error {
 		return fmt.Errorf("contraseña 2FA incorrecta: %w", err)
 	}
 
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Mensajes guardados
+//
+// El chat que Telegram llama "Mensajes guardados" es el chat del usuario
+// consigo mismo (InputPeerSelf). Es el sitio natural para dejarse una nota que
+// se quiere leer desde otro dispositivo: nadie más puede verla.
+// ---------------------------------------------------------------------------
+
+// messageRandomID genera el identificador que Telegram usa para descartar
+// mensajes duplicados si una petición se reintenta.
+func messageRandomID() (int64, error) {
+	var buf [8]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return 0, fmt.Errorf("no se pudo generar el identificador del mensaje: %w", err)
+	}
+	return int64(binary.LittleEndian.Uint64(buf[:])), nil
+}
+
+// codeEntities marca fragmentos del mensaje para que Telegram los pinte como
+// código: al tocarlos, la aplicación los copia al portapapeles de una vez, que
+// es justo lo que hace falta para un token largo.
+//
+// Los desplazamientos de Telegram se cuentan en unidades UTF-16, no en bytes ni
+// en caracteres, así que hay que convertir antes de medir: con un emoji delante
+// (que ocupa dos unidades) cualquier otra cuenta desplazaría el resaltado.
+func codeEntities(text string, fragments []string) []tg.MessageEntityClass {
+	entities := make([]tg.MessageEntityClass, 0, len(fragments))
+	for _, fragment := range fragments {
+		if fragment == "" {
+			continue
+		}
+		idx := strings.Index(text, fragment)
+		if idx < 0 {
+			continue
+		}
+		entities = append(entities, &tg.MessageEntityCode{
+			Offset: len(utf16.Encode([]rune(text[:idx]))),
+			Length: len(utf16.Encode([]rune(fragment))),
+		})
+	}
+	return entities
+}
+
+// SendToSavedMessages publica un mensaje en los Mensajes guardados del usuario.
+// Los fragmentos que se pasen en codeFragments se envían con formato de código
+// para poder copiarlos con un toque desde el móvil.
+func (cm *ClientManager) SendToSavedMessages(ctx context.Context, text string, codeFragments ...string) error {
+	if strings.TrimSpace(text) == "" {
+		return errors.New("no hay nada que enviar")
+	}
+
+	cm.mu.RLock()
+	client := cm.client
+	cm.mu.RUnlock()
+
+	if client == nil {
+		return errors.New("Telegram no está configurado")
+	}
+	if err := cm.WaitReady(ctx); err != nil {
+		return fmt.Errorf("no se pudo conectar con Telegram: %w", err)
+	}
+
+	// Sin sesión iniciada la llamada fallaría con un error críptico de MTProto;
+	// es mejor decir exactamente qué falta.
+	if status, err := client.Auth().Status(ctx); err != nil || status == nil || !status.Authorized {
+		return errors.New("no hay ninguna sesión de Telegram iniciada")
+	}
+
+	cm.mu.RLock()
+	raw := cm.rawClient
+	cm.mu.RUnlock()
+	if raw == nil {
+		return errors.New("Telegram no está conectado")
+	}
+
+	randomID, err := messageRandomID()
+	if err != nil {
+		return err
+	}
+
+	req := &tg.MessagesSendMessageRequest{
+		Peer:      &tg.InputPeerSelf{},
+		Message:   text,
+		RandomID:  randomID,
+		NoWebpage: true,
+	}
+	if entities := codeEntities(text, codeFragments); len(entities) > 0 {
+		req.SetEntities(entities)
+	}
+
+	if _, err := raw.MessagesSendMessage(ctx, req); err != nil {
+		return fmt.Errorf("Telegram rechazó el mensaje: %w", err)
+	}
 	return nil
 }
 

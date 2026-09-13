@@ -58,6 +58,7 @@ import {
   UserCheck01Icon,
   Video01Icon,
   Cancel01Icon,
+  DeliverySent02Icon,
   FlashIcon
 } from '@hugeicons/core-free-icons'
 
@@ -116,6 +117,7 @@ export const RotateCcw = icono(ArrowReloadHorizontalIcon) // reintentar una desc
 export const Save = icono(FloppyDiskIcon) // guardar ajustes
 export const ScrollText = icono(Pulse01Icon) // entrada "Logs" del menú
 export const Search = icono(Search01Icon) // buscar dentro del registro
+export const Send = icono(DeliverySent02Icon) // enviar el token a Telegram
 export const Settings2 = icono(Settings02Icon) // entrada "Ajustes" del menú
 export const ShieldCheck = icono(ShieldCheckIcon) // verificación en dos pasos
 export const Trash2 = icono(Delete02Icon) // eliminar
