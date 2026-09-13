@@ -426,6 +426,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/listener/item/", s.handleListenerDeleteItemPath)
 	mux.HandleFunc("/api/listener/resolve-chat", s.handleListenerResolveChat)
 	mux.HandleFunc("/api/listener/chat/", s.handleListenerResolveChatPath)
+	mux.HandleFunc("/api/listener/topics", s.handleListenerTopics)
+	mux.HandleFunc("/api/listener/topics/", s.handleListenerTopics)
 
 	// Registro de actividad (vista de logs en vivo)
 	mux.HandleFunc("/api/logs", s.handleLogs)
@@ -1294,20 +1296,20 @@ func (s *Server) handleListenerSettings(w http.ResponseWriter, r *http.Request) 
 			if idBytes, err := json.Marshal(rawIDs); err == nil {
 				var ids []int64
 				if err := json.Unmarshal(idBytes, &ids); err == nil {
+					// Esta rama solo recibe IDs de chat, sin temas. Un grupo ya
+					// configurado conserva TODAS sus entradas (la del grupo entero y
+					// las de cada tema): quedarse solo con la primera borraría en
+					// silencio los temas vigilados.
 					newChats := make([]config.ListenerChat, 0, len(ids))
 					for _, id := range ids {
-						var existingChat config.ListenerChat
 						exists := false
 						for _, old := range cfg.ListenerChats {
 							if old.ID == id {
-								existingChat = old
+								newChats = append(newChats, old)
 								exists = true
-								break
 							}
 						}
-						if exists {
-							newChats = append(newChats, existingChat)
-						} else {
+						if !exists {
 							newChats = append(newChats, config.ListenerChat{
 								ID:           id,
 								Name:         fmt.Sprintf("%d", id),
@@ -1409,6 +1411,53 @@ func (s *Server) handleListenerDeleteItemPath(w http.ResponseWriter, r *http.Req
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// resolveChatPayload arma la ficha de un chat para el panel. Si se pide un
+// tema concreto, se añade su número y su título: así la lista de escucha puede
+// enseñar "Tema · Grupo" desde el momento en que se añade.
+func (s *Server) resolveChatPayload(ctx context.Context, chatID, topicID int64) map[string]any {
+	info, _ := s.listener.ResolveChat(ctx, chatID)
+
+	chat := map[string]any{
+		"id":            chatID,
+		"name":          info.Name,
+		"type":          info.Type,
+		"username":      info.Username,
+		"is_forum":      info.IsForum,
+		"auto_download": false,
+		"f_photos":      true,
+		"f_videos":      true,
+		"f_audios":      true,
+		"f_docs":        true,
+		"f_stickers":    true,
+	}
+
+	if topicID > 0 {
+		chat["topic_id"] = topicID
+		if topicName, err := s.listener.ResolveTopicName(ctx, chatID, topicID); err == nil && strings.TrimSpace(topicName) != "" {
+			chat["topic_name"] = topicName
+		}
+	}
+
+	return chat
+}
+
+// topicIDFromQuery lee el tema pedido en la URL. Un valor ausente o inválido
+// significa «todo el grupo».
+func topicIDFromQuery(r *http.Request) int64 {
+	raw := strings.TrimSpace(r.URL.Query().Get("topic_id"))
+	if raw == "" {
+		raw = strings.TrimSpace(r.URL.Query().Get("topic"))
+	}
+	if raw == "" {
+		return 0
+	}
+	topicID, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || topicID < 0 {
+		return 0
+	}
+	return topicID
+}
+
 func (s *Server) handleListenerResolveChat(w http.ResponseWriter, r *http.Request) {
 	chatIDStr := r.URL.Query().Get("chat_id")
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
@@ -1417,21 +1466,9 @@ func (s *Server) handleListenerResolveChat(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	info, _ := s.listener.ResolveChat(r.Context(), chatID)
 	s.jsonResponse(w, http.StatusOK, map[string]any{
 		"status": "ok",
-		"chat": map[string]any{
-			"id":            chatID,
-			"name":          info.Name,
-			"type":          info.Type,
-			"username":      info.Username,
-			"auto_download": false,
-			"f_photos":      true,
-			"f_videos":      true,
-			"f_audios":      true,
-			"f_docs":        true,
-			"f_stickers":    true,
-		},
+		"chat":   s.resolveChatPayload(r.Context(), chatID, topicIDFromQuery(r)),
 	})
 }
 
@@ -1449,21 +1486,50 @@ func (s *Server) handleListenerResolveChatPath(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	info, _ := s.listener.ResolveChat(r.Context(), chatID)
+	// El tema puede venir en la ruta (/api/listener/chat/-100.../57) o como
+	// parámetro (?topic_id=57).
+	topicID := topicIDFromQuery(r)
+	if len(parts) >= 5 && strings.TrimSpace(parts[4]) != "" {
+		if parsed, perr := strconv.ParseInt(parts[4], 10, 64); perr == nil && parsed > 0 {
+			topicID = parsed
+		}
+	}
+
 	s.jsonResponse(w, http.StatusOK, map[string]any{
 		"status": "ok",
-		"chat": map[string]any{
-			"id":            chatID,
-			"name":          info.Name,
-			"type":          info.Type,
-			"username":      info.Username,
-			"auto_download": false,
-			"f_photos":      true,
-			"f_videos":      true,
-			"f_audios":      true,
-			"f_docs":        true,
-			"f_stickers":    true,
-		},
+		"chat":   s.resolveChatPayload(r.Context(), chatID, topicID),
+	})
+}
+
+// handleListenerTopics devuelve los temas de un grupo para que el panel deje
+// elegir cuál vigilar en lugar de escuchar el grupo entero.
+func (s *Server) handleListenerTopics(w http.ResponseWriter, r *http.Request) {
+	chatIDStr := strings.TrimSpace(r.URL.Query().Get("chat_id"))
+	if chatIDStr == "" {
+		// También se admite /api/listener/topics/<chat_id>
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(parts) >= 4 {
+			chatIDStr = parts[3]
+		}
+	}
+
+	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "chat_id inválido")
+		return
+	}
+
+	topics, err := s.listener.ResolveTopics(r.Context(), chatID)
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]any{
+		"status":   "ok",
+		"chat_id":  chatID,
+		"is_forum": len(topics) > 0,
+		"topics":   topics,
 	})
 }
 

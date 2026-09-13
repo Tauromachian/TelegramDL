@@ -114,3 +114,80 @@ func TestParseURLGarbageFails(t *testing.T) {
 		t.Fatal("una URL que no es de Telegram debe devolver error")
 	}
 }
+
+func TestParseURLChannelWithTopic(t *testing.T) {
+	res, err := ParseURL("https://t.me/c/2121902112/57/31449")
+	if err != nil {
+		t.Fatalf("un enlace de un grupo con temas debe aceptarse: %v", err)
+	}
+	if res.ChatID != -1002121902112 {
+		t.Fatalf("ChatID incorrecto: got %d, want -1002121902112", res.ChatID)
+	}
+	if res.TopicID != 57 {
+		t.Fatalf("TopicID incorrecto: got %d, want 57", res.TopicID)
+	}
+	// El último número siempre es el mensaje: es lo único que hace falta para
+	// descargar, porque el ID de mensaje es único dentro del chat.
+	if res.StartMsgID != 31449 || res.EndMsgID != 31449 {
+		t.Fatalf("rango incorrecto: start=%d end=%d", res.StartMsgID, res.EndMsgID)
+	}
+}
+
+func TestParseURLChannelWithTopicRange(t *testing.T) {
+	res, err := ParseURL("https://t.me/c/2121902112/57/31449-31455")
+	if err != nil {
+		t.Fatalf("error inesperado: %v", err)
+	}
+	if res.TopicID != 57 || res.StartMsgID != 31449 || res.EndMsgID != 31455 {
+		t.Fatalf("resultado inesperado: %+v", res)
+	}
+}
+
+func TestParseURLChannelWithTopicTrailingSlash(t *testing.T) {
+	res, err := ParseURL("https://t.me/c/2121902112/57/31449/")
+	if err != nil {
+		t.Fatalf("error inesperado: %v", err)
+	}
+	if res.TopicID != 57 || res.StartMsgID != 31449 {
+		t.Fatalf("resultado inesperado: %+v", res)
+	}
+}
+
+func TestParseURLChannelWithTopicAndQuery(t *testing.T) {
+	res, err := ParseURL("https://t.me/c/2121902112/57/31449?single")
+	if err != nil {
+		t.Fatalf("error inesperado: %v", err)
+	}
+	if res.TopicID != 57 || res.StartMsgID != 31449 {
+		t.Fatalf("resultado inesperado: %+v", res)
+	}
+}
+
+func TestParseURLWithoutTopicKeepsTopicZero(t *testing.T) {
+	res, err := ParseURL("https://t.me/c/2121902112/31449")
+	if err != nil {
+		t.Fatalf("error inesperado: %v", err)
+	}
+	if res.TopicID != 0 {
+		t.Fatalf("un enlace sin tema no debe inventarse uno: got %d", res.TopicID)
+	}
+}
+
+func TestParseURLUsernameWithTopic(t *testing.T) {
+	res, err := ParseURL("https://t.me/migrupo/12/345")
+	if err != nil {
+		t.Fatalf("error inesperado: %v", err)
+	}
+	if res.ChatUsername != "migrupo" {
+		t.Fatalf("username incorrecto: %q", res.ChatUsername)
+	}
+	if res.TopicID != 12 || res.StartMsgID != 345 || res.EndMsgID != 345 {
+		t.Fatalf("resultado inesperado: %+v", res)
+	}
+}
+
+func TestParseURLTopicRangeTooLargeStillFails(t *testing.T) {
+	if _, err := ParseURL("https://t.me/c/2121902112/57/1-600"); err == nil {
+		t.Fatal("el límite de mensajes debe seguir aplicándose con temas")
+	}
+}

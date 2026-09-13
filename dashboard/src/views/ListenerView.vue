@@ -16,6 +16,9 @@ const props = defineProps({
 const enabled = ref(props.settings.listener_enabled)
 const chats = ref(props.settings.listener_chats || [])
 const newChatId = ref('')
+// Un grupo con temas se añade en dos pasos: primero se resuelve el grupo y
+// después se elige si se escucha entero o solo uno de sus temas.
+const topicPicker = reactive({ visible: false, loading: false, chat: null, topics: [], selected: 'all' })
 const items = ref(props.initialItems)
 const saving = ref(false)
 const error = ref('')
@@ -43,6 +46,41 @@ watch(() => props.settings.listener_chats, (newVal) => {
 watch(() => props.initialItems, (newItems) => {
   items.value = newItems
 }, { deep: true })
+
+// Una entrada de escucha se identifica por el grupo Y el tema: el mismo grupo
+// puede aparecer varias veces, una por cada tema vigilado.
+const chatKey = chat => (chat && chat.topic_id ? `${chat.id}:${chat.topic_id}` : String(chat ? chat.id : ''))
+
+const topicLabel = chat => {
+  if (!chat || !chat.topic_id) return ''
+  return (chat.topic_name || '').trim() || `Tema ${chat.topic_id}`
+}
+
+// Primero el nombre del tema y después el del grupo, para saber a dónde pertenece.
+const chatLabel = chat => {
+  const group = ((chat && chat.name) || '').trim() || String(chat ? chat.id : '')
+  const topic = topicLabel(chat)
+  return topic ? `${topic} · ${group}` : group
+}
+
+const chatMeta = chat => (chat && chat.topic_id ? `${chat.id} · tema ${chat.topic_id}` : String(chat ? chat.id : ''))
+
+// Acepta un ID numérico o un enlace privado https://t.me/c/<grupo>/<tema>[/<mensaje>].
+const parseChatInput = raw => {
+  const value = (raw || '').trim()
+  if (!value) return null
+
+  const link = value.match(/t\.me\/c\/(\d+)\/(\d+)(?:\/(\d+))?/i)
+  if (link) {
+    const id = Number(`-100${link[1]}`)
+    const topic = Number(link[2])
+    return { id, topic: Number.isInteger(topic) && topic > 0 ? topic : 0 }
+  }
+
+  const id = Number(value)
+  if (!Number.isInteger(id) || id === 0) return null
+  return { id, topic: 0 }
+}
 
 const api = async (url, options = {}) => {
   const response = await fetch(url, { ...options, headers: { ...(options.headers || {}), ...authHeaders() } })
@@ -95,20 +133,86 @@ const save = async () => {
   } catch (err) { props.notify(err.message, true) } finally { saving.value = false }
 }
 
-const addChat = async () => {
-  const value = Number(newChatId.value.trim())
-  if (!Number.isInteger(value) || value === 0) { error.value = 'Escribe un ID de chat válido'; return }
-  if (chats.value.some(chat => chat.id === value)) { error.value = 'Ese chat ya está configurado'; return }
+const closeTopicPicker = () => {
+  topicPicker.visible = false
+  topicPicker.loading = false
+  topicPicker.chat = null
+  topicPicker.topics = []
+  topicPicker.selected = 'all'
+}
+
+const openTopicPicker = async (chat, preselect) => {
+  topicPicker.chat = chat
+  topicPicker.topics = []
+  topicPicker.selected = 'all'
+  topicPicker.visible = true
+  topicPicker.loading = true
+  error.value = ''
   try {
-    const data = await api(`/api/listener/chat/${value}`)
-    chats.value = [...chats.value, data.chat]
-  } catch (err) { props.notify(err.message, true); return }
+    const data = await api(`/api/listener/topics?chat_id=${chat.id}`)
+    topicPicker.topics = data.topics || []
+    // Si el enlace pegado ya traía un tema, viene marcado de entrada.
+    if (preselect && topicPicker.topics.some(topic => Number(topic.id) === Number(preselect))) {
+      topicPicker.selected = String(preselect)
+    }
+  } catch (err) {
+    props.notify(err.message, true)
+  } finally {
+    topicPicker.loading = false
+  }
+}
+
+const addResolvedChat = async chat => {
+  const entry = { ...chat }
+  delete entry.is_forum
+  if (!entry.topic_id) {
+    delete entry.topic_id
+    delete entry.topic_name
+  }
+  if (chats.value.some(existing => chatKey(existing) === chatKey(entry))) {
+    error.value = entry.topic_id ? 'Ese tema ya está configurado' : 'Ese chat ya está configurado'
+    return
+  }
+  chats.value = [...chats.value, entry]
   newChatId.value = ''
+  error.value = ''
+  closeTopicPicker()
   await save()
 }
 
-const removeChat = async id => {
-  chats.value = chats.value.filter(chat => chat.id !== id)
+const addChat = async () => {
+  const parsed = parseChatInput(newChatId.value)
+  if (!parsed) { error.value = 'Escribe el ID numérico del chat o un enlace https://t.me/c/...'; return }
+
+  let chat
+  try {
+    const data = await api(`/api/listener/chat/${parsed.id}`)
+    chat = data.chat
+  } catch (err) { props.notify(err.message, true); return }
+
+  // Solo los grupos con temas ofrecen la elección; el resto se añade directo.
+  if (chat && chat.is_forum) {
+    await openTopicPicker(chat, parsed.topic)
+    return
+  }
+  await addResolvedChat({ ...chat, topic_id: parsed.topic || 0 })
+}
+
+const confirmTopicSelection = async () => {
+  const chat = topicPicker.chat
+  if (!chat) return
+  if (topicPicker.selected === 'all') {
+    await addResolvedChat({ ...chat, topic_id: 0 })
+    return
+  }
+  const topicId = Number(topicPicker.selected)
+  const topic = topicPicker.topics.find(t => Number(t.id) === topicId)
+  await addResolvedChat({ ...chat, topic_id: topicId, topic_name: topic ? topic.name : '' })
+}
+
+const removeChat = async chat => {
+  const key = chatKey(chat)
+  chats.value = chats.value.filter(existing => chatKey(existing) !== key)
   await save()
 }
 const toggle = async () => { await save() }
@@ -253,8 +357,9 @@ const mediaMeta = kind => {
 
 const getChatName = item => {
   if (item.chat_name && item.chat_name !== String(item.chat_id)) return item.chat_name
-  const found = chats.value.find(c => String(c.id) === String(item.chat_id))
-  if (found && found.name && found.name !== String(found.id)) return found.name
+  const found = chats.value.find(c => String(c.id) === String(item.chat_id) && Number(c.topic_id || 0) === Number(item.topic_id || 0))
+    || chats.value.find(c => String(c.id) === String(item.chat_id))
+  if (found && found.name && found.name !== String(found.id)) return chatLabel(found)
   return item.chat_name || item.chat_id
 }
 
@@ -273,20 +378,36 @@ onUnmounted(() => {
   <section class="listener-view">
     <section class="listener-hero"><div><span class="hero-kicker"><Radio :size="13" /> MONITOR DE MENSAJES</span><h2>Escucha multimedia en tiempo real</h2><p>Cuando llegue un archivo a uno de tus chats, aparecerá aquí listo para descargar.</p></div><label class="switch large"><input v-model="enabled" type="checkbox" @change="toggle"><span></span><b>{{ enabled ? 'Escucha activa' : 'Escucha pausada' }}</b></label></section>
     <div class="listener-grid">
-    <section class="panel listener-config"><div class="panel-heading"><div><span class="eyebrow"><MessageCircle :size="12" /> ORÍGENES</span><h2>Chats vigilados</h2></div><span class="count-pill">{{ chats.length }} configurados</span></div><p class="helper-text">Añade el ID numérico de un grupo, canal o chat privado. Se consultará su nombre y podrás decidir si descarga automáticamente sus archivos.</p><div class="listener-add"><input v-model="newChatId" @keyup.enter="addChat" placeholder="Ej. -1001234567890"><button class="save-button" :disabled="saving" @click="addChat"><Plus :size="15" /> Añadir</button></div><div v-if="!chats.length" class="empty-small">No hay chats configurados.</div>
-        <div v-for="chat in chats" :key="chat.id" class="chat-chip">
+    <section class="panel listener-config"><div class="panel-heading"><div><span class="eyebrow"><MessageCircle :size="12" /> ORÍGENES</span><h2>Chats vigilados</h2></div><span class="count-pill">{{ chats.length }} configurados</span></div><p class="helper-text">Añade el ID numérico de un grupo, canal o chat privado, o pega un enlace <code>https://t.me/c/...</code>. Si el grupo usa temas podrás escuchar solo uno de ellos en lugar del grupo entero.</p><div class="listener-add"><input v-model="newChatId" @keyup.enter="addChat" placeholder="Ej. -1001234567890 o https://t.me/c/1234567890/57"><button class="save-button" :disabled="saving" @click="addChat"><Plus :size="15" /> Añadir</button></div>
+        <div v-if="error" class="listener-error">{{ error }}</div>
+        <div v-if="topicPicker.visible" class="topic-picker">
+          <div class="topic-picker-head">
+            <strong>{{ topicPicker.chat?.name }}</strong>
+            <small>Este grupo usa temas. Elige qué quieres escuchar.</small>
+          </div>
+          <div v-if="topicPicker.loading" class="empty-small">Cargando temas…</div>
+          <select v-else v-model="topicPicker.selected" class="topic-select">
+            <option value="all">Todo el grupo</option>
+            <option v-for="topic in topicPicker.topics" :key="topic.id" :value="String(topic.id)">{{ topic.name || ('Tema ' + topic.id) }}{{ topic.closed ? ' (cerrado)' : '' }}</option>
+          </select>
+          <div class="topic-picker-actions">
+            <button class="save-button" :disabled="saving || topicPicker.loading" @click="confirmTopicSelection"><Plus :size="14" /> Añadir</button>
+            <button class="ghost-button" :disabled="saving" @click="closeTopicPicker">Cancelar</button>
+          </div>
+        </div><div v-if="!chats.length" class="empty-small">No hay chats configurados.</div>
+        <div v-for="chat in chats" :key="chatKey(chat)" class="chat-chip">
           <div class="chat-chip-main">
             <MessageCircle :size="14" />
             <div class="chat-details">
-              <strong>{{ chat.name }}</strong>
-              <small>{{ chat.id }}</small>
+              <strong>{{ chatLabel(chat) }}</strong>
+              <small>{{ chatMeta(chat) }}</small>
             </div>
             <label class="auto-toggle switch" :class="{ disabled: saving }">
               <input type="checkbox" v-model="chat.auto_download" :disabled="saving" @change="save">
               <span></span>
               <b>Auto</b>
             </label>
-            <button :disabled="saving" @click="removeChat(chat.id)" aria-label="Eliminar chat"><Trash2 :size="14" /></button>
+            <button :disabled="saving" @click="removeChat(chat)" aria-label="Eliminar chat"><Trash2 :size="14" /></button>
           </div>
           <div class="chat-filters">
             <label class="filter-tag f-photos" :class="{ active: chat.f_photos }"><input type="checkbox" v-model="chat.f_photos" :disabled="saving" @change="save"><span>Fotos</span></label>
@@ -375,6 +496,16 @@ onUnmounted(() => {
 .chat-chip strong{flex:1;color:#d6e4f1;font-weight:500}
 .chat-chip button{border:0;background:transparent;color:#e58b91;font-size:20px;cursor:pointer}
 .save-hint{display:block;color:var(--user-text-dim);font-size:10px;margin-top:13px}.panel-heading{display:flex;justify-content:space-between;align-items:flex-start}.header-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.bulk-actions{display:flex;gap:6px}.bulk-download,.bulk-delete{border:1px solid var(--user-border-light);background:var(--user-bg-base);color:#dbe7f5;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all .2s}.bulk-download:hover{background:var(--user-icon-bg);border-color:var(--user-primary);color:var(--user-accent)}.bulk-delete:hover{background:#251415;border-color:#4a2b2d;color:#e58b91}.listener-item{display:flex;align-items:center;gap:12px;border-top:1px solid var(--user-border);padding:13px 0;overflow:hidden}.file-info{flex:1;min-width:0;overflow:hidden}.file-info strong,.file-info span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.row-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px;margin-left:auto;flex-shrink:0}.row-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}.listener-status{font-size:10px;color:var(--user-text-dim)}.download-small{border:1px solid var(--user-primary);background:var(--user-icon-bg);color:var(--user-primary);border-radius:7px;padding:6px 9px;font-size:10px;cursor:pointer;display:flex;align-items:center;gap:4px}.download-small:hover{background:var(--user-surface-light)}.delete-small{border:1px solid #4a2b2d;background:#251415;color:#e58b91;border-radius:7px;padding:6px 9px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center}.delete-small:hover{background:#3a1d1f}@media(max-width:900px){.listener-grid{grid-template-columns:1fr}}@media(max-width:580px){.listener-hero{align-items:flex-start;flex-direction:column;padding:22px}.listener-add{flex-direction:column}.listener-add .save-button{height:38px}.listener-item .row-side{min-width:75px}}
+.listener-error{margin-top:10px;color:#e58b91;font-size:11px}
+.topic-picker{margin-top:12px;padding:13px;border:1px solid var(--user-border-light);border-radius:12px;background:var(--user-bg-base);display:flex;flex-direction:column;gap:10px}
+.topic-picker-head{display:flex;flex-direction:column;gap:3px}
+.topic-picker-head strong{color:#d6e4f1;font-size:13px;font-weight:500}
+.topic-picker-head small{color:var(--user-text-dim);font-size:11px}
+.topic-select{width:100%;background:var(--user-surface);border:1px solid var(--user-border-light);color:#dbe7f5;border-radius:9px;padding:9px 10px;outline:none;font:inherit;font-size:12px}
+.topic-picker-actions{display:flex;gap:8px}
+.topic-picker-actions .save-button{width:auto;margin:0;padding:0 15px}
+.ghost-button{border:1px solid var(--user-border-light);background:transparent;color:var(--user-text-dim);border-radius:9px;padding:0 15px;font:inherit;font-size:12px;cursor:pointer}
+.ghost-button:hover{color:#dbe7f5;border-color:var(--user-primary)}
 .chat-details{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.chat-details strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-details small{color:var(--user-text-dim);font-size:10px}.auto-toggle{display:flex;align-items:center;gap:7px;color:var(--user-text-dim);cursor:pointer;white-space:nowrap}.auto-toggle span{flex:none}.auto-toggle b{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--user-text-dim);transition:color .2s}.auto-toggle input:checked+span+b{color:var(--user-accent)}.auto-toggle.disabled{cursor:default;opacity:.6}
 .file-symbol{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;border:1px solid var(--user-border);flex-shrink:0;transition:all .2s ease}
 .media-badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-right:6px;border:1px solid transparent;vertical-align:middle}

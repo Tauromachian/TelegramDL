@@ -25,6 +25,9 @@ type ListenerItem struct {
 	MessageID int64   `json:"message_id"`
 	ChatID    int64   `json:"chat_id"`
 	ChatName  string  `json:"chat_name"`
+	GroupName string  `json:"group_name,omitempty"`
+	TopicID   int64   `json:"topic_id,omitempty"`
+	TopicName string  `json:"topic_name,omitempty"`
 	FileName  string  `json:"file_name"`
 	Kind      string  `json:"kind"`
 	TotalStr  string  `json:"total_str"`
@@ -40,22 +43,26 @@ type ListenerEngine struct {
 	storage   *storage.Storage
 	engine    *downloader.Engine
 
-	mu             sync.RWMutex
-	config         config.Config
-	items          map[string]*ListenerItem
-	chatMap        map[int64]config.ListenerChat
+	mu     sync.RWMutex
+	config config.Config
+	items  map[string]*ListenerItem
+	// chatMap agrupa por ID de chat todas sus entradas de escucha: la del grupo
+	// entero y/o una por cada tema vigilado.
+	chatMap        map[int64][]config.ListenerChat
+	topicNameTries map[string]bool
 	stateListeners []ListenerStateListener
 }
 
 func NewListenerEngine(cm *telegram.ClientManager, st *storage.Storage, eng *downloader.Engine, cfg config.Config) *ListenerEngine {
 	cfg = config.NormalizeConfig(cfg)
 	le := &ListenerEngine{
-		clientMgr: cm,
-		storage:   st,
-		engine:    eng,
-		config:    cfg,
-		items:     make(map[string]*ListenerItem),
-		chatMap:   make(map[int64]config.ListenerChat),
+		clientMgr:      cm,
+		storage:        st,
+		engine:         eng,
+		config:         cfg,
+		items:          make(map[string]*ListenerItem),
+		chatMap:        make(map[int64][]config.ListenerChat),
+		topicNameTries: make(map[string]bool),
 	}
 
 	le.updateChatMap(cfg)
@@ -65,15 +72,24 @@ func NewListenerEngine(cm *telegram.ClientManager, st *storage.Storage, eng *dow
 		if saved, err := st.LoadDownloads(""); err == nil {
 			for id, d := range saved {
 				if d.Source == "listener" && (d.Status == "available" || d.Status == "cancelled") {
+					// Al reiniciar no sabemos de qué tema venía cada archivo: solo
+					// se puede afinar cuando el grupo tiene una única entrada
+					// vigilada. Con varias, se muestra el nombre del grupo.
 					chatName := strconv.FormatInt(d.ChatID, 10)
-					if cfgChat, ok := le.chatMap[d.ChatID]; ok && cfgChat.Name != "" {
-						chatName = cfgChat.Name
+					groupName := ""
+					if entries := le.chatMap[d.ChatID]; len(entries) > 0 {
+						groupName = entries[0].GroupName()
+						chatName = groupName
+						if len(entries) == 1 {
+							chatName = entries[0].DisplayName()
+						}
 					}
 					le.items[id] = &ListenerItem{
 						ID:        d.ID,
 						MessageID: d.MessageID,
 						ChatID:    d.ChatID,
 						ChatName:  chatName,
+						GroupName: groupName,
 						FileName:  d.FileName,
 						Kind:      d.Kind,
 						TotalStr:  d.TotalStr,
@@ -137,9 +153,9 @@ func (le *ListenerEngine) notifyState(item ListenerItem) {
 }
 
 func (le *ListenerEngine) updateChatMap(cfg config.Config) {
-	le.chatMap = make(map[int64]config.ListenerChat)
+	le.chatMap = make(map[int64][]config.ListenerChat)
 	for _, c := range cfg.ListenerChats {
-		le.chatMap[c.ID] = c
+		le.chatMap[c.ID] = append(le.chatMap[c.ID], c)
 	}
 }
 
@@ -155,25 +171,88 @@ func (le *ListenerEngine) UpdateConfig(cfg config.Config) {
 			le.config.ListenerEnabled, len(le.chatMap)), "")
 }
 
-func (le *ListenerEngine) matchChatID(peerID int64, rawChannelID ...int64) (config.ListenerChat, bool) {
-	if cfg, ok := le.chatMap[peerID]; ok {
-		return cfg, true
-	}
-
-	if len(rawChannelID) > 0 && rawChannelID[0] != 0 {
-		channelID := rawChannelID[0]
-		candidates := []int64{channelID, -channelID}
-		if canonical, err := strconv.ParseInt(fmt.Sprintf("-100%d", channelID), 10, 64); err == nil {
+// chatIDCandidates enumera las formas en que un mismo chat puede estar anotado
+// en la configuración: el ID canónico y, para canales, también el ID interno
+// con y sin signo.
+func chatIDCandidates(peerID int64, rawChannelID int64) []int64 {
+	candidates := []int64{peerID}
+	if rawChannelID != 0 {
+		candidates = append(candidates, rawChannelID, -rawChannelID)
+		if canonical, err := strconv.ParseInt(fmt.Sprintf("-100%d", rawChannelID), 10, 64); err == nil && canonical != peerID {
 			candidates = append(candidates, canonical)
 		}
-		for _, candidate := range candidates {
-			if cfg, ok := le.chatMap[candidate]; ok {
-				return cfg, true
+	}
+	return candidates
+}
+
+// topicMatches compara el tema configurado con el que trae el mensaje. En un
+// grupo con temas, los mensajes del tema «General» llegan sin cabecera de tema,
+// así que un 0 se interpreta como ese tema (el número 1).
+func topicMatches(configured, msgTopicID int64) bool {
+	if msgTopicID <= 0 {
+		msgTopicID = config.GeneralTopicID
+	}
+	return configured == msgTopicID
+}
+
+// messageTopicID extrae de un mensaje el tema del foro al que pertenece.
+// Devuelve 0 cuando el mensaje no está en un tema (grupo normal o tema
+// «General», que Telegram no marca).
+func messageTopicID(msg *tg.Message) int64 {
+	if msg == nil {
+		return 0
+	}
+	header, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
+	if !ok || header == nil {
+		return 0
+	}
+	// Sin esta marca no estamos ante un tema, sino ante una respuesta normal:
+	// tomar su reply_to_msg_id como tema haría que cualquier respuesta pareciera
+	// pertenecer a un tema inexistente.
+	if !header.ForumTopic {
+		return 0
+	}
+	// Al responder dentro de un tema, reply_to_top_id apunta al tema y
+	// reply_to_msg_id al mensaje concreto. Cuando se escribe directamente en el
+	// tema, solo viene reply_to_msg_id y ese es el tema.
+	if topID, ok := header.GetReplyToTopID(); ok && topID != 0 {
+		return int64(topID)
+	}
+	if msgID, ok := header.GetReplyToMsgID(); ok && msgID != 0 {
+		return int64(msgID)
+	}
+	return 0
+}
+
+// matchChat busca la entrada de escucha que corresponde a un mensaje. Gana
+// siempre la entrada más específica: si el grupo tiene vigilado ese tema
+// concreto se usa esa, y solo si no hay ninguna se recurre a la entrada del
+// grupo entero. Un grupo vigilado únicamente por temas ignora todo lo que
+// llegue por temas distintos.
+func (le *ListenerEngine) matchChat(peerID, rawChannelID, msgTopicID int64) (config.ListenerChat, bool) {
+	var fallback config.ListenerChat
+	haveFallback := false
+
+	for _, candidate := range chatIDCandidates(peerID, rawChannelID) {
+		entries, ok := le.chatMap[candidate]
+		if !ok {
+			continue
+		}
+		for _, chat := range entries {
+			if chat.HasTopic() {
+				if topicMatches(chat.Topic(), msgTopicID) {
+					return chat, true
+				}
+				continue
+			}
+			if !haveFallback {
+				fallback = chat
+				haveFallback = true
 			}
 		}
 	}
 
-	return config.ListenerChat{}, false
+	return fallback, haveFallback
 }
 
 func entityChatName(entities tg.Entities, peerID, rawChannelID int64) string {
@@ -240,12 +319,80 @@ func (le *ListenerEngine) rememberChatName(peerID, rawChannelID int64, name stri
 	}
 }
 
+// ensureTopicName pregunta a Telegram el título de un tema vigilado cuando la
+// configuración todavía no lo tiene, y lo guarda. Se intenta una sola vez por
+// tema y en segundo plano, para no retrasar el manejo del mensaje que lo
+// disparó ni repetir la consulta con cada archivo que llegue.
+func (le *ListenerEngine) ensureTopicName(ctx context.Context, chat config.ListenerChat) {
+	if !chat.HasTopic() || le.clientMgr == nil {
+		return
+	}
+
+	key := chat.Key()
+	le.mu.Lock()
+	if le.topicNameTries == nil {
+		le.topicNameTries = make(map[string]bool)
+	}
+	if le.topicNameTries[key] {
+		le.mu.Unlock()
+		return
+	}
+	le.topicNameTries[key] = true
+	le.mu.Unlock()
+
+	chatID := chat.ID
+	topicID := chat.Topic()
+	go func() {
+		// El contexto del mensaje se cancela en cuanto se atiende; para una
+		// consulta que va por libre hace falta uno propio.
+		reqCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
+		defer cancel()
+
+		name, err := le.ResolveTopicName(reqCtx, chatID, topicID)
+		if err != nil || strings.TrimSpace(name) == "" {
+			return
+		}
+		le.rememberTopicName(chatID, topicID, name)
+	}()
+}
+
+// rememberTopicName guarda el título de un tema en la configuración y lo
+// persiste, igual que se hace con el nombre del grupo.
+func (le *ListenerEngine) rememberTopicName(chatID, topicID int64, name string) {
+	name = strings.TrimSpace(name)
+	if name == "" || topicID <= 0 {
+		return
+	}
+
+	le.mu.Lock()
+	updated := false
+	for i := range le.config.ListenerChats {
+		chat := &le.config.ListenerChats[i]
+		if chat.ID == chatID && chat.Topic() == topicID && chat.TopicName != name {
+			chat.TopicName = name
+			updated = true
+		}
+	}
+	if updated {
+		le.updateChatMap(le.config)
+	}
+	cfg := le.config
+	le.mu.Unlock()
+
+	if updated && le.storage != nil {
+		if err := le.storage.SaveConfig(cfg); err != nil {
+			log.Printf("[LISTENER] error guardando configuración en BD: %v", err)
+		}
+	}
+}
+
 // ChatName devuelve el nombre configurado de un chat vigilado, o cadena vacía
-// si ese chat no está en la lista de escucha.
+// si ese chat no está en la lista de escucha. Es el nombre del grupo, sin el
+// tema: quien lo usa (el registro de actividad) solo conoce el ID del chat.
 func (le *ListenerEngine) ChatName(chatID int64) string {
 	le.mu.RLock()
 	defer le.mu.RUnlock()
-	if chat, ok := le.chatMap[chatID]; ok {
+	for _, chat := range le.chatMap[chatID] {
 		name := strings.TrimSpace(chat.Name)
 		if name != "" && name != strconv.FormatInt(chatID, 10) {
 			return name
@@ -309,8 +456,12 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 		return nil
 	}
 
+	// El tema al que pertenece el mensaje decide si nos interesa: un grupo
+	// vigilado por temas solo acepta los suyos.
+	msgTopicID := messageTopicID(msg)
+
 	le.mu.RLock()
-	chatCfg, watched := le.matchChatID(peerID, rawChannelID)
+	chatCfg, watched := le.matchChat(peerID, rawChannelID, msgTopicID)
 	le.mu.RUnlock()
 
 	if !watched {
@@ -321,11 +472,18 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 		chatCfg.Name = actualName
 		le.rememberChatName(peerID, rawChannelID, actualName)
 	}
-
-	chatName := chatCfg.Name
-	if chatName == "" {
-		chatName = strconv.FormatInt(peerID, 10)
+	if chatCfg.Name == "" {
+		chatCfg.Name = strconv.FormatInt(peerID, 10)
 	}
+
+	// Si el tema se configuró sin nombre (por ejemplo pegando un enlace), se
+	// pregunta a Telegram una sola vez y se guarda para los siguientes archivos.
+	if chatCfg.HasTopic() && strings.TrimSpace(chatCfg.TopicName) == "" {
+		le.ensureTopicName(ctx, chatCfg)
+	}
+
+	// Nombre del tema seguido del nombre del grupo, para saber de dónde viene.
+	chatName := chatCfg.DisplayName()
 
 	// Un mensaje sin multimedia (texto, encuesta, servicio...) simplemente no
 	// interesa a la escucha: no se registra nada para no llenar el log.
@@ -397,6 +555,9 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 			MessageID: int64(msg.ID),
 			ChatID:    peerID,
 			ChatName:  chatName,
+			GroupName: chatCfg.GroupName(),
+			TopicID:   chatCfg.Topic(),
+			TopicName: chatCfg.TopicLabel(),
 			FileName:  mediaInfo.FileName,
 			Kind:      string(mediaInfo.Kind),
 			TotalStr:  config.FormatBytes(float64(mediaInfo.FileSize)),
@@ -524,6 +685,17 @@ type ResolvedChatInfo struct {
 	Name     string `json:"name"`
 	Type     string `json:"type"`
 	Username string `json:"username,omitempty"`
+	// IsForum indica que el supergrupo tiene temas, así que el panel puede
+	// ofrecer la lista de temas en lugar de vigilar el grupo entero.
+	IsForum bool `json:"is_forum"`
+}
+
+// ForumTopicInfo es un tema de un grupo, tal y como lo necesita el panel para
+// dejar elegir cuál vigilar.
+type ForumTopicInfo struct {
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
+	Closed bool   `json:"closed,omitempty"`
 }
 
 // ResolveChat consulta a Telegram los datos de un chat y, de paso, guarda su
@@ -576,6 +748,7 @@ func (le *ListenerEngine) resolveChat(ctx context.Context, chatID int64) (Resolv
 					if ch, ok := chats[0].(*tg.Channel); ok {
 						info.Name = ch.Title
 						info.Username = ch.Username
+						info.IsForum = ch.Forum
 						if ch.Megagroup {
 							info.Type = "supergroup"
 						} else {
@@ -605,6 +778,7 @@ func (le *ListenerEngine) resolveChat(ctx context.Context, chatID int64) (Resolv
 					if ch, ok := chat.(*tg.Channel); ok && ch.ID == channelID {
 						info.Name = ch.Title
 						info.Username = ch.Username
+						info.IsForum = ch.Forum
 						if ch.Megagroup {
 							info.Type = "supergroup"
 						} else {
@@ -668,6 +842,7 @@ func (le *ListenerEngine) resolveChat(ctx context.Context, chatID int64) (Resolv
 				if ch, ok := resCh.GetChats()[0].(*tg.Channel); ok {
 					info.Name = ch.Title
 					info.Username = ch.Username
+					info.IsForum = ch.Forum
 					if ch.Megagroup {
 						info.Type = "supergroup"
 					} else {
@@ -680,4 +855,124 @@ func (le *ListenerEngine) resolveChat(ctx context.Context, chatID int64) (Resolv
 	}
 
 	return info, nil
+}
+
+// inputPeer construye el peer de MTProto para un ID de chat canónico,
+// recuperando el access hash de la caché del cliente (y refrescando los
+// diálogos si todavía no lo tenemos).
+func (le *ListenerEngine) inputPeer(ctx context.Context, chatID int64) (tg.InputPeerClass, error) {
+	if le.clientMgr == nil || le.clientMgr.RawClient() == nil {
+		return nil, errors.New("cliente no conectado")
+	}
+
+	if chatID > 0 {
+		accessHash, found := le.clientMgr.GetUserAccessHash(chatID)
+		if !found {
+			_ = le.clientMgr.FetchDialogs(ctx)
+			accessHash, _ = le.clientMgr.GetUserAccessHash(chatID)
+		}
+		return &tg.InputPeerUser{UserID: chatID, AccessHash: accessHash}, nil
+	}
+
+	s := strconv.FormatInt(chatID, 10)
+	if !strings.HasPrefix(s, "-100") || len(s) <= 4 {
+		// Grupo básico: no admite temas, pero devolvemos un peer válido para que
+		// quien llame decida qué hacer.
+		return &tg.InputPeerChat{ChatID: -chatID}, nil
+	}
+
+	channelID, err := strconv.ParseInt(s[4:], 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("ID de canal inválido: %s", s)
+	}
+	accessHash, found := le.clientMgr.GetChannelAccessHash(channelID)
+	if !found {
+		_ = le.clientMgr.FetchDialogs(ctx)
+		accessHash, _ = le.clientMgr.GetChannelAccessHash(channelID)
+	}
+	return &tg.InputPeerChannel{ChannelID: channelID, AccessHash: accessHash}, nil
+}
+
+// maxForumTopics acota cuántos temas se traen para el desplegable del panel.
+// Un grupo con más temas que esto es rarísimo y paginar aquí solo complicaría
+// la vista sin aportar nada.
+const maxForumTopics = 200
+
+// ResolveTopics devuelve los temas de un grupo con temas, para que el panel
+// deje elegir cuál vigilar. Si el grupo no tiene temas, la lista viene vacía.
+func (le *ListenerEngine) ResolveTopics(ctx context.Context, chatID int64) ([]ForumTopicInfo, error) {
+	if le.clientMgr == nil {
+		return nil, errors.New("cliente no conectado")
+	}
+	raw := le.clientMgr.RawClient()
+	if raw == nil {
+		return nil, errors.New("cliente no conectado")
+	}
+
+	peer, err := le.inputPeer(ctx, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if _, isChannel := peer.(*tg.InputPeerChannel); !isChannel {
+		return []ForumTopicInfo{}, nil
+	}
+
+	res, err := raw.MessagesGetForumTopics(ctx, &tg.MessagesGetForumTopicsRequest{
+		Peer:  peer,
+		Limit: maxForumTopics,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("no se pudieron obtener los temas: %w", err)
+	}
+
+	topics := make([]ForumTopicInfo, 0, len(res.Topics))
+	for _, t := range res.Topics {
+		topic, ok := t.(*tg.ForumTopic)
+		if !ok {
+			continue
+		}
+		topics = append(topics, ForumTopicInfo{
+			ID:     int64(topic.ID),
+			Name:   strings.TrimSpace(topic.Title),
+			Closed: topic.Closed,
+		})
+	}
+	return topics, nil
+}
+
+// ResolveTopicName devuelve el título de un tema concreto.
+func (le *ListenerEngine) ResolveTopicName(ctx context.Context, chatID, topicID int64) (string, error) {
+	if le.clientMgr == nil {
+		return "", errors.New("cliente no conectado")
+	}
+	raw := le.clientMgr.RawClient()
+	if raw == nil {
+		return "", errors.New("cliente no conectado")
+	}
+	if topicID <= 0 {
+		return "", nil
+	}
+
+	peer, err := le.inputPeer(ctx, chatID)
+	if err != nil {
+		return "", err
+	}
+	if _, isChannel := peer.(*tg.InputPeerChannel); !isChannel {
+		return "", nil
+	}
+
+	res, err := raw.MessagesGetForumTopicsByID(ctx, &tg.MessagesGetForumTopicsByIDRequest{
+		Peer:   peer,
+		Topics: []int{int(topicID)},
+	})
+	if err != nil {
+		return "", fmt.Errorf("no se pudo obtener el tema %d: %w", topicID, err)
+	}
+
+	for _, t := range res.Topics {
+		if topic, ok := t.(*tg.ForumTopic); ok && int64(topic.ID) == topicID {
+			return strings.TrimSpace(topic.Title), nil
+		}
+	}
+	return "", fmt.Errorf("el tema %d no existe en este grupo", topicID)
 }

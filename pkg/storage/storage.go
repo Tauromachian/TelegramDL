@@ -93,16 +93,7 @@ func (s *Storage) initSchema() error {
 		value TEXT NOT NULL
 	);
 
-	CREATE TABLE IF NOT EXISTS listener_chats (
-		chat_id INTEGER PRIMARY KEY,
-		name TEXT NOT NULL,
-		auto_download INTEGER NOT NULL DEFAULT 0,
-		f_photos INTEGER NOT NULL DEFAULT 1,
-		f_videos INTEGER NOT NULL DEFAULT 1,
-		f_audios INTEGER NOT NULL DEFAULT 1,
-		f_docs INTEGER NOT NULL DEFAULT 1,
-		f_stickers INTEGER NOT NULL DEFAULT 1
-	);
+	` + listenerChatsSchema + `
 
 	CREATE TABLE IF NOT EXISTS downloads (
 		id TEXT PRIMARY KEY,
@@ -147,7 +138,95 @@ func (s *Storage) initSchema() error {
 		_, _ = s.db.Exec(fmt.Sprintf("ALTER TABLE listener_chats ADD COLUMN %s INTEGER NOT NULL DEFAULT 1", col))
 	}
 
+	if err := s.migrateListenerTopics(); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// listenerChatsSchema es la definición actual de la tabla de chats vigilados.
+// La clave primaria es el par (chat_id, topic_id) porque un mismo grupo puede
+// vigilarse varias veces, una por cada tema. topic_id = 0 significa «todo el
+// grupo».
+const listenerChatsSchema = `
+	CREATE TABLE IF NOT EXISTS listener_chats (
+		chat_id INTEGER NOT NULL,
+		topic_id INTEGER NOT NULL DEFAULT 0,
+		topic_name TEXT NOT NULL DEFAULT '',
+		name TEXT NOT NULL,
+		auto_download INTEGER NOT NULL DEFAULT 0,
+		f_photos INTEGER NOT NULL DEFAULT 1,
+		f_videos INTEGER NOT NULL DEFAULT 1,
+		f_audios INTEGER NOT NULL DEFAULT 1,
+		f_docs INTEGER NOT NULL DEFAULT 1,
+		f_stickers INTEGER NOT NULL DEFAULT 1,
+		PRIMARY KEY(chat_id, topic_id)
+	);
+`
+
+// tableColumns devuelve el conjunto de columnas de una tabla, o un mapa vacío
+// si la tabla no existe.
+func (s *Storage) tableColumns(table string) (map[string]bool, error) {
+	cols := make(map[string]bool)
+	rows, err := s.db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return cols, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dflt, &pk); err == nil {
+			cols[name] = true
+		}
+	}
+	return cols, rows.Err()
+}
+
+// migrateListenerTopics lleva la tabla de chats vigilados del esquema antiguo
+// (una fila por grupo, chat_id como clave primaria) al nuevo, que admite una
+// fila por tema. No se puede cambiar una clave primaria con ALTER TABLE, así
+// que hay que reconstruir la tabla y volcar lo que hubiera dentro.
+func (s *Storage) migrateListenerTopics() error {
+	cols, err := s.tableColumns("listener_chats")
+	if err != nil {
+		return fmt.Errorf("error al inspeccionar listener_chats: %w", err)
+	}
+	// Sin columnas la tabla no existe (la acaba de crear el esquema de arriba con
+	// el formato nuevo) y con topic_id la migración ya se hizo en otro arranque.
+	if len(cols) == 0 || cols["topic_id"] {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	steps := []string{
+		"ALTER TABLE listener_chats RENAME TO listener_chats_legacy",
+		listenerChatsSchema,
+		`INSERT OR IGNORE INTO listener_chats(
+			chat_id, topic_id, topic_name, name, auto_download,
+			f_photos, f_videos, f_audios, f_docs, f_stickers
+		)
+		SELECT chat_id, 0, '', name, auto_download,
+			f_photos, f_videos, f_audios, f_docs, f_stickers
+		FROM listener_chats_legacy`,
+		"DROP TABLE listener_chats_legacy",
+	}
+	for _, step := range steps {
+		if _, err := tx.Exec(step); err != nil {
+			return fmt.Errorf("error al migrar listener_chats a temas: %w", err)
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (s *Storage) setConfigKey(key, value string) error {
@@ -344,14 +423,20 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 	}
 
 	// Cargar listener_chats
-	chatRows, err := s.db.Query("SELECT chat_id, name, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers FROM listener_chats ORDER BY chat_id")
+	chatRows, err := s.db.Query("SELECT chat_id, topic_id, topic_name, name, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers FROM listener_chats ORDER BY chat_id, topic_id")
 	if err == nil {
 		defer chatRows.Close()
 		chats := make([]config.ListenerChat, 0)
 		for chatRows.Next() {
 			var c config.ListenerChat
+			var topicID int64
+			var topicName string
 			var auto, photos, videos, audios, docs, stickers int
-			if err := chatRows.Scan(&c.ID, &c.Name, &auto, &photos, &videos, &audios, &docs, &stickers); err == nil {
+			if err := chatRows.Scan(&c.ID, &topicID, &topicName, &c.Name, &auto, &photos, &videos, &audios, &docs, &stickers); err == nil {
+				c.TopicID = config.TopicPointer(topicID)
+				if c.HasTopic() {
+					c.TopicName = topicName
+				}
 				c.AutoDownload = auto != 0
 				c.FPhotos = photos != 0
 				c.FVideos = videos != 0
@@ -399,9 +484,9 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 						c.FDocs = true
 						c.FStickers = true
 						_, _ = s.db.Exec(`
-							INSERT OR REPLACE INTO listener_chats(chat_id, name, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers)
-							VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-						`, c.ID, c.Name, c.AutoDownload, c.FPhotos, c.FVideos, c.FAudios, c.FDocs, c.FStickers)
+							INSERT OR REPLACE INTO listener_chats(chat_id, topic_id, topic_name, name, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers)
+							VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+						`, c.ID, c.Topic(), c.TopicName, c.Name, c.AutoDownload, c.FPhotos, c.FVideos, c.FAudios, c.FDocs, c.FStickers)
 						cfg.ListenerChats = append(cfg.ListenerChats, c)
 					}
 				}
@@ -483,9 +568,9 @@ func (s *Storage) SaveConfig(cfg config.Config) error {
 		}
 
 		_, err := tx.Exec(`
-			INSERT INTO listener_chats(chat_id, name, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers)
-			VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-		`, c.ID, name, auto, fPhotos, fVideos, fAudios, fDocs, fStickers)
+			INSERT OR REPLACE INTO listener_chats(chat_id, topic_id, topic_name, name, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers)
+			VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, c.ID, c.Topic(), c.TopicName, name, auto, fPhotos, fVideos, fAudios, fDocs, fStickers)
 		if err != nil {
 			return err
 		}

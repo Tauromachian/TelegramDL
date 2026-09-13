@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	AppVersion = "2.3.9"
+	AppVersion = "2.4.0"
 	GithubRepo = "infinityxgame/tgdown"
 
 	// DefaultBindHost es la dirección en la que escucha el panel cuando el
@@ -39,8 +39,19 @@ type SpeedLimit struct {
 	Unit  string  `json:"unit"`
 }
 
+// GeneralTopicID es el número que Telegram reserva para el tema «General» de
+// un grupo con temas. Los mensajes publicados ahí no llevan cabecera de tema,
+// así que hay que ponerles este valor a mano para poder compararlos.
+const GeneralTopicID int64 = 1
+
+// ListenerChat describe un origen vigilado. Cuando TopicID es nil se escucha el
+// grupo entero; cuando trae un número, solo ese tema del grupo. Un mismo grupo
+// puede aparecer varias veces con temas distintos, así que lo que identifica a
+// una entrada es el par (ID, TopicID) y no el ID a secas.
 type ListenerChat struct {
 	ID           int64  `json:"id"`
+	TopicID      *int64 `json:"topic_id,omitempty"`
+	TopicName    string `json:"topic_name,omitempty"`
 	Name         string `json:"name"`
 	AutoDownload bool   `json:"auto_download"`
 	FPhotos      bool   `json:"f_photos"`
@@ -48,6 +59,72 @@ type ListenerChat struct {
 	FAudios      bool   `json:"f_audios"`
 	FDocs        bool   `json:"f_docs"`
 	FStickers    bool   `json:"f_stickers"`
+}
+
+// ListenerChatKey construye el identificador único de una entrada de escucha.
+func ListenerChatKey(chatID int64, topicID *int64) string {
+	if topicID == nil || *topicID <= 0 {
+		return strconv.FormatInt(chatID, 10)
+	}
+	return strconv.FormatInt(chatID, 10) + ":" + strconv.FormatInt(*topicID, 10)
+}
+
+// Key identifica la entrada dentro de la lista de escucha.
+func (c ListenerChat) Key() string {
+	return ListenerChatKey(c.ID, c.TopicID)
+}
+
+// HasTopic indica si la entrada está acotada a un tema concreto.
+func (c ListenerChat) HasTopic() bool {
+	return c.TopicID != nil && *c.TopicID > 0
+}
+
+// Topic devuelve el número de tema vigilado, o 0 si se vigila el grupo entero.
+func (c ListenerChat) Topic() int64 {
+	if !c.HasTopic() {
+		return 0
+	}
+	return *c.TopicID
+}
+
+// GroupName es el título del grupo, con el ID como último recurso.
+func (c ListenerChat) GroupName() string {
+	name := strings.TrimSpace(c.Name)
+	if name == "" {
+		return strconv.FormatInt(c.ID, 10)
+	}
+	return name
+}
+
+// TopicLabel es el nombre del tema vigilado ("Tema 42" mientras Telegram no
+// nos haya dado su título), o cadena vacía si se vigila el grupo entero.
+func (c ListenerChat) TopicLabel() string {
+	if !c.HasTopic() {
+		return ""
+	}
+	if topic := strings.TrimSpace(c.TopicName); topic != "" {
+		return topic
+	}
+	return fmt.Sprintf("Tema %d", c.Topic())
+}
+
+// DisplayName es lo que ve el usuario: primero el nombre del tema y después el
+// del grupo al que pertenece, para saber siempre de dónde viene el archivo.
+func (c ListenerChat) DisplayName() string {
+	if topic := c.TopicLabel(); topic != "" {
+		return topic + " · " + c.GroupName()
+	}
+	return c.GroupName()
+}
+
+// TopicPointer normaliza un número de tema a la forma que guarda ListenerChat:
+// 0 o negativo significan «todo el grupo».
+func TopicPointer(topicID int64) *int64 {
+	if topicID <= 0 {
+		return nil
+	}
+	v := topicID
+	return &v
 }
 
 type Config struct {
@@ -353,9 +430,41 @@ func NormalizeConfig(raw Config) Config {
 		raw.SpeedLimit.Value = 0
 	}
 
-	chatIDs := make([]int64, 0, len(raw.ListenerChats))
-	for i := range raw.ListenerChats {
-		chatIDs = append(chatIDs, raw.ListenerChats[i].ID)
+	// Dos entradas con el mismo grupo y el mismo tema son la misma cosa: la
+	// última gana. Sin esto, la clave primaria (chat_id, topic_id) de SQLite
+	// rechazaría el guardado entero.
+	seenKeys := make(map[string]int, len(raw.ListenerChats))
+	uniqueChats := make([]ListenerChat, 0, len(raw.ListenerChats))
+	for _, chat := range raw.ListenerChats {
+		if chat.TopicID != nil && *chat.TopicID <= 0 {
+			chat.TopicID = nil
+		}
+		if !chat.HasTopic() {
+			chat.TopicName = ""
+		}
+		chat.TopicName = strings.TrimSpace(chat.TopicName)
+		chat.Name = strings.TrimSpace(chat.Name)
+
+		if pos, dup := seenKeys[chat.Key()]; dup {
+			uniqueChats[pos] = chat
+			continue
+		}
+		seenKeys[chat.Key()] = len(uniqueChats)
+		uniqueChats = append(uniqueChats, chat)
+	}
+	raw.ListenerChats = uniqueChats
+
+	// ListenerChatIDs es la lista plana de grupos vigilados. Con temas, un mismo
+	// grupo puede tener varias entradas, así que aquí solo aparece una vez.
+	seenIDs := make(map[int64]bool, len(uniqueChats))
+	chatIDs := make([]int64, 0, len(uniqueChats))
+	for i := range uniqueChats {
+		id := uniqueChats[i].ID
+		if seenIDs[id] {
+			continue
+		}
+		seenIDs[id] = true
+		chatIDs = append(chatIDs, id)
 	}
 	raw.ListenerChatIDs = chatIDs
 

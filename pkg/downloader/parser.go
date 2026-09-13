@@ -12,14 +12,22 @@ type ParsedURL struct {
 	ChatUsername string
 	ChatID       int64
 	IsChannelID  bool
-	StartMsgID   int
-	EndMsgID     int
+	// TopicID es el tema del grupo cuando el enlace lo lleva
+	// (https://t.me/c/CHAT/TEMA/MENSAJE), o 0 si no aplica. Para descargar no
+	// hace falta —el ID de mensaje es único dentro del chat—, pero se conserva
+	// para poder mostrarlo y registrarlo.
+	TopicID    int
+	StartMsgID int
+	EndMsgID   int
 }
 
+// Los enlaces de un grupo con temas llevan un número extra en medio:
+// https://t.me/c/2121902112/57/31449. El grupo (?:(\d+)/)? lo captura de forma
+// opcional, de modo que los enlaces de siempre siguen funcionando igual.
 var (
-	channelRegex  = regexp.MustCompile(`^https://t\.me/c/(\d+)/(\d+)(?:-(\d+))?(?:/)?(?:[?#].*)?$`)
-	botRegex      = regexp.MustCompile(`^https://t\.me/b/([A-Za-z0-9_]{1,64})/(\d+)(?:-(\d+))?(?:/)?(?:[?#].*)?$`)
-	usernameRegex = regexp.MustCompile(`^https://t\.me/([A-Za-z0-9_]{1,64})/(\d+)(?:-(\d+))?(?:/)?(?:[?#].*)?$`)
+	channelRegex  = regexp.MustCompile(`^https://t\.me/c/(\d+)/(?:(\d+)/)?(\d+)(?:-(\d+))?(?:/)?(?:[?#].*)?$`)
+	botRegex      = regexp.MustCompile(`^https://t\.me/b/([A-Za-z0-9_]{1,64})/(?:(\d+)/)?(\d+)(?:-(\d+))?(?:/)?(?:[?#].*)?$`)
+	usernameRegex = regexp.MustCompile(`^https://t\.me/([A-Za-z0-9_]{1,64})/(?:(\d+)/)?(\d+)(?:-(\d+))?(?:/)?(?:[?#].*)?$`)
 )
 
 const MaxMessagesPerJob = 500
@@ -67,7 +75,8 @@ func ParseURL(url string) (*ParsedURL, error) {
 	}
 
 	if match := channelRegex.FindStringSubmatch(clean); match != nil {
-		startID, endID, err := parseMsgRange(match[2], submatchOrEmpty(match, 3))
+		topicID, _ := strconv.Atoi(submatchOrEmpty(match, 2))
+		startID, endID, err := parseMsgRange(match[3], submatchOrEmpty(match, 4))
 		if err != nil {
 			return nil, err
 		}
@@ -78,6 +87,7 @@ func ParseURL(url string) (*ParsedURL, error) {
 		return &ParsedURL{
 			ChatID:      tgChatID,
 			IsChannelID: true,
+			TopicID:     topicID,
 			StartMsgID:  startID,
 			EndMsgID:    endID,
 		}, nil
@@ -85,7 +95,8 @@ func ParseURL(url string) (*ParsedURL, error) {
 
 	if match := botRegex.FindStringSubmatch(clean); match != nil {
 		username := match[1]
-		startID, endID, err := parseMsgRange(match[2], submatchOrEmpty(match, 3))
+		topicID, _ := strconv.Atoi(submatchOrEmpty(match, 2))
+		startID, endID, err := parseMsgRange(match[3], submatchOrEmpty(match, 4))
 		if err != nil {
 			return nil, err
 		}
@@ -93,6 +104,7 @@ func ParseURL(url string) (*ParsedURL, error) {
 		return &ParsedURL{
 			ChatUsername: username,
 			IsChannelID:  false,
+			TopicID:      topicID,
 			StartMsgID:   startID,
 			EndMsgID:     endID,
 		}, nil
@@ -100,7 +112,8 @@ func ParseURL(url string) (*ParsedURL, error) {
 
 	if match := usernameRegex.FindStringSubmatch(clean); match != nil {
 		username := match[1]
-		startID, endID, err := parseMsgRange(match[2], submatchOrEmpty(match, 3))
+		topicID, _ := strconv.Atoi(submatchOrEmpty(match, 2))
+		startID, endID, err := parseMsgRange(match[3], submatchOrEmpty(match, 4))
 		if err != nil {
 			return nil, err
 		}
@@ -108,10 +121,11 @@ func ParseURL(url string) (*ParsedURL, error) {
 		return &ParsedURL{
 			ChatUsername: username,
 			IsChannelID:  false,
+			TopicID:      topicID,
 			StartMsgID:   startID,
 			EndMsgID:     endID,
 		}, nil
 	}
 
-	return nil, errors.New("URL no válida. Formatos soportados: https://t.me/c/... o https://t.me/...")
+	return nil, errors.New("URL no válida. Formatos soportados: https://t.me/c/CHAT/MENSAJE, https://t.me/c/CHAT/TEMA/MENSAJE o https://t.me/usuario/MENSAJE")
 }

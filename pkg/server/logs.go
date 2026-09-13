@@ -128,18 +128,20 @@ func logListenerConfigChanges(before, after config.Config) {
 		}
 	}
 
-	oldChats := make(map[int64]config.ListenerChat, len(before.ListenerChats))
+	// Las entradas se indexan por (chat, tema): un mismo grupo puede aparecer
+	// varias veces, una por cada tema vigilado, y cada una se registra aparte.
+	oldChats := make(map[string]config.ListenerChat, len(before.ListenerChats))
 	for _, c := range before.ListenerChats {
-		oldChats[c.ID] = c
+		oldChats[c.Key()] = c
 	}
-	newChats := make(map[int64]config.ListenerChat, len(after.ListenerChats))
+	newChats := make(map[string]config.ListenerChat, len(after.ListenerChats))
 	for _, c := range after.ListenerChats {
-		newChats[c.ID] = c
+		newChats[c.Key()] = c
 	}
 
 	// Chats añadidos y modificados, en el orden en que están configurados.
 	for _, chat := range after.ListenerChats {
-		previous, existed := oldChats[chat.ID]
+		previous, existed := oldChats[chat.Key()]
 		if !existed {
 			logbus.Success(logbus.CatListener,
 				fmt.Sprintf("Chat añadido a la escucha: %s", describeChat(chat)),
@@ -160,6 +162,9 @@ func logListenerConfigChanges(before, after config.Config) {
 		if previous.Name != chat.Name && strings.TrimSpace(chat.Name) != "" {
 			details = append(details, fmt.Sprintf("Nombre: %s → %s", previous.Name, chat.Name))
 		}
+		if previous.TopicName != chat.TopicName && strings.TrimSpace(chat.TopicName) != "" {
+			details = append(details, fmt.Sprintf("Tema: %s", chat.TopicName))
+		}
 		if len(details) > 0 {
 			logbus.Info(logbus.CatListener,
 				fmt.Sprintf("Chat actualizado: %s", describeChat(chat)),
@@ -167,24 +172,39 @@ func logListenerConfigChanges(before, after config.Config) {
 		}
 	}
 
-	// Chats eliminados, en orden estable por ID para que el log sea reproducible.
+	// Chats eliminados, en orden estable por ID y tema para que el log sea
+	// reproducible.
 	removed := make([]config.ListenerChat, 0)
-	for id, chat := range oldChats {
-		if _, still := newChats[id]; !still {
+	for key, chat := range oldChats {
+		if _, still := newChats[key]; !still {
 			removed = append(removed, chat)
 		}
 	}
-	sort.Slice(removed, func(i, j int) bool { return removed[i].ID < removed[j].ID })
+	sort.Slice(removed, func(i, j int) bool {
+		if removed[i].ID != removed[j].ID {
+			return removed[i].ID < removed[j].ID
+		}
+		return removed[i].Topic() < removed[j].Topic()
+	})
 	for _, chat := range removed {
 		logbus.Warn(logbus.CatListener,
 			fmt.Sprintf("Chat eliminado de la escucha: %s", describeChat(chat)), "")
 	}
 }
 
+// describeChat identifica una entrada de escucha en el registro. Cuando está
+// acotada a un tema, se nombra primero el tema y después el grupo, igual que en
+// el panel, para saber de dónde sale cada archivo.
 func describeChat(chat config.ListenerChat) string {
 	name := strings.TrimSpace(chat.Name)
 	if name == "" || name == strconv.FormatInt(chat.ID, 10) {
+		if topic := chat.TopicLabel(); topic != "" {
+			return fmt.Sprintf("%s · %d", topic, chat.ID)
+		}
 		return strconv.FormatInt(chat.ID, 10)
+	}
+	if topic := chat.TopicLabel(); topic != "" {
+		return fmt.Sprintf("%s · %s (%d, tema %d)", topic, name, chat.ID, chat.Topic())
 	}
 	return fmt.Sprintf("%s (%d)", name, chat.ID)
 }
