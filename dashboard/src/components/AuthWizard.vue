@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { KeyRound, Phone, ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, Loader2, RefreshCw, Info } from '../icons'
+import { KeyRound, Phone, ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Loader2, Info } from '../icons'
 import { useAuthToken } from '../composables/useAuthToken'
 
 const { authHeaders } = useAuthToken()
@@ -14,7 +14,8 @@ const props = defineProps({
 
 const emit = defineEmits(['auth-success'])
 
-const currentStep = computed(() => {
+// Paso que dicta el servidor segun el estado real de la sesion de Telegram.
+const serverStep = computed(() => {
   if (!props.authStatus.has_credentials || props.authStatus.state === 'UNCONFIGURED') return 1
   if (props.authStatus.state === 'NOT_LOGGED_IN' || props.authStatus.state === 'NEED_PHONE') return 2
   if (props.authStatus.state === 'WAITING_CODE') return 3
@@ -22,6 +23,13 @@ const currentStep = computed(() => {
   if (props.authStatus.state === 'LOGGED_IN') return 5
   return 1
 })
+
+// Paso que el usuario ha forzado con el boton "Atras". Mientras valga null el
+// asistente sigue al servidor; en cuanto una llamada al servidor sale bien se
+// vuelve a poner a null para no quedarse anclado en una pantalla vieja.
+const stepOverride = ref(null)
+
+const currentStep = computed(() => stepOverride.value ?? serverStep.value)
 
 // El servidor ya no devuelve api_id ni api_hash (el token de acceso no debe
 // servir para leer las credenciales de Telegram), así que estos campos siempre
@@ -42,6 +50,12 @@ watch(() => props.authStatus, (val) => {
 const loading = ref(false)
 const errorMessage = ref('')
 
+// Un error pertenece al paso en el que se produjo: al movernos de paso deja de
+// tener sentido y se limpia, para que no viaje a la pantalla siguiente.
+watch(currentStep, () => {
+  errorMessage.value = ''
+})
+
 const apiCall = async (url, body) => {
   loading.value = true
   errorMessage.value = ''
@@ -55,6 +69,8 @@ const apiCall = async (url, body) => {
     if (!res.ok) {
       throw new Error(data.detail || data.error || 'Error en el proceso')
     }
+    // La accion ha ido bien: devolvemos el mando al estado del servidor.
+    stepOverride.value = null
     return data
   } catch (err) {
     errorMessage.value = err.message
@@ -115,14 +131,51 @@ const verify2FA = async () => {
   emit('auth-success', { ...data, authenticated: true })
 }
 
-const resetFlow = async () => {
-  try {
-    await fetch('/api/auth/logout', { method: 'POST', headers: { ...authHeaders() } })
-  } catch (e) {}
-  phoneNumber.value = ''
-  code.value = ''
-  password.value = ''
-  emit('auth-success', { authenticated: false, state: props.authStatus.has_credentials ? 'NOT_LOGGED_IN' : 'UNCONFIGURED', has_credentials: props.authStatus.has_credentials })
+// Vuelve al paso anterior del asistente.
+//
+// Los pasos 1 y 2 se desandan sin tocar el servidor: basta con volver a pintar
+// la pantalla anterior y que el usuario reenvie el dato. El paso de 2FA es
+// distinto: Telegram ya consumio el codigo de verificacion al pedir la
+// contrasena, asi que no se puede "volver al codigo" — hay que cerrar el
+// intento a medias y pedir un codigo nuevo desde el paso del telefono.
+const goBack = async () => {
+  errorMessage.value = ''
+
+  if (currentStep.value === 2) {
+    stepOverride.value = 1
+    return
+  }
+
+  if (currentStep.value === 3) {
+    code.value = ''
+    stepOverride.value = 2
+    return
+  }
+
+  if (currentStep.value === 4) {
+    loading.value = true
+    code.value = ''
+    password.value = ''
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', headers: { ...authHeaders() } })
+    } catch (e) {}
+    loading.value = false
+    stepOverride.value = 2
+    // Se conserva phoneNumber a proposito: lo normal es reintentar con el
+    // mismo numero y que Telegram mande otro codigo.
+    emit('auth-success', {
+      ...props.authStatus,
+      authenticated: false,
+      state: props.authStatus.has_credentials ? 'NOT_LOGGED_IN' : 'UNCONFIGURED'
+    })
+  }
+}
+
+// Descarta la vuelta atras al paso 1 y devuelve al usuario donde lo dejo el
+// servidor (solo aparece cuando ya habia credenciales guardadas).
+const cancelBack = () => {
+  errorMessage.value = ''
+  stepOverride.value = null
 }
 </script>
 
@@ -166,12 +219,6 @@ const resetFlow = async () => {
         </div>
       </div>
 
-      <!-- Error alert -->
-      <div v-if="errorMessage" class="auth-alert danger">
-        <AlertCircle :size="18" />
-        <span>{{ errorMessage }}</span>
-      </div>
-
       <!-- Step 1: Credenciales API -->
       <div v-if="currentStep === 1" class="step-content">
         <div class="step-intro">
@@ -180,6 +227,11 @@ const resetFlow = async () => {
             <h3>Credenciales de la App (API ID & Hash)</h3>
             <p>Necesitas tus credenciales oficiales de Telegram Developer.</p>
           </div>
+        </div>
+
+        <div v-if="errorMessage" class="auth-alert danger" role="alert" aria-live="polite">
+          <AlertCircle :size="18" class="alert-icon" />
+          <span>{{ errorMessage }}</span>
         </div>
 
         <div class="info-banner">
@@ -211,13 +263,24 @@ const resetFlow = async () => {
           />
         </div>
 
-        <button class="auth-button primary" :disabled="loading" @click="saveCredentials">
-          <Loader2 v-if="loading" class="spin" :size="18" />
-          <template v-else>
-            <span>Guardar y Continuar</span>
-            <ArrowRight :size="18" />
-          </template>
-        </button>
+        <div class="button-group">
+          <button
+            v-if="stepOverride === 1 && serverStep > 1"
+            class="auth-button secondary btn-back"
+            :disabled="loading"
+            @click="cancelBack"
+          >
+            <ArrowLeft :size="16" />
+            <span>Cancelar</span>
+          </button>
+          <button class="auth-button primary" :disabled="loading" @click="saveCredentials">
+            <Loader2 v-if="loading" class="spin" :size="18" />
+            <template v-else>
+              <span>Guardar y Continuar</span>
+              <ArrowRight :size="18" />
+            </template>
+          </button>
+        </div>
       </div>
 
       <!-- Step 2: Teléfono -->
@@ -228,6 +291,11 @@ const resetFlow = async () => {
             <h3>Número de Teléfono</h3>
             <p>Ingresa tu número de teléfono registrado en Telegram.</p>
           </div>
+        </div>
+
+        <div v-if="errorMessage" class="auth-alert danger" role="alert" aria-live="polite">
+          <AlertCircle :size="18" class="alert-icon" />
+          <span>{{ errorMessage }}</span>
         </div>
 
         <div class="form-group">
@@ -241,13 +309,19 @@ const resetFlow = async () => {
           <small class="help-text">Asegúrate de incluir el prefijo internacional (ej. +34 para España, +52 para México, +1 para EE.UU.).</small>
         </div>
 
-        <button class="auth-button primary" :disabled="loading" @click="sendCode">
-          <Loader2 v-if="loading" class="spin" :size="18" />
-          <template v-else>
-            <span>Enviar Código</span>
-            <ArrowRight :size="18" />
-          </template>
-        </button>
+        <div class="button-group">
+          <button class="auth-button secondary btn-back" :disabled="loading" @click="goBack">
+            <ArrowLeft :size="16" />
+            <span>Atrás</span>
+          </button>
+          <button class="auth-button primary" :disabled="loading" @click="sendCode">
+            <Loader2 v-if="loading" class="spin" :size="18" />
+            <template v-else>
+              <span>Enviar Código</span>
+              <ArrowRight :size="18" />
+            </template>
+          </button>
+        </div>
       </div>
 
       <!-- Step 3: Código de Verificación -->
@@ -258,6 +332,11 @@ const resetFlow = async () => {
             <h3>Código de Verificación</h3>
             <p>Telegram ha enviado un código a tu aplicación o por SMS a {{ phoneNumber }}.</p>
           </div>
+        </div>
+
+        <div v-if="errorMessage" class="auth-alert danger" role="alert" aria-live="polite">
+          <AlertCircle :size="18" class="alert-icon" />
+          <span>{{ errorMessage }}</span>
         </div>
 
         <div class="form-group">
@@ -273,9 +352,9 @@ const resetFlow = async () => {
         </div>
 
         <div class="button-group">
-          <button class="auth-button secondary" :disabled="loading" @click="resetFlow">
-            <RefreshCw :size="16" />
-            <span>Cambiar número</span>
+          <button class="auth-button secondary btn-back" :disabled="loading" @click="goBack">
+            <ArrowLeft :size="16" />
+            <span>Atrás</span>
           </button>
           <button class="auth-button primary" :disabled="loading" @click="verifyCode">
             <Loader2 v-if="loading" class="spin" :size="18" />
@@ -297,6 +376,11 @@ const resetFlow = async () => {
           </div>
         </div>
 
+        <div v-if="errorMessage" class="auth-alert danger" role="alert" aria-live="polite">
+          <AlertCircle :size="18" class="alert-icon" />
+          <span>{{ errorMessage }}</span>
+        </div>
+
         <div class="form-group">
           <label>Contraseña de 2 Pasos</label>
           <input 
@@ -307,13 +391,23 @@ const resetFlow = async () => {
           />
         </div>
 
-        <button class="auth-button primary" :disabled="loading" @click="verify2FA">
-          <Loader2 v-if="loading" class="spin" :size="18" />
-          <template v-else>
-            <span>Iniciar Sesión</span>
-            <ArrowRight :size="18" />
-          </template>
-        </button>
+        <div class="button-group">
+          <button class="auth-button secondary btn-back" :disabled="loading" @click="goBack">
+            <ArrowLeft :size="16" />
+            <span>Atrás</span>
+          </button>
+          <button class="auth-button primary" :disabled="loading" @click="verify2FA">
+            <Loader2 v-if="loading" class="spin" :size="18" />
+            <template v-else>
+              <span>Iniciar Sesión</span>
+              <ArrowRight :size="18" />
+            </template>
+          </button>
+        </div>
+        <small class="help-text back-note">
+          «Atrás» vuelve al paso del teléfono. Telegram ya usó el código anterior,
+          así que se te enviará uno nuevo.
+        </small>
       </div>
 
       <!-- Step 5: Éxito -->
@@ -538,14 +632,23 @@ const resetFlow = async () => {
   margin-top: 2px;
 }
 
-/* Alert */
+/* Alert
+   Vive dentro de .step-content, justo debajo del encabezado del paso, para que
+   el gap del contenedor le de aire por arriba y por abajo. Cuando colgaba de
+   .auth-card quedaba pegada al titulo del paso. */
 .auth-alert {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 11px 14px;
   border-radius: 10px;
   font-size: 13px;
+  line-height: 1.45;
+}
+
+.auth-alert .alert-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 
 .auth-alert.danger {
@@ -603,6 +706,17 @@ const resetFlow = async () => {
 
 .button-group .auth-button {
   flex: 1;
+}
+
+/* El boton de volver no compite con la accion principal. */
+.button-group .btn-back {
+  flex: 0 0 auto;
+  padding: 13px 16px;
+}
+
+.back-note {
+  margin-top: -8px;
+  text-align: center;
 }
 
 .text-center {
