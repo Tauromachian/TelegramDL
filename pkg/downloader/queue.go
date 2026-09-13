@@ -11,8 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"tgdown/pkg/logbus"
 	"tgdown/pkg/storage"
