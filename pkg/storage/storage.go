@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -246,16 +248,10 @@ func (s *Storage) GetCredentials() (string, string, error) {
 	_ = s.db.QueryRow("SELECT value FROM app_config WHERE key = 'api_hash' OR key = 'tgdl_api_hash' ORDER BY key ASC LIMIT 1").Scan(&apiHash)
 
 	if apiID == "" || apiHash == "" {
-		// Fallback a variables de entorno / .env
-		envID, envHash := config.LoadEnvCredentials()
-		if envID != "" {
-			apiID = envID
-		}
-		if envHash != "" {
-			apiHash = envHash
-		}
-
-		// Si aún falta apiID, buscar en downloader_session.session de Pyrogram
+		// Ya no hay respaldo en ningún .env: lo que hubiera en el archivo se
+		// vuelca a app_config una sola vez, al arrancar, desde
+		// MigrateLegacyEnv. Lo que queda aquí es el rescate del api_id para
+		// quien venga de la versión en Python.
 		if apiID == "" {
 			sessionFiles := []string{
 				filepath.Join(config.DataDir, "downloader_session.session"),
@@ -296,6 +292,99 @@ func (s *Storage) SaveCredentials(apiID, apiHash string) error {
 		return err
 	}
 	return s.setConfigKey("api_hash", apiHash)
+}
+
+// getConfigKey lee una clave de app_config y devuelve cadena vacía si no está.
+// No toma el mutex: eso corresponde a quien lo llama.
+func (s *Storage) getConfigKey(key string) string {
+	var value string
+	if err := s.db.QueryRow("SELECT value FROM app_config WHERE key = ?", key).Scan(&value); err != nil {
+		return ""
+	}
+	return value
+}
+
+// ServerBinding devuelve la dirección y el puerto en los que debe escuchar el
+// panel. Lo que no esté guardado sale vacío o en cero, y decide quien llama.
+func (s *Storage) ServerBinding() (string, int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	host := strings.TrimSpace(s.getConfigKey("bind_host"))
+
+	port, err := strconv.Atoi(strings.TrimSpace(s.getConfigKey("server_port")))
+	if err != nil || port <= 0 || port > 65535 {
+		port = 0
+	}
+
+	return host, port
+}
+
+// SaveServerBinding persiste la dirección de escucha. Los valores vacíos o
+// fuera de rango se ignoran en vez de sobrescribir lo que ya hubiera.
+func (s *Storage) SaveServerBinding(host string, port int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if h := strings.TrimSpace(host); h != "" {
+		if err := s.setConfigKey("bind_host", h); err != nil {
+			return err
+		}
+	}
+	if port > 0 && port <= 65535 {
+		return s.setConfigKey("server_port", strconv.Itoa(port))
+	}
+	return nil
+}
+
+// MigrateLegacyEnv vuelca a la base de datos lo que quedara en el .env de una
+// versión anterior y aparta el archivo. Solo rellena lo que falte: si una clave
+// ya está en app_config, manda la base de datos.
+//
+// Se ejecuta una vez al arrancar; a partir de ahí la aplicación no vuelve a
+// mirar ningún .env.
+func (s *Storage) MigrateLegacyEnv() {
+	values := config.LegacyEnvValues()
+
+	primero := func(names ...string) string {
+		for _, n := range names {
+			if v := strings.TrimSpace(values[n]); v != "" {
+				return v
+			}
+		}
+		return ""
+	}
+
+	s.mu.Lock()
+
+	var migradas []string
+	guardar := func(key, value string) {
+		if value == "" || s.getConfigKey(key) != "" {
+			return
+		}
+		if err := s.setConfigKey(key, value); err != nil {
+			log.Printf("[STORAGE] No se pudo migrar %s desde el .env: %v", key, err)
+			return
+		}
+		migradas = append(migradas, key)
+	}
+
+	guardar("api_id", primero("TGDL_API_ID", "API_ID"))
+	guardar("api_hash", primero("TGDL_API_HASH", "API_HASH"))
+	guardar("bind_host", primero("TGDL_BIND_HOST", "BIND_HOST"))
+	guardar("server_port", primero("TGDL_PORT", "PORT"))
+
+	// Si nunca hubo una elección de dirección, se deja escrita la de por
+	// defecto. Antes esto lo hacía el .env recién creado; ahora el valor queda
+	// visible en app_config para quien quiera cambiarlo.
+	guardar("bind_host", config.DefaultBindHost)
+
+	s.mu.Unlock()
+
+	if len(migradas) > 0 {
+		log.Printf("[STORAGE] Configuración migrada del .env a la base de datos: %s", strings.Join(migradas, ", "))
+	}
+	config.ArchiveLegacyEnv()
 }
 
 // GetAPIToken devuelve el token de acceso a la API HTTP local, si existe.

@@ -11,8 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/joho/godotenv"
 )
 
 const (
@@ -154,7 +152,7 @@ func InitPaths() {
 			home = "."
 		}
 		DataDir = filepath.Join(home, ".tgdown")
-		_ = os.MkdirAll(DataDir, 0755)
+		_ = os.MkdirAll(DataDir, 0o700)
 
 		UserEnvPath = filepath.Join(DataDir, ".env")
 
@@ -166,123 +164,119 @@ func InitPaths() {
 			BaseDir = "."
 		}
 
-		// Migración de .env legacy si existe
-		legacyEnv := filepath.Join(BaseDir, ".env")
-		if _, err := os.Stat(UserEnvPath); os.IsNotExist(err) {
-			if _, lerr := os.Stat(legacyEnv); lerr == nil {
-				if content, rerr := os.ReadFile(legacyEnv); rerr == nil {
-					_ = os.WriteFile(UserEnvPath, content, 0600)
-				}
-			} else if _, cerr := os.Stat(".env"); cerr == nil {
-				if content, rerr := os.ReadFile(".env"); rerr == nil {
-					_ = os.WriteFile(UserEnvPath, content, 0600)
-				}
-			}
-		}
-
-		// Dejar escrito el valor por defecto de TGDL_BIND_HOST antes de cargar
-		// nada, para que el archivo recién creado ya sirva en este mismo
-		// arranque.
-		ensureEnvDefaults()
-
-		// Cargar variables de entorno prioritariamente desde UserEnvPath (.tgdown/.env)
-		if _, err := os.Stat(UserEnvPath); err == nil {
-			_ = godotenv.Overload(UserEnvPath)
-		} else if _, err := os.Stat(legacyEnv); err == nil {
-			_ = godotenv.Overload(legacyEnv)
-		} else if _, err := os.Stat(".env"); err == nil {
-			_ = godotenv.Overload(".env")
-		}
+		// Todo lo que vive en esta carpeta —la sesión de Telegram, las
+		// credenciales, el historial— es privado del usuario. Se creaba en 0755,
+		// es decir legible por cualquier otro usuario de la máquina.
+		secureDataDir()
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Edición del archivo .env
+// secureDataDir cierra los permisos de la carpeta de datos y de los archivos
+// sensibles que haya dentro. Se aplica también a instalaciones que ya existían,
+// porque MkdirAll no toca el modo de un directorio ya creado.
 //
-// El .env del usuario puede tener comentarios y variables que la aplicación no
-// conoce, así que nunca se reescribe entero: se cambia solo la línea que toca y
-// se respeta el resto tal cual estaba.
+// En Windows el modo de Go no significa nada —mandan las ACL, y la carpeta del
+// usuario ya está restringida por defecto—, así que allí esto no hace daño ni
+// falta.
+func secureDataDir() {
+	_ = os.Chmod(DataDir, 0o700)
+
+	for _, name := range []string{
+		"tg_session.json",
+		"tgdown.sqlite3",
+		"tgdown.sqlite3-wal",
+		"tgdown.sqlite3-shm",
+		"tgdown.db",
+		".env",
+	} {
+		path := filepath.Join(DataDir, name)
+		if _, err := os.Stat(path); err == nil {
+			_ = os.Chmod(path, 0o600)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Lectura del .env antiguo
+//
+// La aplicación ya no usa ningún archivo .env: las credenciales y la dirección
+// de escucha viven en la tabla app_config de la base de datos, que es la única
+// fuente de verdad. Lo que queda aquí es solo lo justo para leer una vez el
+// archivo de quienes vienen de una versión anterior y volcarlo a la base de
+// datos. Para eso no hace falta godotenv.
 // ---------------------------------------------------------------------------
 
-func splitEnvLines(content string) []string {
-	content = strings.ReplaceAll(content, "\r\n", "\n")
-	if content == "" {
-		return nil
-	}
-	lines := strings.Split(content, "\n")
-	// El salto final del archivo deja un elemento vacío que no es una línea.
-	if len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
-	}
-	return lines
-}
+// parseEnvFile entiende lo único que la aplicación llegó a escribir: líneas
+// CLAVE=valor, saltándose comentarios, líneas en blanco, el prefijo export y
+// las comillas alrededor del valor.
+func parseEnvFile(path string) map[string]string {
+	out := map[string]string{}
 
-func joinEnvLines(lines []string) string {
-	if len(lines) == 0 {
-		return ""
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return out
 	}
-	return strings.Join(lines, "\n") + "\n"
-}
 
-// envKeyLine devuelve el índice de la línea que define una clave, o -1 si esa
-// clave no está definida. Ignora comentarios y líneas en blanco.
-func envKeyLine(lines []string, key string) int {
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+	for _, line := range strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		trimmed = strings.TrimPrefix(trimmed, "export ")
-		name, _, found := strings.Cut(trimmed, "=")
+		line = strings.TrimPrefix(line, "export ")
+
+		name, value, found := strings.Cut(line, "=")
 		if !found {
 			continue
 		}
-		if strings.EqualFold(strings.TrimSpace(name), key) {
-			return i
+		name = strings.TrimSpace(name)
+		value = strings.TrimSpace(value)
+
+		if len(value) >= 2 {
+			first, last := value[0], value[len(value)-1]
+			if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+				value = value[1 : len(value)-1]
+			}
+		}
+
+		if name != "" {
+			out[name] = value
 		}
 	}
-	return -1
+	return out
 }
 
-// setEnvValue actualiza una clave conservando su posición, o la añade al final
-// si todavía no existía.
-func setEnvValue(content, key, value string) string {
-	lines := splitEnvLines(content)
-	if i := envKeyLine(lines, key); i >= 0 {
-		lines[i] = key + "=" + value
-		return joinEnvLines(lines)
+// LegacyEnvValues reúne lo que hubiera en los .env de versiones anteriores. Se
+// leen de menor a mayor prioridad, así que el archivo del usuario pisa a los
+// que estén junto al ejecutable.
+func LegacyEnvValues() map[string]string {
+	InitPaths()
+
+	merged := map[string]string{}
+	for _, path := range []string{
+		".env",
+		filepath.Join(BaseDir, ".env"),
+		UserEnvPath,
+	} {
+		for k, v := range parseEnvFile(path) {
+			if strings.TrimSpace(v) != "" {
+				merged[k] = v
+			}
+		}
 	}
-	return joinEnvLines(append(lines, key+"="+value))
+	return merged
 }
 
-// ensureEnvDefaults garantiza que el .env del usuario declare en qué dirección
-// escucha el panel. Solo escribe si no hay ninguna elección previa: si ya hay
-// un TGDL_BIND_HOST (o BIND_HOST), se respeta aunque sea 127.0.0.1.
-func ensureEnvDefaults() {
-	content := ""
-	if data, err := os.ReadFile(UserEnvPath); err == nil {
-		content = string(data)
-	}
+// ArchiveLegacyEnv aparta el .env del usuario una vez migrado. Se renombra en
+// vez de borrarse: deja de leerse, pero si algo saliera mal las credenciales
+// siguen ahí. Los .env que puedan estar junto al ejecutable no se tocan, porque
+// esa carpeta puede ser de solo lectura.
+func ArchiveLegacyEnv() {
+	InitPaths()
 
-	lines := splitEnvLines(content)
-	if envKeyLine(lines, "TGDL_BIND_HOST") >= 0 || envKeyLine(lines, "BIND_HOST") >= 0 {
+	if _, err := os.Stat(UserEnvPath); err != nil {
 		return
 	}
-
-	if len(lines) > 0 {
-		lines = append(lines, "")
-	}
-	lines = append(lines,
-		"# Dirección en la que escucha el panel.",
-		"# 0.0.0.0 permite abrirlo desde el móvil u otro equipo de la red local;",
-		"# 127.0.0.1 lo limita únicamente a este ordenador.",
-		"TGDL_BIND_HOST="+DefaultBindHost,
-	)
-
-	if err := os.WriteFile(UserEnvPath, []byte(joinEnvLines(lines)), 0600); err != nil {
-		return
-	}
-	_ = os.Setenv("TGDL_BIND_HOST", DefaultBindHost)
+	_ = os.Rename(UserEnvPath, UserEnvPath+".migrado")
 }
 
 func GetDefaultDownloadFolder() string {
@@ -315,94 +309,96 @@ func DefaultConfig() Config {
 	}
 }
 
-func LoadEnvCredentials() (string, string) {
-	InitPaths()
-	// Cargar primero desde UserEnvPath
-	_ = godotenv.Load(UserEnvPath)
+// ---------------------------------------------------------------------------
+// Dirección de escucha
+//
+// El host y el puerto se guardan en la base de datos, pero este paquete no
+// puede leerla: pkg/storage ya importa pkg/config, así que el import al revés
+// sería un ciclo. Por eso quien sí tiene acceso a la base de datos —app.go, al
+// arrancar— los inyecta aquí con SetServerBinding antes de levantar el
+// servidor.
+//
+// Las variables de entorno siguen pudiendo pisar el valor guardado. No son
+// secretos y son la salida de emergencia: si el puerto está ocupado y la
+// ventana no llega a abrir, o si la aplicación corre en modo --server bajo
+// systemd, es la única forma de cambiarlo sin interfaz.
+// ---------------------------------------------------------------------------
 
-	apiID := os.Getenv("TGDL_API_ID")
-	if apiID == "" {
-		apiID = os.Getenv("API_ID")
-	}
-	apiHash := os.Getenv("TGDL_API_HASH")
-	if apiHash == "" {
-		apiHash = os.Getenv("API_HASH")
-	}
+const DefaultServerPort = 8000
 
-	if apiID == "" || apiHash == "" {
-		// Intentar leer desde BaseDir/.env
-		_ = godotenv.Load(filepath.Join(BaseDir, ".env"))
-		if apiID == "" {
-			apiID = os.Getenv("TGDL_API_ID")
-			if apiID == "" {
-				apiID = os.Getenv("API_ID")
-			}
-		}
-		if apiHash == "" {
-			apiHash = os.Getenv("TGDL_API_HASH")
-			if apiHash == "" {
-				apiHash = os.Getenv("API_HASH")
-			}
-		}
-	}
+var (
+	bindingMu  sync.RWMutex
+	bindHost   string
+	bindPort   int
+	bindingSet bool
+)
 
-	return strings.TrimSpace(apiID), strings.TrimSpace(apiHash)
+// SetServerBinding fija el host y el puerto leídos de la base de datos. Un
+// valor vacío o un puerto fuera de rango se ignoran y se queda el de siempre.
+func SetServerBinding(host string, port int) {
+	bindingMu.Lock()
+	defer bindingMu.Unlock()
+
+	if h := strings.TrimSpace(host); h != "" {
+		bindHost = h
+	}
+	if port > 0 && port <= 65535 {
+		bindPort = port
+	}
+	bindingSet = true
 }
 
-func SaveEnvCredentials(apiID, apiHash string) error {
-	InitPaths()
-	apiID = strings.TrimSpace(apiID)
-	apiHash = strings.TrimSpace(apiHash)
-
-	// Se conserva lo que ya hubiera en el archivo (TGDL_BIND_HOST, TGDL_PORT,
-	// comentarios...): antes se reescribía entero y cualquier ajuste del
-	// usuario se perdía al volver a guardar las credenciales.
-	existing := ""
-	if data, rerr := os.ReadFile(UserEnvPath); rerr == nil {
-		existing = string(data)
-	}
-
-	content := setEnvValue(existing, "API_ID", apiID)
-	content = setEnvValue(content, "API_HASH", apiHash)
-	content = setEnvValue(content, "TGDL_API_ID", apiID)
-	content = setEnvValue(content, "TGDL_API_HASH", apiHash)
-
-	err := os.WriteFile(UserEnvPath, []byte(content), 0600)
-	if err != nil {
-		return err
-	}
-
-	_ = os.Setenv("API_ID", apiID)
-	_ = os.Setenv("API_HASH", apiHash)
-	_ = os.Setenv("TGDL_API_ID", apiID)
-	_ = os.Setenv("TGDL_API_HASH", apiHash)
-	return nil
+// ServerBindingLoaded indica si ya se inyectaron valores desde la base de
+// datos. Sirve para no anunciar un puerto que todavía es el de por defecto.
+func ServerBindingLoaded() bool {
+	bindingMu.RLock()
+	defer bindingMu.RUnlock()
+	return bindingSet
 }
 
 func GetServerPort() int {
 	InitPaths()
-	portStr := os.Getenv("TGDL_PORT")
+
+	// 1. Variable de entorno, que manda sobre todo.
+	portStr := strings.TrimSpace(os.Getenv("TGDL_PORT"))
 	if portStr == "" {
-		portStr = os.Getenv("PORT")
+		portStr = strings.TrimSpace(os.Getenv("PORT"))
 	}
-	if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
+	if p, err := strconv.Atoi(portStr); err == nil && p > 0 && p <= 65535 {
 		return p
 	}
-	return 8000
+
+	// 2. Lo guardado en la base de datos.
+	bindingMu.RLock()
+	p := bindPort
+	bindingMu.RUnlock()
+	if p > 0 {
+		return p
+	}
+
+	// 3. Por defecto.
+	return DefaultServerPort
 }
 
 func GetServerHost() string {
 	InitPaths()
+
 	host := strings.TrimSpace(os.Getenv("TGDL_BIND_HOST"))
 	if host == "" {
 		host = strings.TrimSpace(os.Getenv("BIND_HOST"))
 	}
-	if host == "" {
-		// Mismo valor que se escribe en el .env al crearlo, para que el código y
-		// el archivo nunca digan cosas distintas.
-		return DefaultBindHost
+	if host != "" {
+		return host
 	}
-	return host
+
+	bindingMu.RLock()
+	h := bindHost
+	bindingMu.RUnlock()
+	if h != "" {
+		return h
+	}
+
+	return DefaultBindHost
 }
 
 func NormalizeConfig(raw Config) Config {

@@ -6,7 +6,6 @@ require (
 	github.com/creativeprojects/go-selfupdate v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/gotd/td v0.161.0
-	github.com/joho/godotenv v1.5.1
 	github.com/minio/selfupdate v0.6.0
 	github.com/wailsapp/wails/v2 v2.15.0
 	golang.org/x/sys v0.47.0

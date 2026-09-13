@@ -720,13 +720,12 @@ func (s *Server) handleAuthCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Guardar en la base de datos SQLite
+	// La base de datos es la única fuente de verdad para las credenciales. Antes
+	// se escribían además en un .env, y el fallo que se daba por bueno era el de
+	// la base de datos: si esto falla no queda ningún otro sitio de donde
+	// recuperarlas, así que ahora sí se corta aquí.
 	if err := s.storage.SaveCredentials(body.APIID, body.APIHash); err != nil {
 		log.Printf("[SERVER] error guardando credenciales en BD: %v", err)
-	}
-
-	// Guardar también en archivo .env
-	if err := config.SaveEnvCredentials(body.APIID, body.APIHash); err != nil {
 		s.errorResponse(w, http.StatusInternalServerError, "Error guardando credenciales")
 		return
 	}

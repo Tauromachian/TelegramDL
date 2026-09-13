@@ -58,6 +58,15 @@ func NewApp(assets fs.FS) *App {
 		st, _ = storage.NewStorage(dbPath)
 	}
 
+	// 1.b Volcar a la base de datos lo que quedara en el .env de una versión
+	// anterior y fijar desde ahí la dirección de escucha. Tiene que ir antes de
+	// cualquier config.GetServerPort/GetServerHost, porque es de donde esas
+	// funciones sacan el valor: pkg/config no puede leer la base de datos por sí
+	// mismo sin crear un ciclo de imports.
+	st.MigrateLegacyEnv()
+	bindHost, bindPort := st.ServerBinding()
+	config.SetServerBinding(bindHost, bindPort)
+
 	// 2. Cargar configuración previa de SQLite o migrar desde config.json legacy
 	cfg, err := st.LoadConfig(config.DefaultConfig(), filepath.Join(config.BaseDir, "config.json"))
 	if err != nil {
