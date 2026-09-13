@@ -26,21 +26,107 @@ type MediaInfo struct {
 	FileSize int64
 }
 
-var invalidPathChars = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1f]`)
+// invalidPathChars son los caracteres que ningún sistema admite en un nombre de
+// archivo. Se incluyen «&», «^» y «%» aunque en Linux y macOS sean legales:
+// esos tres los interpreta cmd.exe de Windows, y el nombre lo elige quien sube
+// el archivo a Telegram, no quien lo descarga.
+var invalidPathChars = regexp.MustCompile(`[<>:"/\\|?*&^%\x00-\x1f]`)
 
+// reservedWindowsNames no se pueden usar como nombre de archivo en Windows ni
+// con extensión detrás: «NUL.mp4» sigue siendo el dispositivo nulo.
+var reservedWindowsNames = map[string]bool{
+	"CON": true, "PRN": true, "AUX": true, "NUL": true,
+	"COM1": true, "COM2": true, "COM3": true, "COM4": true, "COM5": true,
+	"COM6": true, "COM7": true, "COM8": true, "COM9": true,
+	"LPT1": true, "LPT2": true, "LPT3": true, "LPT4": true, "LPT5": true,
+	"LPT6": true, "LPT7": true, "LPT8": true, "LPT9": true,
+}
+
+// maxFileNameBytes deja margen de sobra bajo el límite de 255 bytes que imponen
+// NTFS, APFS y ext4, contando que después se le añade una ruta por delante.
+const maxFileNameBytes = 200
+
+// SanitizeFileName convierte el nombre que venga de Telegram en uno que se pueda
+// escribir en disco sin sorpresas. El nombre es entrada no confiable: lo elige
+// quien sube el archivo.
 func SanitizeFileName(name string) string {
 	clean := invalidPathChars.ReplaceAllString(name, "_")
 	clean = strings.TrimSpace(clean)
+	// Windows no admite que un nombre termine en punto o espacio.
 	clean = strings.Trim(clean, ". ")
 	if clean == "" {
 		return "archivo"
 	}
-	if len(clean) > 200 {
-		ext := filepath.Ext(clean)
-		base := clean[:200-len(ext)]
-		clean = base + ext
+
+	clean = truncateFileName(clean)
+
+	// El truncado puede dejar otra vez un punto o un espacio al final.
+	clean = strings.Trim(clean, ". ")
+	if clean == "" {
+		return "archivo"
 	}
+
+	if isReservedWindowsName(clean) {
+		clean = "_" + clean
+	}
+
 	return clean
+}
+
+// truncateFileName recorta el nombre conservando la extensión.
+//
+// La versión anterior hacía clean[:200-len(ext)], que con una extensión de más
+// de 200 caracteres daba un índice negativo y reventaba el proceso entero: un
+// nombre como «x.» seguido de 250 letras bastaba para tumbar la aplicación
+// desde un mensaje de Telegram. Aquí la extensión se descarta si no cabe, y el
+// corte es por runas para no partir un carácter UTF-8 por la mitad.
+func truncateFileName(name string) string {
+	if len(name) <= maxFileNameBytes {
+		return name
+	}
+
+	ext := filepath.Ext(name)
+	// Una «extensión» que ocupa casi todo el nombre no es una extensión.
+	if len(ext) > maxFileNameBytes/2 {
+		ext = ""
+	}
+
+	stem := strings.TrimSuffix(name, ext)
+	stem = truncateRunes(stem, maxFileNameBytes-len(ext))
+
+	result := stem + ext
+	if result == "" || result == ext {
+		return truncateRunes(name, maxFileNameBytes)
+	}
+	return result
+}
+
+// truncateRunes corta a lo sumo limit bytes sin partir ningún carácter.
+func truncateRunes(s string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+	if len(s) <= limit {
+		return s
+	}
+
+	total := 0
+	for i, r := range s {
+		size := len(string(r))
+		if total+size > limit {
+			return s[:i]
+		}
+		total += size
+	}
+	return s
+}
+
+func isReservedWindowsName(name string) bool {
+	base := name
+	if i := strings.IndexByte(base, '.'); i >= 0 {
+		base = base[:i]
+	}
+	return reservedWindowsNames[strings.ToUpper(strings.TrimSpace(base))]
 }
 
 func ExtractMediaInfo(msg *tg.Message) *MediaInfo {

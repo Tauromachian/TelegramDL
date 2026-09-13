@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	AppVersion = "2.4.1"
+	AppVersion = "2.4.2"
 	GithubRepo = "infinityxgame/tgdown"
 
 	// DefaultBindHost es la dirección en la que escucha el panel cuando el
@@ -277,6 +277,103 @@ func ArchiveLegacyEnv() {
 		return
 	}
 	_ = os.Rename(UserEnvPath, UserEnvPath+".migrado")
+}
+
+// ---------------------------------------------------------------------------
+// Validación de la carpeta de descargas
+//
+// La carpeta llega desde /api/settings, o sea desde cualquiera que tenga el
+// token, incluido un dispositivo remoto. Sin comprobar nada se podía apuntar a
+// la carpeta de Inicio de Windows y conseguir que la aplicación dejara ahí un
+// ejecutable descargado de Telegram, que arrancaría en la siguiente sesión. Y
+// apuntándola a ~/.tgdown se podía pisar la sesión de Telegram.
+//
+// No es una lista blanca: el usuario tiene que poder elegir cualquier carpeta
+// suya. Se rechazan solo los sitios donde dejar un archivo tiene consecuencias.
+// ---------------------------------------------------------------------------
+
+// ValidateDownloadFolder devuelve un error si la carpeta no sirve como destino
+// de descargas.
+func ValidateDownloadFolder(folder string) error {
+	InitPaths()
+
+	folder = strings.TrimSpace(folder)
+	if folder == "" {
+		return fmt.Errorf("la carpeta de descargas no puede estar vacía")
+	}
+	if !filepath.IsAbs(folder) {
+		return fmt.Errorf("la carpeta de descargas debe ser una ruta absoluta")
+	}
+
+	limpia := filepath.Clean(folder)
+
+	for _, prohibida := range carpetasProhibidas() {
+		if prohibida == "" {
+			continue
+		}
+		if rutaDentroDe(prohibida, limpia) {
+			return fmt.Errorf("esa carpeta está reservada por el sistema o por la propia aplicación; elige otra")
+		}
+	}
+
+	return nil
+}
+
+// rutaDentroDe indica si hijo es padre o está por debajo de él, comparando sin
+// distinguir mayúsculas en Windows y macOS, donde el sistema de archivos
+// tampoco las distingue.
+func rutaDentroDe(padre, hijo string) bool {
+	padre = filepath.Clean(padre)
+	hijo = filepath.Clean(hijo)
+
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		padre = strings.ToLower(padre)
+		hijo = strings.ToLower(hijo)
+	}
+
+	if padre == hijo {
+		return true
+	}
+	return strings.HasPrefix(hijo, padre+string(filepath.Separator))
+}
+
+func carpetasProhibidas() []string {
+	// La carpeta de datos de la aplicación: ahí viven la sesión de Telegram, las
+	// credenciales y la base de datos.
+	prohibidas := []string{DataDir}
+
+	home, _ := os.UserHomeDir()
+	unir := func(base string, partes ...string) string {
+		if base == "" {
+			return ""
+		}
+		return filepath.Join(append([]string{base}, partes...)...)
+	}
+
+	switch runtime.GOOS {
+	case "windows":
+		prohibidas = append(prohibidas,
+			os.Getenv("SystemRoot"),
+			os.Getenv("ProgramFiles"),
+			os.Getenv("ProgramFiles(x86)"),
+			unir(os.Getenv("AppData"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup"),
+			unir(os.Getenv("ProgramData"), "Microsoft", "Windows", "Start Menu", "Programs", "StartUp"),
+		)
+	case "darwin":
+		prohibidas = append(prohibidas,
+			"/System", "/Library/LaunchAgents", "/Library/LaunchDaemons", "/Applications",
+			unir(home, "Library", "LaunchAgents"),
+		)
+	default:
+		prohibidas = append(prohibidas,
+			"/etc", "/bin", "/sbin", "/usr", "/boot", "/lib",
+			unir(home, ".config", "autostart"),
+			unir(home, ".local", "share", "systemd"),
+			unir(home, ".config", "systemd"),
+		)
+	}
+
+	return prohibidas
 }
 
 func GetDefaultDownloadFolder() string {

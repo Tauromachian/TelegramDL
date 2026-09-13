@@ -3,6 +3,7 @@ package downloader
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/gotd/td/tg"
 )
@@ -160,5 +161,52 @@ func TestExtensionFromMimeKnownAndUnknown(t *testing.T) {
 	}
 	if ext := extensionFromMime("application/x-made-up"); ext != "" {
 		t.Fatalf("un mime desconocido debería devolver cadena vacía, got %q", ext)
+	}
+}
+
+// --- Regresiones de seguridad -------------------------------------------
+
+// Un nombre con una «extensión» de más de 200 caracteres hacía que el truncado
+// calculara un índice negativo y reventara el proceso. El nombre lo elige quien
+// sube el archivo a Telegram, y la escucha lo procesa sola, así que bastaba un
+// mensaje para tumbar la aplicación.
+func TestSanitizeFileNameNoPanicaConExtensionLarga(t *testing.T) {
+	entradas := []string{
+		"x." + strings.Repeat("y", 250),
+		"." + strings.Repeat("z", 300),
+		strings.Repeat(".", 300),
+		strings.Repeat("a", 5000),
+		strings.Repeat("😀", 300) + ".mp4",
+	}
+	for _, entrada := range entradas {
+		got := SanitizeFileName(entrada)
+		if got == "" {
+			t.Errorf("devolvió un nombre vacío para una entrada de %d bytes", len(entrada))
+		}
+		if len(got) > 200 {
+			t.Errorf("no se respetó el límite de 200 bytes: len=%d", len(got))
+		}
+		if !utf8.ValidString(got) {
+			t.Errorf("se partió un carácter UTF-8: %q", got)
+		}
+	}
+}
+
+// «&», «^» y «%» los interpreta cmd.exe. Aunque abrirEnElSistema ya no pasa por
+// el shell, el nombre no debe llevarlos de todas formas.
+func TestSanitizeFileNameQuitaCaracteresDeShell(t *testing.T) {
+	if got := SanitizeFileName("video&calc.mp4"); strings.ContainsAny(got, "&^%") {
+		t.Fatalf("sobrevivió un carácter que interpreta cmd.exe: %q", got)
+	}
+}
+
+func TestSanitizeFileNameEvitaNombresReservadosDeWindows(t *testing.T) {
+	for _, entrada := range []string{"NUL.mp4", "con.txt", "COM1.dat", "lpt9"} {
+		if isReservedWindowsName(SanitizeFileName(entrada)) {
+			t.Errorf("%q sigue siendo un nombre reservado", entrada)
+		}
+	}
+	if got := SanitizeFileName("CONcierto.mp4"); got != "CONcierto.mp4" {
+		t.Errorf("se alteró un nombre legítimo: %q", got)
 	}
 }

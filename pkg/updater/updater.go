@@ -3,12 +3,16 @@ package updater
 import (
 	"archive/tar"
 	"archive/zip"
+	"bufio"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -357,6 +361,17 @@ func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 			return
 		}
 
+		// 1.a Comprobar que lo descargado es exactamente lo que se publicó.
+		// Antes se instalaba lo que viniera: HTTPS cubre a un intermediario en
+		// la red, pero no a nadie que consiga publicar en el repositorio, y el
+		// archivo acaba ejecutándose en la máquina del usuario.
+		u.setProgress("verifying", 0, 0, 100)
+		if err := verifyChecksum(archivePath, rel.release.AssetURL, rel.release.AssetName); err != nil {
+			u.setProgress("error: "+err.Error(), 0, 0, 0)
+			logbus.Error(logbus.CatUpdater, "Actualización rechazada por no superar la verificación", err.Error())
+			return
+		}
+
 		// 1.b Instalación propia de la plataforma. En macOS la aplicación es un
 		// bundle .app y hay que sustituirlo entero, no el binario de dentro;
 		// installPlatform se encarga de eso y no regresa si lo consigue. En
@@ -544,6 +559,142 @@ func (u *AppUpdater) restartApp(exePath string) {
 	os.Exit(0)
 }
 
+// dentroDe comprueba que una ruta extraída no se escapa del directorio de
+// destino. Es la defensa contra las entradas con «..» dentro de un archivo
+// comprimido, conocido como Zip Slip.
+func dentroDe(dest, target string) bool {
+	destAbs, err := filepath.Abs(dest)
+	if err != nil {
+		return false
+	}
+	targetAbs, err := filepath.Abs(target)
+	if err != nil {
+		return false
+	}
+	if targetAbs == destAbs {
+		return true
+	}
+	return strings.HasPrefix(targetAbs, destAbs+string(os.PathSeparator))
+}
+
+// modoSeguro se queda con los permisos del archivo comprimido pero descarta
+// setuid, setgid y sticky, que en un archivo bajado de internet no pintan nada.
+func modoSeguro(mode int64) os.FileMode {
+	perm := os.FileMode(mode).Perm()
+	if perm == 0 {
+		perm = 0o644
+	}
+	// Si el archivo era ejecutable para alguien, se conserva para el dueño.
+	if perm&0o111 != 0 {
+		perm |= 0o100
+	}
+	return perm
+}
+
+// ---------------------------------------------------------------------------
+// Verificación de integridad
+//
+// Cada release publica un checksums.txt en el formato de sha256sum:
+//
+//	<sha256 en hexadecimal>  <nombre del archivo>
+//
+// Se exige que exista y que coincida. Si falta, la actualización se rechaza en
+// vez de instalarse a ciegas: una release sin checksums es indistinguible de
+// una manipulada.
+// ---------------------------------------------------------------------------
+
+const checksumsFileName = "checksums.txt"
+
+func verifyChecksum(archivePath, assetURL, assetName string) error {
+	esperado, err := descargarChecksum(assetURL, assetName)
+	if err != nil {
+		return err
+	}
+
+	real, err := sha256DeArchivo(archivePath)
+	if err != nil {
+		return fmt.Errorf("no se pudo calcular la firma del archivo descargado: %w", err)
+	}
+
+	if !strings.EqualFold(real, esperado) {
+		return fmt.Errorf("la actualización descargada no coincide con la publicada (esperado %s, obtenido %s)", esperado, real)
+	}
+
+	logbus.Info(logbus.CatUpdater, "Integridad de la actualización verificada", assetName)
+	return nil
+}
+
+func sha256DeArchivo(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// descargarChecksum busca el checksums.txt junto al asset y devuelve la suma
+// que corresponde a assetName.
+func descargarChecksum(assetURL, assetName string) (string, error) {
+	checksumURL, err := urlDelChecksum(assetURL)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := http.Get(checksumURL)
+	if err != nil {
+		return "", fmt.Errorf("no se pudo descargar %s: %w", checksumsFileName, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("esta versión no publica %s, así que no se puede comprobar que la descarga sea legítima (código %d)",
+			checksumsFileName, resp.StatusCode)
+	}
+
+	// Un checksums.txt legítimo son unos pocos cientos de bytes; el límite evita
+	// que una respuesta enorme agote la memoria.
+	scanner := bufio.NewScanner(io.LimitReader(resp.Body, 1<<20))
+	for scanner.Scan() {
+		campos := strings.Fields(scanner.Text())
+		if len(campos) < 2 {
+			continue
+		}
+		// sha256sum antepone «*» al nombre en modo binario.
+		nombre := strings.TrimPrefix(campos[len(campos)-1], "*")
+		if filepath.Base(nombre) == filepath.Base(assetName) {
+			return campos[0], nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("no se pudo leer %s: %w", checksumsFileName, err)
+	}
+
+	return "", fmt.Errorf("%s no incluye una entrada para %s", checksumsFileName, assetName)
+}
+
+// urlDelChecksum cambia el nombre del archivo al final de la URL del asset por
+// checksums.txt, que es donde lo deja el flujo de publicación.
+func urlDelChecksum(assetURL string) (string, error) {
+	u, err := url.Parse(assetURL)
+	if err != nil {
+		return "", fmt.Errorf("URL de descarga no válida: %w", err)
+	}
+	i := strings.LastIndex(u.Path, "/")
+	if i < 0 {
+		return "", fmt.Errorf("URL de descarga no válida: %s", assetURL)
+	}
+	u.Path = u.Path[:i+1] + checksumsFileName
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String(), nil
+}
+
 // Funciones auxiliares de extracción
 func unzip(src, dest string) error {
 	r, err := zip.OpenReader(src)
@@ -554,17 +705,17 @@ func unzip(src, dest string) error {
 
 	for _, f := range r.File {
 		fpath := filepath.Join(dest, f.Name)
-		if !strings.HasPrefix(fpath, filepath.Clean(dest)+string(os.PathSeparator)) {
+		if !dentroDe(dest, fpath) {
 			continue
 		}
 		if f.FileInfo().IsDir() {
-			_ = os.MkdirAll(fpath, os.ModePerm)
+			_ = os.MkdirAll(fpath, 0o755)
 			continue
 		}
-		if err = os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
+		if err = os.MkdirAll(filepath.Dir(fpath), 0o755); err != nil {
 			return err
 		}
-		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, modoSeguro(int64(f.Mode())))
 		if err != nil {
 			return err
 		}
@@ -607,12 +758,17 @@ func untarGz(src, dest string) error {
 		}
 
 		target := filepath.Join(dest, header.Name)
+		// Una entrada con «..» en el nombre escribiría fuera del directorio de
+		// destino. unzip ya lo comprobaba; esto faltaba aquí.
+		if !dentroDe(dest, target) {
+			continue
+		}
 		switch header.Typeflag {
 		case tar.TypeDir:
-			_ = os.MkdirAll(target, 0755)
+			_ = os.MkdirAll(target, 0o755)
 		case tar.TypeReg:
-			_ = os.MkdirAll(filepath.Dir(target), 0755)
-			outFile, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
+			_ = os.MkdirAll(filepath.Dir(target), 0o755)
+			outFile, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR|os.O_TRUNC, modoSeguro(header.Mode))
 			if err != nil {
 				return err
 			}

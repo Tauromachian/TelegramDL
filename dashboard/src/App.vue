@@ -683,12 +683,16 @@ const connectWebSocket = async () => {
   } else {
     wsUrl = 'ws://127.0.0.1:8000/api/ws'
   }
+  // El token viaja como subprotocolo, no en la URL. Las URL completas quedan
+  // registradas en cualquier proxy o túnel por el que pase la conexión, que es
+  // justo lo que se usa para el acceso remoto; la cabecera del subprotocolo no.
+  const protocolos = ['tgdl-v1']
   if (token.value) {
-    wsUrl += `?token=${encodeURIComponent(token.value)}`
+    protocolos.push(token.value)
   }
 
   try {
-    socket = new WebSocket(wsUrl)
+    socket = new WebSocket(wsUrl, protocolos)
     socket.onopen = () => { websocketConnected.value = true }
     socket.onmessage = event => {
       try {

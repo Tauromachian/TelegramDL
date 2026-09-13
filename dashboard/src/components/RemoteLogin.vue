@@ -38,7 +38,13 @@ const sendTokenToTelegram = async () => {
   sendState.value = ''
   sendMessage.value = ''
   try {
-    const response = await fetch('/api/auth/token/send', { method: 'POST' })
+    // La cabecera propia no es un secreto: obliga al navegador a hacer el
+    // preflight de CORS, que es lo que impide que otra página web dispare este
+    // endpoint (responde sin token) desde el navegador del usuario.
+    const response = await fetch('/api/auth/token/send', {
+      method: 'POST',
+      headers: { 'X-TGDL-Request': '1' }
+    })
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
       sendState.value = 'error'

@@ -56,6 +56,10 @@ type Server struct {
 	// tokenSendNextAt es el momento a partir del cual se vuelve a admitir un
 	// envío del token a Telegram (ver tokenSendCooldown).
 	tokenSendNextAt time.Time
+	// tokenSendPorIP limita además por origen. El límite global por sí solo
+	// dejaba que cualquiera en la red llenase los mensajes guardados del
+	// usuario a razón de uno por minuto, día y noche.
+	tokenSendPorIP map[string]time.Time
 }
 
 type wsClient struct {
@@ -96,12 +100,21 @@ func NewServer(
 		assets:     assets,
 		wsClients:  make(map[*wsClient]bool),
 		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
+			// Antes esto devolvía true siempre. Hoy el token ya frena a un
+			// atacante, pero era la única barrera: cualquier página abierta en
+			// el navegador del usuario podía intentar la conexión. Sin cabecera
+			// Origin es un cliente nativo (la ventana de Wails), que sí se
+			// admite.
+			CheckOrigin: func(r *http.Request) bool {
+				origin := r.Header.Get("Origin")
+				return origin == "" || isAllowedOrigin(origin)
+			},
 		},
-		exitCallback: exitCb,
-		mux:          http.NewServeMux(),
-		stopCh:       make(chan struct{}),
-		broadcastCh:  make(chan struct{}, 1),
+		exitCallback:   exitCb,
+		mux:            http.NewServeMux(),
+		stopCh:         make(chan struct{}),
+		broadcastCh:    make(chan struct{}, 1),
+		tokenSendPorIP: make(map[string]time.Time),
 	}
 
 	s.apiToken = s.loadOrCreateToken()
@@ -143,6 +156,16 @@ const (
 	// reintentar en cuanto la arregle, sin dejar por ello la puerta abierta a
 	// reintentos sin freno.
 	tokenSendFailureCooldown = 10 * time.Second
+
+	// tokenSendCooldownPorIP es la espera que se aplica a cada origen por
+	// separado, por encima del límite global.
+	tokenSendCooldownPorIP = 15 * time.Minute
+
+	// cabeceraPeticionPropia la pone el panel en los endpoints que responden sin
+	// token. No es un secreto: su única función es que el navegador tenga que
+	// hacer el preflight de CORS, que es lo que corta una petición lanzada
+	// desde otra página web.
+	cabeceraPeticionPropia = "X-TGDL-Request"
 )
 
 // publicAPIPaths son los únicos endpoints de la API que responden sin token.
@@ -208,6 +231,11 @@ func (s *Server) Start(port int) error {
 
 	s.httpServer = &http.Server{
 		Handler: s.WebHandler(),
+		// Solo se limita la lectura de cabeceras y el tiempo ocioso. Ni
+		// ReadTimeout ni WriteTimeout: cortarían los WebSocket, que son
+		// conexiones largas por definición.
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	// Tarea de refresco y broadcast periódico debounced
@@ -282,7 +310,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, "+cabeceraPeticionPropia)
 		}
 
 		if r.Method == http.MethodOptions {
@@ -308,6 +336,23 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// wsSubprotocol es el subprotocolo que marca una conexión de TelegramDL. El
+// cliente ofrece dos: este y, como segundo, el token.
+const wsSubprotocol = "tgdl-v1"
+
+// tokenDelSubprotocolo saca el token de la cabecera Sec-WebSocket-Protocol.
+func tokenDelSubprotocolo(r *http.Request) string {
+	for _, cabecera := range r.Header.Values("Sec-WebSocket-Protocol") {
+		for _, parte := range strings.Split(cabecera, ",") {
+			parte = strings.TrimSpace(parte)
+			if parte != "" && parte != wsSubprotocol {
+				return parte
+			}
+		}
+	}
+	return ""
+}
+
 func (s *Server) checkAuth(r *http.Request) bool {
 	s.mu.RLock()
 	token := s.apiToken
@@ -320,9 +365,12 @@ func (s *Server) checkAuth(r *http.Request) bool {
 
 	provided := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 	if provided == "" {
-		// El navegador no puede fijar cabeceras personalizadas al abrir un
-		// WebSocket, así que ahí se acepta también como query param.
-		provided = r.URL.Query().Get("token")
+		// El navegador no deja poner cabeceras al abrir un WebSocket, pero sí
+		// declarar subprotocolos, y eso viaja en una cabecera normal. Antes se
+		// aceptaba el token como parámetro de la URL, y las URL completas
+		// quedan registradas en cualquier proxy o túnel por el que pase la
+		// conexión: justo lo que se usa para el acceso remoto.
+		provided = tokenDelSubprotocolo(r)
 	}
 	if provided == "" {
 		return false
@@ -494,7 +542,14 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := s.upgrader.Upgrade(w, r, nil)
+	// Si el cliente ofreció subprotocolos hay que devolverle uno, o el navegador
+	// rechaza la conexión. Se responde siempre el nuestro, nunca el token.
+	var cabeceras http.Header
+	if r.Header.Get("Sec-WebSocket-Protocol") != "" {
+		cabeceras = http.Header{"Sec-WebSocket-Protocol": []string{wsSubprotocol}}
+	}
+
+	conn, err := s.upgrader.Upgrade(w, r, cabeceras)
 	if err != nil {
 		return
 	}
@@ -847,6 +902,24 @@ func requestOrigin(r *http.Request) string {
 	return "origen desconocido"
 }
 
+// registrarEnvioPorIP anota cuándo puede volver a pedir el token este origen y
+// aprovecha para limpiar las entradas ya caducadas, de modo que el mapa no
+// crezca sin límite si alguien insiste desde muchas direcciones.
+//
+// Debe llamarse con s.mu tomado.
+func (s *Server) registrarEnvioPorIP(origin string, hasta time.Time) {
+	if s.tokenSendPorIP == nil {
+		s.tokenSendPorIP = make(map[string]time.Time)
+	}
+	ahora := time.Now()
+	for k, v := range s.tokenSendPorIP {
+		if v.Before(ahora) {
+			delete(s.tokenSendPorIP, k)
+		}
+	}
+	s.tokenSendPorIP[origin] = hasta
+}
+
 // buildTokenMessage redacta la nota que se deja en los Mensajes guardados. El
 // token va en su propia línea para que el formato de código lo abarque entero
 // y baste un toque para copiarlo.
@@ -882,10 +955,31 @@ func (s *Server) handleSendTokenToTelegram(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Este endpoint responde sin token, así que cualquier página web abierta en
+	// el navegador del usuario podía dispararlo: la petición no llevaba cuerpo
+	// ni Content-Type, y eso la convierte en una «simple request» que el
+	// navegador manda sin consultar antes con CORS. Exigir una cabecera propia
+	// obliga al navegador a hacer el preflight, que CORS rechaza.
+	if r.Header.Get(cabeceraPeticionPropia) == "" {
+		s.errorResponse(w, http.StatusForbidden, "Petición no válida")
+		return
+	}
+
 	origin := requestOrigin(r)
 	now := time.Now()
 
 	s.mu.Lock()
+	if wait := s.tokenSendPorIP[origin].Sub(now); wait > 0 {
+		s.mu.Unlock()
+		seconds := int(wait.Seconds()) + 1
+		w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		s.jsonResponse(w, http.StatusTooManyRequests, map[string]any{
+			"status":      "rate_limited",
+			"detail":      fmt.Sprintf("Espera %d segundos antes de volver a pedirlo.", seconds),
+			"retry_after": seconds,
+		})
+		return
+	}
 	if wait := s.tokenSendNextAt.Sub(now); wait > 0 {
 		s.mu.Unlock()
 
@@ -905,6 +999,7 @@ func (s *Server) handleSendTokenToTelegram(w http.ResponseWriter, r *http.Reques
 	// El turno se consume antes de enviar: si Telegram tarda, un botón pulsado
 	// con impaciencia no debe convertirse en cinco mensajes.
 	s.tokenSendNextAt = now.Add(tokenSendCooldown)
+	s.registrarEnvioPorIP(origin, now.Add(tokenSendCooldownPorIP))
 	token := s.apiToken
 	s.mu.Unlock()
 
@@ -919,6 +1014,10 @@ func (s *Server) handleSendTokenToTelegram(w http.ResponseWriter, r *http.Reques
 	if err := s.clientMgr.SendToSavedMessages(ctx, buildTokenMessage(token), token); err != nil {
 		s.mu.Lock()
 		s.tokenSendNextAt = time.Now().Add(tokenSendFailureCooldown)
+		// El límite por origen también se levanta: si el envío falló, quien lo
+		// pidió debe poder reintentar en cuanto arregle la sesión, igual que con
+		// el límite global.
+		delete(s.tokenSendPorIP, origin)
 		s.mu.Unlock()
 
 		logbus.Error(logbus.CatServer, "No se pudo enviar el token a Telegram", err.Error())
@@ -1214,22 +1313,39 @@ func (s *Server) handleOpenDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go func() {
-		target := item.FilePath
-		if runtime.GOOS == "windows" {
-			if _, err := os.Stat(target); err == nil {
-				_ = exec.Command("cmd", "/c", "start", "", target).Start()
-			} else {
-				_ = exec.Command("explorer.exe", filepath.Dir(target)).Start()
-			}
-		} else if runtime.GOOS == "darwin" {
-			_ = exec.Command("open", target).Start()
-		} else {
-			_ = exec.Command("xdg-open", target).Start()
-		}
-	}()
+	go abrirEnElSistema(item.FilePath)
 
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// abrirEnElSistema abre un archivo con la aplicación que le corresponda.
+//
+// En Windows esto se hacía con exec.Command("cmd", "/c", "start", "", ruta), y
+// era una inyección de comandos: cmd.exe interpreta «&», «^» y «%», Go solo
+// entrecomilla los argumentos que llevan espacios, y el nombre del archivo lo
+// elige quien lo sube a Telegram. Un archivo llamado «video&calc.mp4» ejecutaba
+// calc al pulsar «abrir». Ahora no se pasa por el shell en ningún sistema:
+// rundll32 recibe la ruta como un único argumento y no la interpreta.
+//
+// SanitizeFileName también filtra ya esos caracteres, así que son dos barreras
+// independientes; esta es la que no depende de acertar con la lista.
+func abrirEnElSistema(target string) {
+	if strings.TrimSpace(target) == "" {
+		return
+	}
+
+	switch runtime.GOOS {
+	case "windows":
+		if _, err := os.Stat(target); err == nil {
+			_ = exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", target).Start()
+		} else {
+			_ = exec.Command("explorer.exe", filepath.Dir(target)).Start()
+		}
+	case "darwin":
+		_ = exec.Command("open", "--", target).Start()
+	default:
+		_ = exec.Command("xdg-open", target).Start()
+	}
 }
 
 // Settings
@@ -1268,7 +1384,15 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if v, ok := raw["download_folder"]; ok && v != nil {
 		if sVal, ok := v.(string); ok && strings.TrimSpace(sVal) != "" {
-			cfg.DownloadFolder = sVal
+			// Se descarta en silencio una carpeta prohibida en vez de aplicarla:
+			// quien llama puede ser un dispositivo remoto con el token, y dejar
+			// archivos en la carpeta de Inicio o sobre la sesión de Telegram no
+			// es una preferencia, es una vía de ataque.
+			if err := config.ValidateDownloadFolder(sVal); err != nil {
+				logbus.Warn(logbus.CatServer, "Carpeta de descargas rechazada", sVal+": "+err.Error())
+			} else {
+				cfg.DownloadFolder = sVal
+			}
 		}
 	}
 	if v, ok := raw["color_id"]; ok {
@@ -1722,7 +1846,24 @@ func isLocalRequest(r *http.Request) bool {
 		remote = h
 	}
 	ip := net.ParseIP(strings.Trim(remote, "[]"))
-	return ip != nil && ip.IsLoopback()
+	if ip == nil || !ip.IsLoopback() {
+		return false
+	}
+
+	// Un túnel (Cloudflare Tunnel, ngrok, un proxy inverso) corre en esta misma
+	// máquina, así que su conexión también sale de loopback y hasta aquí pasaba
+	// por local. Todos ellos añaden alguna de estas cabeceras al reenviar, así
+	// que su presencia significa que la petición viene de fuera.
+	for _, cabecera := range []string{
+		"X-Forwarded-For", "X-Real-Ip", "X-Forwarded-Host", "X-Forwarded-Proto",
+		"Cf-Connecting-Ip", "Cf-Ray", "Forwarded",
+	} {
+		if r.Header.Get(cabecera) != "" {
+			return false
+		}
+	}
+
+	return true
 }
 
 // handleFSPick abre el diálogo nativo de carpetas del sistema y devuelve la
