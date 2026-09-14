@@ -78,7 +78,8 @@ const themeMap = {
   // <html>. El backend guarda el id tal cual, sin validar rango, así que
   // añadir temas aquí no necesita ningún cambio en Go.
   16: { name: 'Twilight Comet', especial: true, primary: '#d1618f', secondary: '#f5b96b', accent: '#b79af5', bgBase: '#0d0a1e', bgTop: '#3a2568', surface: '#160f2d', surfaceLight: '#1d1539', border: '#2f2258', borderLight: '#41307a', iconBg: '#2f2163', glow: 'rgba(192, 81, 140, 0.20)', textDim: '#9086bb', gradient: 'linear-gradient(135deg, #5b45b0 0%, #c0518c 52%, #f0803c 100%)' },
-  17: { name: 'Edge Runner UI', especial: true, secondary: '#00e5ff', primary: '#e0ff00', accent: '#00e5ff', bgBase: '#0a0a0c', bgTop: '#14161d', surface: '#16181e', surfaceLight: '#1e2029', border: '#272a33', borderLight: '#3a3e4a', iconBg: '#1f2230', glow: 'rgba(224, 255, 0, 0.18)', textDim: '#a0a5b5', gradient: 'linear-gradient(120deg, #e0ff00 0%, #a8f53c 42%, #00e5ff 100%)' }
+  17: { name: 'Edge Runner UI', especial: true, secondary: '#00e5ff', primary: '#e0ff00', accent: '#00e5ff', bgBase: '#0a0a0c', bgTop: '#14161d', surface: '#16181e', surfaceLight: '#1e2029', border: '#272a33', borderLight: '#3a3e4a', iconBg: '#1f2230', glow: 'rgba(224, 255, 0, 0.18)', textDim: '#a0a5b5', gradient: 'linear-gradient(120deg, #e0ff00 0%, #a8f53c 42%, #00e5ff 100%)' },
+  18: { name: 'Rainy Garden', especial: true, secondary: '#8fa4b5', primary: '#e6ecef', accent: '#8fa4b5', bgBase: '#0f1c11', bgTop: '#2d5a27', surface: '#1a3318', surfaceLight: '#224021', border: '#3a5361', borderLight: '#5c768d', iconBg: '#26402c', glow: 'rgba(230, 236, 239, 0.16)', textDim: '#93a79b', gradient: 'linear-gradient(120deg, #e6ecef 0%, #b9c9d4 46%, #8fa4b5 100%)' }
 }
 
 const applyLoaderTheme = (colorId) => {
@@ -93,7 +94,8 @@ const applyLoaderTheme = (colorId) => {
 // (0-15) no tienen entrada aquí y no pintan nada extra: solo cambian variables.
 const clasesTemaEspecial = {
   16: 'tema-twilight-comet',
-  17: 'tema-edge-runner'
+  17: 'tema-edge-runner',
+  18: 'tema-rainy-garden'
 }
 
 const aplicarClaseTema = (colorId) => {

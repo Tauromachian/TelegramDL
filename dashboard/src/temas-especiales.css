@@ -7,8 +7,9 @@
    animadas y detalles que los temas de Telegram no tienen.
 
    Cada tema vive entero dentro de su propia clase (.tema-twilight-comet,
-   .tema-edge-runner), que App.vue pone y quita en el <html> al aplicar el
-   tema. Con un color de Telegram seleccionado no hay ni una regla activa de
+   .tema-edge-runner, .tema-rainy-garden), que App.vue pone y quita en el
+   <html> al aplicar el tema. Con un color de Telegram seleccionado no hay ni
+   una regla activa de
    este archivo, así que el panel de siempre se comporta exactamente igual que
    antes de que existiera.
 
@@ -739,4 +740,361 @@
 .tema-edge-runner .boot-screen,
 .tema-edge-runner .update-required-overlay {
   background-image: radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 46%);
+}
+
+/* -----------------------------------------------------------------------------
+   Rainy Garden (color 18)
+   El jardín bajo la lluvia: follaje en penumbra, cristal mojado y luz gris de
+   día nublado. Es el más calmado de los tres —nada de neón ni de destellos—
+   y todo el movimiento es la lluvia, que cae detrás y delante del contenido.
+
+   Sobre la paleta: el panel tiene blancos fijos en su CSS (títulos, etiquetas)
+   pensados para fondo oscuro, así que el tema es el jardín al anochecer y no a
+   mediodía: verdes oscuros de fondo, el azul lluvia en bordes y superficies
+   secundarias, y la niebla clara para lo activo y el texto principal, que es
+   justo el reparto de la paleta.
+   -------------------------------------------------------------------------- */
+.tema-rainy-garden {
+  --rg-niebla: #e6ecef;
+  --rg-lluvia: #8fa4b5;
+  --rg-lluvia-honda: #5c768d;
+  --rg-musgo: #2d5a27;
+  --rg-musgo-hondo: #1e4620;
+}
+
+/* --- El jardín ------------------------------------------------------------ */
+
+.tema-rainy-garden body {
+  background-image:
+    /* follaje desenfocado en las dos esquinas de abajo */
+    radial-gradient(60% 42% at 4% 108%, color-mix(in srgb, var(--rg-musgo), transparent 62%) 0%, transparent 62%),
+    radial-gradient(52% 38% at 98% 104%, color-mix(in srgb, var(--rg-musgo-hondo), transparent 58%) 0%, transparent 60%),
+    /* luz gris de día nublado entrando por arriba */
+    radial-gradient(70% 48% at 62% -10%, color-mix(in srgb, var(--rg-lluvia), transparent 86%) 0%, transparent 58%),
+    radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 48%);
+  background-attachment: fixed;
+}
+
+/* Lluvia. Cada gota es un radial-gradient alargado dentro de un mosaico que se
+   repite; el mosaico entero se mueve con transform, así que la caída es fluida
+   y no cuesta nada. Dos capas: una lejana por detrás del contenido y otra
+   cercana por delante, más rápida y casi transparente. Esa diferencia de
+   velocidad es lo que da la profundidad.
+
+   El giro va dentro del transform y la caída después, para que las gotas bajen
+   por su propio eje inclinado; por eso las capas se extienden un 25% fuera de
+   la pantalla, para que al girar no se vean los bordes. Y el recorrido es
+   exactamente el alto del mosaico, así que el bucle no tiene salto. */
+.tema-rainy-garden body::before,
+.tema-rainy-garden::before {
+  content: '';
+  position: fixed;
+  inset: -25%;
+  pointer-events: none;
+}
+
+/* Lluvia lejana: densa, lenta y por detrás de los paneles. */
+.tema-rainy-garden body::before {
+  z-index: -1;
+  background-image:
+    radial-gradient(1.1px 14px at 12% 20%, color-mix(in srgb, var(--rg-niebla), transparent 68%), transparent 70%),
+    radial-gradient(1.0px 11px at 37% 62%, color-mix(in srgb, var(--rg-niebla), transparent 76%), transparent 70%),
+    radial-gradient(1.2px 16px at 64% 8%,  color-mix(in srgb, var(--rg-niebla), transparent 72%), transparent 70%),
+    radial-gradient(1.0px 12px at 82% 44%, color-mix(in srgb, var(--rg-niebla), transparent 80%), transparent 70%),
+    radial-gradient(1.1px 13px at 51% 85%, color-mix(in srgb, var(--rg-niebla), transparent 74%), transparent 70%),
+    radial-gradient(1.0px 10px at 92% 72%, color-mix(in srgb, var(--rg-niebla), transparent 82%), transparent 70%),
+    radial-gradient(1.2px 15px at 26% 47%, color-mix(in srgb, var(--rg-niebla), transparent 78%), transparent 70%);
+  background-size: 180px 220px;
+  animation: rgLluviaLejos 1.9s linear infinite;
+}
+
+/* Lluvia cercana: cuatro gotas largas por mosaico, al 12% de opacidad. A ese
+   nivel se percibe el movimiento sin que estorbe para leer lo que hay debajo,
+   que es el único sitio del tema donde algo pasa por encima del texto. */
+.tema-rainy-garden::before {
+  z-index: 400;
+  opacity: .12;
+  background-image:
+    radial-gradient(1.5px 28px at 22% 30%, var(--rg-niebla), transparent 72%),
+    radial-gradient(1.7px 34px at 68% 70%, var(--rg-niebla), transparent 72%),
+    radial-gradient(1.4px 24px at 45% 12%, var(--rg-niebla), transparent 72%),
+    radial-gradient(1.5px 30px at 88% 52%, var(--rg-niebla), transparent 72%);
+  background-size: 300px 300px;
+  animation: rgLluviaCerca 1.15s linear infinite;
+}
+
+@keyframes rgLluviaLejos {
+  from { transform: rotate(7deg) translateY(0) }
+  to   { transform: rotate(7deg) translateY(220px) }
+}
+
+@keyframes rgLluviaCerca {
+  from { transform: rotate(7deg) translateY(0) }
+  to   { transform: rotate(7deg) translateY(300px) }
+}
+
+/* El charco: el resplandor del agua acumulada abajo. Va por detrás de todo,
+   así que solo asoma por los huecos del fondo, y respira despacio en vez de
+   quedarse plano. */
+.tema-rainy-garden body::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 26vh;
+  z-index: -1;
+  pointer-events: none;
+  background-image: linear-gradient(to top,
+    color-mix(in srgb, var(--rg-lluvia-honda), transparent 80%) 0%,
+    color-mix(in srgb, var(--rg-lluvia-honda), transparent 92%) 45%,
+    transparent 100%);
+  animation: rgCharco 9s ease-in-out infinite;
+}
+
+@keyframes rgCharco {
+  0%, 100% { opacity: .55 }
+  50%      { opacity: .85 }
+}
+
+.tema-rainy-garden .app-shell { position: relative; z-index: 1 }
+
+@media (prefers-reduced-motion: reduce) {
+  .tema-rainy-garden body::before { animation: none }
+  .tema-rainy-garden::before { display: none }
+  .tema-rainy-garden body::after { animation: none }
+  .tema-rainy-garden .progress-fill::before,
+  .tema-rainy-garden .disk-bar .fill::before { animation: none }
+}
+
+/* --- Cristal mojado ------------------------------------------------------- */
+/* Los paneles son la ventana desde la que se mira el jardín: traslúcidos, con
+   bastante desenfoque y una línea de luz en el filo de arriba, que es donde el
+   agua atrapa la claridad. */
+
+.tema-rainy-garden .sidebar {
+  background: color-mix(in srgb, var(--user-bg-base), transparent 18%);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-right: 1px solid color-mix(in srgb, var(--rg-lluvia-honda), transparent 55%);
+}
+
+.tema-rainy-garden .panel,
+.tema-rainy-garden .stat-card,
+.tema-rainy-garden .hero-card,
+.tema-rainy-garden .logs-hero {
+  background-color: color-mix(in srgb, var(--user-surface), transparent 12%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: color-mix(in srgb, var(--user-border-light), transparent 52%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--rg-niebla), transparent 86%),
+    0 14px 34px rgba(0, 0, 0, .3);
+}
+
+.tema-rainy-garden .stat-card:hover {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--rg-niebla), transparent 78%),
+    0 14px 30px rgba(0, 0, 0, .38);
+}
+
+.tema-rainy-garden .hero-card {
+  background-image: linear-gradient(118deg,
+    color-mix(in srgb, var(--user-surface-light), transparent 8%) 0%,
+    color-mix(in srgb, var(--user-surface), transparent 10%) 62%,
+    color-mix(in srgb, var(--rg-lluvia-honda), var(--user-surface) 78%) 100%);
+}
+
+/* El halo de la esquina pasa a ser luz difusa entre la lluvia. */
+.tema-rainy-garden .hero-card:after {
+  background: radial-gradient(circle, var(--rg-niebla) 0%, transparent 66%);
+  opacity: .10;
+  filter: blur(26px);
+}
+
+/* --- Texto ---------------------------------------------------------------- */
+/* El tema no toca ninguna fuente. Solo los blancos, que en el panel tiran a
+   azul frío y sobre verde se ven morados: pasan a la niebla de la paleta. */
+
+.tema-rainy-garden .topbar h1,
+.tema-rainy-garden .brand,
+.tema-rainy-garden .hero-card h2,
+.tema-rainy-garden .panel-heading h2,
+.tema-rainy-garden .logs-hero h2,
+.tema-rainy-garden .stat-card strong,
+.tema-rainy-garden .sidebar-bottom strong,
+.tema-rainy-garden .setting-label,
+.tema-rainy-garden .sidebar-user-badge,
+.tema-rainy-garden .download-form input,
+.tema-rainy-garden .speed-row input,
+.tema-rainy-garden .token-row input { color: var(--rg-niebla) }
+
+.tema-rainy-garden .empty-state p { color: color-mix(in srgb, var(--rg-niebla), transparent 25%) }
+.tema-rainy-garden .sidebar-status { color: var(--rg-lluvia) }
+
+/* --- Navegación ----------------------------------------------------------- */
+
+.tema-rainy-garden .sidebar-nav button:hover {
+  color: var(--rg-niebla);
+  background: color-mix(in srgb, var(--rg-lluvia), transparent 90%);
+}
+
+.tema-rainy-garden .sidebar-nav button.selected {
+  color: var(--rg-niebla);
+  background: color-mix(in srgb, var(--rg-musgo), transparent 55%) !important;
+  box-shadow: inset 3px 0 var(--rg-lluvia), 0 6px 20px rgba(0, 0, 0, .25);
+}
+.tema-rainy-garden .sidebar-nav button.selected span { color: var(--rg-niebla) }
+
+@media (max-width: 900px) {
+  .tema-rainy-garden .sidebar-nav button.selected {
+    box-shadow: inset 0 -3px var(--rg-lluvia), 0 6px 20px rgba(0, 0, 0, .25);
+  }
+}
+
+/* --- Barras de progreso --------------------------------------------------- */
+/* Agua subiendo, con la lluvia rayándola en diagonal. Misma técnica que los
+   otros dos temas: capa propia movida con transform y recorrido fijo, para que
+   el avance se vea igual con la barra corta que con la barra llena.
+   El patrón va a 105° y repite cada 11px sobre su eje, así que en horizontal
+   repite cada 11 / sen(105°) = 11,39px; el recorrido, 22,78px, son dos
+   periodos justos y el salto del bucle no se ve. */
+
+.tema-rainy-garden .progress-fill,
+.tema-rainy-garden .disk-bar .fill,
+.tema-rainy-garden .update-progress-fill {
+  background-image: var(--user-gradient);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--rg-niebla), transparent 78%);
+}
+
+.tema-rainy-garden .progress-track {
+  background: color-mix(in srgb, var(--user-bg-base), transparent 25%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rg-lluvia-honda), transparent 72%);
+}
+
+.tema-rainy-garden .progress-fill,
+.tema-rainy-garden .disk-bar .fill {
+  position: relative;
+  overflow: hidden;
+}
+
+.tema-rainy-garden .progress-fill::before,
+.tema-rainy-garden .disk-bar .fill::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  /* Sobra por la derecha: es hacia donde se desplaza la capa. */
+  right: -26px;
+  background-image:
+    repeating-linear-gradient(105deg,
+      rgba(255, 255, 255, .26) 0 2px,
+      rgba(92, 118, 141, .16) 2px 11px);
+  animation: rgAgua 1.5s linear infinite;
+}
+
+@keyframes rgAgua {
+  from { transform: translateX(0) }
+  to   { transform: translateX(-22.78px) }
+}
+
+/* La barra del diálogo de actualización ya trae su propia animación dentro,
+   así que ahí el rayado se queda quieto, de fondo. */
+.tema-rainy-garden .update-progress-fill {
+  background-image:
+    repeating-linear-gradient(105deg,
+      rgba(255, 255, 255, .26) 0 2px,
+      rgba(92, 118, 141, .16) 2px 11px),
+    var(--user-gradient);
+}
+
+/* --- Estados y detalles --------------------------------------------------- */
+
+.tema-rainy-garden .status-dot,
+.tema-rainy-garden .live-dot {
+  background: var(--rg-niebla);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--rg-niebla), transparent 45%);
+}
+.tema-rainy-garden .status-dot.disconnected {
+  background: #c97a6d;
+  box-shadow: 0 0 12px rgba(201, 122, 109, .55);
+}
+.tema-rainy-garden .sidebar-status.is-disconnected {
+  color: #e0a79c;
+  background: rgba(201, 122, 109, .08);
+  border-color: rgba(201, 122, 109, .18);
+}
+
+.tema-rainy-garden .badge,
+.tema-rainy-garden .save-state {
+  background: color-mix(in srgb, var(--rg-lluvia), transparent 88%);
+  color: var(--rg-niebla);
+  border-color: color-mix(in srgb, var(--rg-lluvia), transparent 74%);
+}
+
+.tema-rainy-garden .count-pill {
+  color: var(--rg-niebla);
+  background: color-mix(in srgb, var(--rg-lluvia-honda), transparent 70%);
+}
+
+.tema-rainy-garden .sidebar-user-badge .user-icon { color: var(--rg-lluvia) }
+
+.tema-rainy-garden .row-side button,
+.tema-rainy-garden .delete-button,
+.tema-rainy-garden .sidebar-user-badge .logout-btn { color: #d99a8f }
+.tema-rainy-garden .row-side button:hover,
+.tema-rainy-garden .delete-button:hover,
+.tema-rainy-garden .sidebar-user-badge .logout-btn:hover {
+  color: #f2c4bb;
+  background: rgba(201, 122, 109, .16);
+}
+.tema-rainy-garden .row-side .pause-action { color: var(--rg-lluvia) }
+.tema-rainy-garden .row-side .resume-action { color: #9ec79a }
+
+.tema-rainy-garden .toast.success {
+  background: color-mix(in srgb, var(--user-surface), transparent 6%);
+  color: var(--rg-niebla);
+  border: 1px solid color-mix(in srgb, var(--rg-lluvia), transparent 62%);
+}
+
+.tema-rainy-garden .inline-link,
+.tema-rainy-garden .inline-link:visited { color: var(--rg-lluvia) }
+.tema-rainy-garden .inline-link:hover { color: var(--rg-niebla) }
+.tema-rainy-garden .inline-link:focus-visible { outline-color: var(--rg-lluvia) }
+
+/* Los cuatro iconos de cifras, en tonos del jardín en vez de sus colores fijos. */
+.tema-rainy-garden .stat-icon.blue  { background: color-mix(in srgb, var(--rg-musgo), transparent 55%);        color: var(--rg-niebla) }
+.tema-rainy-garden .stat-icon.amber { background: color-mix(in srgb, var(--rg-lluvia-honda), transparent 68%); color: var(--rg-lluvia) }
+.tema-rainy-garden .stat-icon.green { background: color-mix(in srgb, var(--rg-musgo-hondo), transparent 45%);  color: #9ec79a }
+.tema-rainy-garden .stat-icon.gray  { background: color-mix(in srgb, var(--user-text-dim), transparent 88%);   color: var(--user-text-dim) }
+
+/* Botón principal: cristal claro sobre el verde, con el texto en el verde
+   hondo del fondo. */
+.tema-rainy-garden .primary-button,
+.tema-rainy-garden .save-button {
+  color: var(--user-bg-base);
+  font-weight: 700;
+}
+.tema-rainy-garden .primary-button:hover:not(:disabled),
+.tema-rainy-garden .save-button:hover:not(:disabled) {
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--rg-lluvia-honda), transparent 55%);
+}
+
+.tema-rainy-garden ::-webkit-scrollbar { width: 9px; height: 9px }
+.tema-rainy-garden ::-webkit-scrollbar-track { background: transparent }
+.tema-rainy-garden ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--rg-lluvia-honda), transparent 35%);
+  border-radius: 9px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.tema-rainy-garden ::-webkit-scrollbar-thumb:hover {
+  background: var(--rg-lluvia);
+  background-clip: content-box;
+}
+
+.tema-rainy-garden .boot-screen,
+.tema-rainy-garden .update-required-overlay {
+  background-image: radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 48%);
 }
