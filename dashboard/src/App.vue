@@ -69,7 +69,15 @@ const themeMap = {
   12: { primary: '#3fa7b5', secondary: '#62d4e3', accent: '#7cd1db', bgBase: '#081616', bgTop: '#143a3d', surface: '#0d2222', surfaceLight: '#112d2d', border: '#1b4a4d', borderLight: '#246366', iconBg: '#143a3d', glow: 'rgba(63, 167, 181, 0.15)', textDim: '#7ba8a8', gradient: 'linear-gradient(135deg, #3fa7b5 0%, #62d4e3 100%)' },
   13: { primary: '#38a7ff', secondary: '#b48bf2', accent: '#5ebcff', bgBase: '#07111f', bgTop: '#163557', surface: '#0b1a2a', surfaceLight: '#0e2032', border: '#1b344b', borderLight: '#234765', iconBg: '#11385b', glow: 'rgba(73, 182, 255, 0.15)', textDim: '#728ba2', gradient: 'linear-gradient(135deg, #38a7ff 0%, #b48bf2 100%)' },
   14: { primary: '#c04c7d', secondary: '#f28b7e', accent: '#e67dac', bgBase: '#160811', bgTop: '#3a1428', surface: '#220d18', surfaceLight: '#2d111f', border: '#4a1b32', borderLight: '#632442', iconBg: '#3a1428', glow: 'rgba(192, 76, 125, 0.15)', textDim: '#a87b92', gradient: 'linear-gradient(135deg, #c04c7d 0%, #f28b7e 100%)' },
-  15: { primary: '#7d8b99', secondary: '#b0b8c2', accent: '#acb8c2', bgBase: '#121416', bgTop: '#282d33', surface: '#1a1e22', surfaceLight: '#22282d', border: '#353d45', borderLight: '#45505a', iconBg: '#282d33', glow: 'rgba(125, 139, 153, 0.15)', textDim: '#888888', gradient: 'linear-gradient(135deg, #7d8b99 0%, #b0b8c2 100%)' }
+  15: { primary: '#7d8b99', secondary: '#b0b8c2', accent: '#acb8c2', bgBase: '#121416', bgTop: '#282d33', surface: '#1a1e22', surfaceLight: '#22282d', border: '#353d45', borderLight: '#45505a', iconBg: '#282d33', glow: 'rgba(125, 139, 153, 0.15)', textDim: '#888888', gradient: 'linear-gradient(135deg, #7d8b99 0%, #b0b8c2 100%)' },
+
+  // --- Temas especiales del panel ---
+  // Del 16 en adelante ya no son colores de Telegram Premium sino paletas
+  // propias, y además de las variables de color encienden una capa decorativa
+  // (ver temas-especiales.css) a través de la clase que pone applyTheme en el
+  // <html>. El backend guarda el id tal cual, sin validar rango, así que
+  // añadir temas aquí no necesita ningún cambio en Go.
+  16: { name: 'Twilight Comet', especial: true, primary: '#d1618f', secondary: '#f5b96b', accent: '#b79af5', bgBase: '#0d0a1e', bgTop: '#3a2568', surface: '#160f2d', surfaceLight: '#1d1539', border: '#2f2258', borderLight: '#41307a', iconBg: '#2f2163', glow: 'rgba(192, 81, 140, 0.20)', textDim: '#9086bb', gradient: 'linear-gradient(135deg, #5b45b0 0%, #c0518c 52%, #f0803c 100%)' }
 }
 
 const applyLoaderTheme = (colorId) => {
@@ -78,6 +86,19 @@ const applyLoaderTheme = (colorId) => {
   root.style.setProperty('--loader-primary', theme.primary)
   root.style.setProperty('--loader-glow', theme.glow)
   localStorage.setItem('tgdl_loader_color', colorId)
+}
+
+// Clase que enciende el decorado de cada tema especial. Los colores de Telegram
+// (0-15) no tienen entrada aquí y no pintan nada extra: solo cambian variables.
+const clasesTemaEspecial = {
+  16: 'tema-twilight-comet'
+}
+
+const aplicarClaseTema = (colorId) => {
+  const root = document.documentElement
+  Object.values(clasesTemaEspecial).forEach(clase => root.classList.remove(clase))
+  const clase = clasesTemaEspecial[colorId]
+  if (clase) root.classList.add(clase)
 }
 
 const applyTheme = (colorId) => {
@@ -95,6 +116,7 @@ const applyTheme = (colorId) => {
   root.style.setProperty('--user-glow', theme.glow)
   root.style.setProperty('--user-text-dim', theme.textDim)
   root.style.setProperty('--user-gradient', theme.gradient)
+  aplicarClaseTema(themeMap[colorId] ? colorId : 5)
 
   // Persistir el color en el objeto de usuario para que index.html lo use en el arranque
   try {
@@ -1344,6 +1366,39 @@ onUnmounted(() => {
   z-index: 2;
 }
 .gradient-dot { position: relative; }
+
+/* Colores temáticos (ids 16+). Se presentan con el nombre a la vista y no como
+   un punto más: son pocos, no vienen de Telegram y el nombre es lo que los
+   distingue. */
+.seccion-temas { margin-top: 30px; border-top: 1px solid var(--user-border); padding-top: 20px; }
+.temas-nota { font-size: 11px; color: var(--user-text-dim); line-height: 1.5; margin-top: -6px; }
+.temas-lista { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 20px; }
+.tema-chip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 13px 7px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--user-border);
+  background: var(--user-surface-light);
+  color: var(--user-text-dim);
+  font: 600 12px 'DM Sans';
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.tema-chip:hover { transform: translateY(-2px); border-color: var(--user-border-light); color: #eef7ff; }
+.tema-chip.active {
+  color: #eef7ff;
+  border-color: var(--user-primary);
+  box-shadow: 0 0 0 1px var(--user-primary), 0 6px 18px var(--user-glow);
+}
+.tema-muestra {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
 .reset-button-alt {
   background: var(--user-surface-light);
   border: 1px solid var(--user-border);

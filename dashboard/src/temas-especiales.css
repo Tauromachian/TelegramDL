@@ -1,0 +1,372 @@
+/* =============================================================================
+   Temas especiales del panel
+   -----------------------------------------------------------------------------
+   Los colores 0-15 son los de Telegram Premium: el panel los toma de la cuenta
+   con la que se inicia sesión y solo cambian variables de color. Del 16 en
+   adelante hay paletas propias, y esas sí pueden traer decorado: fondo, capas
+   animadas y detalles que los temas de Telegram no tienen.
+
+   Todo lo de este archivo vive dentro de una clase (.tema-twilight-comet), que
+   App.vue pone y quita en el <html> al aplicar el tema. Con cualquier otro
+   color seleccionado no hay ni una regla activa, así que el panel de siempre
+   se comporta exactamente igual que antes de existir este archivo.
+
+   Para añadir otro tema especial: una paleta nueva en el themeMap de App.vue e
+   index.html, su clase en `clasesTemaEspecial` (App.vue) y un bloque aquí.
+   ========================================================================== */
+
+/* -----------------------------------------------------------------------------
+   Twilight Comet (color 16)
+   Un cielo de atardecer entrando en la noche: resplandor del horizonte abajo,
+   estrellas, un cometa que cruza de vez en cuando y un cordón carmesí atando
+   las piezas que marcan avance o selección.
+   -------------------------------------------------------------------------- */
+.tema-twilight-comet {
+  /* El carmesí del cordón es el único color que no sale del themeMap: es el
+     punto fijo del tema y no cambia aunque cambie la paleta. */
+  --tc-cordon: #c9372c;
+  --tc-cordon-claro: #e0574a;
+  --tc-cometa: #bdeaff;
+  --tc-cometa-estela: #7fd4f5;
+  --tc-oro: #f7c56b;
+  --tc-horizonte: #f0803c;
+}
+
+/* --- El cielo ------------------------------------------------------------- */
+
+.tema-twilight-comet body {
+  background-image:
+    /* último resplandor del sol, abajo a la derecha */
+    radial-gradient(120% 70% at 78% 118%, color-mix(in srgb, var(--tc-horizonte), transparent 82%) 0%, transparent 60%),
+    /* la franja magenta del atardecer */
+    radial-gradient(100% 60% at 20% 105%, color-mix(in srgb, var(--user-primary), transparent 84%) 0%, transparent 62%),
+    /* la noche que ya viene por arriba */
+    radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 46%);
+  background-attachment: fixed;
+}
+
+/* Estrellas: radial-gradients dentro de un mosaico que se repite, no una
+   imagen. Dos baldosas de tamaños distintos (620px y 410px) cubren la pantalla
+   sin que se note la repetición y pesan cero bytes. Cada una parpadea a su
+   ritmo, lo que da algo de profundidad. */
+.tema-twilight-comet body::before,
+.tema-twilight-comet .app-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.tema-twilight-comet body::before {
+  background-image:
+    radial-gradient(1.7px 1.7px at 12% 18%, rgba(255,255,255,.95), transparent 62%),
+    radial-gradient(1.2px 1.2px at 34% 9%,  rgba(255,255,255,.70), transparent 62%),
+    radial-gradient(2.0px 2.0px at 57% 24%, var(--tc-cometa), transparent 62%),
+    radial-gradient(1.1px 1.1px at 73% 12%, rgba(255,255,255,.75), transparent 62%),
+    radial-gradient(1.5px 1.5px at 88% 31%, rgba(255,255,255,.80), transparent 62%),
+    radial-gradient(1.2px 1.2px at 21% 41%, rgba(255,255,255,.60), transparent 62%),
+    radial-gradient(1.9px 1.9px at 46% 52%, var(--tc-oro), transparent 62%),
+    radial-gradient(1.1px 1.1px at 66% 44%, rgba(255,255,255,.55), transparent 62%),
+    radial-gradient(1.4px 1.4px at 93% 57%, rgba(255,255,255,.65), transparent 62%),
+    radial-gradient(1.6px 1.6px at 8% 63%,  rgba(255,255,255,.60), transparent 62%),
+    radial-gradient(1.2px 1.2px at 39% 73%, rgba(255,255,255,.50), transparent 62%),
+    radial-gradient(1.5px 1.5px at 80% 77%, var(--tc-cometa), transparent 62%),
+    radial-gradient(1.3px 1.3px at 28% 88%, rgba(255,255,255,.55), transparent 62%),
+    radial-gradient(1.1px 1.1px at 61% 95%, rgba(255,255,255,.45), transparent 62%);
+  background-size: 620px 620px;
+  opacity: .75;
+  animation: tcParpadeo 7s ease-in-out infinite;
+}
+
+/* Segunda baldosa: estrellas más pequeñas y tenues, el fondo del cielo. */
+.tema-twilight-comet .app-shell::before {
+  background-image:
+    radial-gradient(1.1px 1.1px at 18% 27%, rgba(255,255,255,.55), transparent 62%),
+    radial-gradient(0.9px 0.9px at 47% 14%, rgba(255,255,255,.45), transparent 62%),
+    radial-gradient(1.2px 1.2px at 71% 36%, var(--tc-oro), transparent 62%),
+    radial-gradient(0.9px 0.9px at 85% 19%, rgba(255,255,255,.40), transparent 62%),
+    radial-gradient(1.0px 1.0px at 31% 58%, rgba(255,255,255,.50), transparent 62%),
+    radial-gradient(1.1px 1.1px at 63% 69%, rgba(255,255,255,.42), transparent 62%),
+    radial-gradient(0.9px 0.9px at 9% 82%,  rgba(255,255,255,.38), transparent 62%),
+    radial-gradient(1.2px 1.2px at 89% 86%, var(--tc-cometa), transparent 62%);
+  background-size: 410px 410px;
+  opacity: .5;
+  animation: tcParpadeo 11s ease-in-out infinite reverse;
+}
+
+/* El cometa cruza la ventana cada 45 segundos y tarda unos cinco en pasar. Va
+   POR ENCIMA del contenido a propósito (z-index alto, por debajo de los
+   avisos): detrás de los paneles no se vería, y a media opacidad se lee como
+   un reflejo sobre el cristal y no como un elemento de la interfaz. Se mueve
+   con transform, así que lo resuelve la GPU sin repintar la página. */
+.tema-twilight-comet body::after {
+  content: '';
+  position: fixed;
+  top: -16vh;
+  left: -26vw;
+  width: 42vw;
+  height: 2px;
+  z-index: 300;
+  pointer-events: none;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--tc-cometa-estela), transparent 78%) 38%,
+    var(--tc-cometa) 93%,
+    #fff 100%);
+  filter: drop-shadow(0 0 8px var(--tc-cometa)) drop-shadow(0 0 22px var(--tc-cometa-estela)) blur(.4px);
+  opacity: 0;
+  animation: tcCometa 45s linear infinite;
+}
+
+/* El contenido va por encima del cielo. La barra lateral ya tiene z-index 100. */
+.tema-twilight-comet .app-shell { position: relative; z-index: 1 }
+
+@keyframes tcParpadeo {
+  0%, 100% { opacity: .42 }
+  50%      { opacity: .68 }
+}
+
+/* El giro va DENTRO de transform, no en la propiedad `rotate`: por separado el
+   navegador aplica la rotación por fuera de la traslación y el trazo se sale
+   por abajo en vez de cruzar. El ángulo es el de la propia trayectoria, para
+   que el cometa apunte a donde va. */
+@keyframes tcCometa {
+  0%   { transform: translate3d(0, 0, 0) rotate(23deg) scaleX(.3); opacity: 0 }
+  2%   { opacity: .50 }
+  8%   { opacity: .46 }
+  12%  { transform: translate3d(150vw, 95vh, 0) rotate(23deg) scaleX(1); opacity: 0 }
+  100% { transform: translate3d(150vw, 95vh, 0) rotate(23deg) scaleX(1); opacity: 0 }
+}
+
+/* Con `prefers-reduced-motion` el cielo se queda quieto: las estrellas siguen
+   ahí, el parpadeo y el cometa no. */
+@media (prefers-reduced-motion: reduce) {
+  .tema-twilight-comet body::before,
+  .tema-twilight-comet .app-shell::before { animation: none }
+  .tema-twilight-comet body::after { display: none }
+  .tema-twilight-comet .hero-card:after { animation: none }
+  .tema-twilight-comet .progress-fill::before,
+  .tema-twilight-comet .disk-bar .fill::before { animation: none }
+}
+
+/* --- Cristal -------------------------------------------------------------- */
+/* Los paneles dejan de ser cajas opacas para que el cielo se vea detrás. El
+   desenfoque es lo que evita que las estrellas molesten al leer. */
+
+.tema-twilight-comet .sidebar {
+  background: color-mix(in srgb, var(--user-bg-base), transparent 22%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-right: 1px solid color-mix(in srgb, var(--user-border-light), transparent 40%);
+}
+
+.tema-twilight-comet .panel,
+.tema-twilight-comet .stat-card,
+.tema-twilight-comet .hero-card {
+  background-color: color-mix(in srgb, var(--user-surface), transparent 14%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* La tarjeta grande es el trozo de cielo más literal del panel: va de la noche
+   (arriba izquierda) al naranja del horizonte (abajo derecha). */
+.tema-twilight-comet .hero-card {
+  background-image:
+    radial-gradient(90% 120% at 100% 130%, color-mix(in srgb, var(--tc-horizonte), transparent 80%) 0%, transparent 58%),
+    linear-gradient(118deg, var(--user-surface-light) 0%, var(--user-surface) 64%);
+  border-color: color-mix(in srgb, var(--user-border-light), transparent 25%);
+}
+
+/* El halo de la esquina pasa a ser un sol poniente en vez de una mancha. */
+.tema-twilight-comet .hero-card:after {
+  background: radial-gradient(circle, var(--tc-oro) 0%, color-mix(in srgb, var(--tc-horizonte), transparent 45%) 38%, transparent 70%);
+  opacity: .30;
+  filter: blur(14px);
+  animation: tcSol 9s ease-in-out infinite;
+}
+
+@keyframes tcSol {
+  0%, 100% { opacity: .24; transform: scale(1) }
+  50%      { opacity: .38; transform: scale(1.07) }
+}
+
+/* --- Tipografía ----------------------------------------------------------- */
+/* El tema NO cambia de fuente: usa la misma que el resto de los colores, para
+   que cambiar de tema no mueva el texto de sitio. Lo único que se toca es el
+   tono del título de la vista, un poco más claro sobre el cielo violeta. */
+
+.tema-twilight-comet .topbar h1 { color: #f6f0fa }
+
+/* --- El cordón carmesí ---------------------------------------------------- */
+/* Ata las piezas que indican avance o selección: barras de progreso y pestaña
+   activa. */
+
+/* Trenzado: un degradado repetido en diagonal sobre el color del tema da la
+   textura del cordón sin necesidad de una imagen. */
+.tema-twilight-comet .progress-fill,
+.tema-twilight-comet .disk-bar .fill,
+.tema-twilight-comet .update-progress-fill {
+  background-image: var(--user-gradient);
+  box-shadow: 0 0 12px var(--user-glow);
+}
+
+/* El trenzado va en una capa aparte y se mueve con transform, no con
+   background-position.
+   El porqué: la animación original (progressSheen, en style.css) desplaza el
+   fondo un 200% del ANCHO de la barra en 2,3 s. Con la barra corta eso son
+   unas decenas de pixeles por segundo y el avance se ve bien; según la
+   descarga progresa y la barra se alarga, el mismo 200% pasa a ser de cientos
+   de pixeles por segundo, las rayas se emborronan y parece que la animación
+   se apaga. Aquí el recorrido es fijo —dos periodos del trazado—, así que el
+   cordón avanza al mismo ritmo con la barra al 5% que al 95%. */
+.tema-twilight-comet .progress-fill,
+.tema-twilight-comet .disk-bar .fill {
+  position: relative;
+  overflow: hidden;
+}
+
+.tema-twilight-comet .progress-fill::before,
+.tema-twilight-comet .disk-bar .fill::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  /* Sobra por la derecha: es lo que se desplaza, y sin ello quedaría un hueco
+     al final de cada vuelta. */
+  right: -24px;
+  background-image:
+    repeating-linear-gradient(115deg,
+      rgba(255, 255, 255, .22) 0 4px,
+      rgba(0, 0, 0, .10) 4px 9px);
+  animation: tcCordonAvanza 1.2s linear infinite;
+}
+
+/* 19.86px son dos periodos horizontales del trazado: el periodo del degradado
+   es de 9px medidos sobre su propio eje, y a 115deg eso son 9 / sin(115deg) =
+   9.93px en horizontal. Al desplazarse un múltiplo exacto, el salto del final
+   del bucle cae justo encima del patrón y no se ve. */
+@keyframes tcCordonAvanza {
+  from { transform: translateX(0) }
+  to   { transform: translateX(-19.86px) }
+}
+
+/* La barra del diálogo de actualización ya trae su propia animación de viento
+   dentro, así que ahí el trenzado se queda quieto, de fondo, y no se le añade
+   el recorte que necesitaría la capa móvil. */
+.tema-twilight-comet .update-progress-fill {
+  background-image:
+    repeating-linear-gradient(115deg,
+      rgba(255, 255, 255, .22) 0 4px,
+      rgba(0, 0, 0, .10) 4px 9px),
+    var(--user-gradient);
+}
+
+.tema-twilight-comet .progress-track {
+  background: color-mix(in srgb, var(--user-bg-base), transparent 30%);
+}
+
+/* La pestaña seleccionada lleva el carmesí al borde, no el color del tema: es
+   el punto fijo de la interfaz. */
+.tema-twilight-comet .sidebar-nav button { position: relative }
+.tema-twilight-comet .sidebar-nav button.selected {
+  box-shadow: inset 3px 0 var(--tc-cordon), 0 6px 20px rgba(0, 0, 0, .25);
+  background: color-mix(in srgb, var(--user-icon-bg), transparent 15%) !important;
+}
+.tema-twilight-comet .sidebar-nav button.selected::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tc-cordon-claro);
+  box-shadow: 0 0 8px var(--tc-cordon);
+}
+
+/* Los enlaces de ayuda ya eran de un rojo fijo: se alinean con el cordón. */
+.tema-twilight-comet .inline-link,
+.tema-twilight-comet .inline-link:visited { color: var(--tc-cordon-claro) }
+.tema-twilight-comet .inline-link:hover { color: #ff7a6d }
+.tema-twilight-comet .inline-link:focus-visible { outline-color: var(--tc-cordon-claro) }
+
+/* --- Detalles ------------------------------------------------------------- */
+
+/* Los cuatro iconos de estadísticas tienen colores fijos que no pegan con el
+   cielo; pasan a los tonos del tema. */
+.tema-twilight-comet .stat-icon.blue  { background: color-mix(in srgb, var(--user-icon-bg), transparent 10%); color: var(--user-accent) }
+.tema-twilight-comet .stat-icon.amber { background: rgba(240, 128, 60, .16); color: var(--tc-oro) }
+.tema-twilight-comet .stat-icon.green { background: rgba(53, 163, 181, .16); color: #7ed3de }
+.tema-twilight-comet .stat-icon.gray  { background: rgba(144, 134, 187, .14); color: #a79ccb }
+
+.tema-twilight-comet .primary-button,
+.tema-twilight-comet .save-button {
+  color: #fff8ef;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--user-glow), transparent 25%);
+}
+.tema-twilight-comet .primary-button:hover:not(:disabled),
+.tema-twilight-comet .save-button:hover:not(:disabled) {
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--tc-horizonte), transparent 62%);
+}
+
+/* El verde del punto de estado desentona con el cielo: pasa al oro. El rojo de
+   desconectado se mantiene, que ahí el color es información. */
+.tema-twilight-comet .status-dot,
+.tema-twilight-comet .live-dot {
+  background: var(--tc-oro);
+  box-shadow: 0 0 12px var(--tc-oro);
+}
+.tema-twilight-comet .status-dot.disconnected {
+  background: var(--tc-cordon);
+  box-shadow: 0 0 12px var(--tc-cordon);
+}
+.tema-twilight-comet .sidebar-user-badge .user-icon { color: var(--tc-oro) }
+
+.tema-twilight-comet .badge,
+.tema-twilight-comet .save-state {
+  background: color-mix(in srgb, var(--tc-oro), transparent 88%);
+  color: var(--tc-oro);
+  border-color: color-mix(in srgb, var(--tc-oro), transparent 80%);
+}
+
+.tema-twilight-comet .toast.success {
+  background: color-mix(in srgb, var(--user-surface), transparent 8%);
+  border-color: color-mix(in srgb, var(--tc-oro), transparent 65%);
+}
+
+/* Barras de desplazamiento del color del tema, no del sistema. */
+.tema-twilight-comet ::-webkit-scrollbar { width: 9px; height: 9px }
+.tema-twilight-comet ::-webkit-scrollbar-track { background: transparent }
+.tema-twilight-comet ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--user-border-light), transparent 20%);
+  border-radius: 9px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.tema-twilight-comet ::-webkit-scrollbar-thumb:hover {
+  background: var(--user-primary);
+  background-clip: content-box;
+}
+
+/* La pantalla de arranque y la de actualización comparten el cielo: sin esto
+   se verían como un rectángulo plano encima del fondo. */
+.tema-twilight-comet .boot-screen,
+.tema-twilight-comet .update-required-overlay {
+  background-image: radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 46%);
+}
+
+/* En pantallas estrechas la barra lateral queda arriba: el cordón pasa a ser
+   el borde inferior, y el cielo se calma para no competir con el contenido. */
+@media (max-width: 900px) {
+  .tema-twilight-comet .sidebar {
+    border-bottom: 1px solid color-mix(in srgb, var(--tc-cordon), transparent 70%);
+  }
+  .tema-twilight-comet .sidebar-nav button.selected {
+    box-shadow: inset 0 -3px var(--tc-cordon), 0 6px 20px rgba(0, 0, 0, .25);
+  }
+  .tema-twilight-comet .sidebar-nav button.selected::after { display: none }
+  .tema-twilight-comet body::before { opacity: .35 }
+}

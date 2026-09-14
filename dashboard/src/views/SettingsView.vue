@@ -41,6 +41,17 @@ const showToken = ref(false)
 const copyLabel = ref('Copiar')
 const maskedToken = computed(() => props.apiToken ? '•'.repeat(Math.min(props.apiToken.length, 40)) : '')
 
+// Los colores 0-15 son los de Telegram Premium (el panel toma el de la cuenta
+// al iniciar sesión). Del 16 en adelante son temas propios del panel, que
+// además del color traen decorado. Se sacan del propio themeMap en vez de una
+// lista fija, para que añadir uno nuevo no obligue a tocar esta vista.
+const temasEspeciales = computed(() =>
+  Object.keys(props.themeMap)
+    .map(Number)
+    .filter(id => id >= 16)
+    .sort((a, b) => a - b)
+)
+
 const copyToken = async () => {
   if (!props.apiToken) return
   try {
@@ -337,6 +348,33 @@ const onImportFile = async (event) => {
             <button type="button" class="reset-button-alt" @click="emit('reset-loader-color')">
               <Zap :size="14" /> Restablecer color del loader
             </button>
+
+            <!-- Colores temáticos: paletas propias del panel. Van aquí, al final
+                 del mismo grupo y detrás de la misma línea separadora que el
+                 color del loader, porque se guardan en el mismo ajuste
+                 (color_id) que los colores de arriba: elegir uno de estos
+                 sustituye al color de la cuenta, y "Restablecer color de la
+                 cuenta" vuelve a dejar el de Telegram. -->
+            <span class="setting-label compact seccion-temas">Colores temáticos</span>
+            <small class="temas-nota">
+              Paletas propias del panel, con fondo y detalles animados. No vienen de tu cuenta
+              de Telegram: al elegir una sustituye al color de la cuenta hasta que vuelvas a
+              uno de los de arriba.
+            </small>
+            <div class="temas-lista">
+              <button
+                v-for="id in temasEspeciales"
+                :key="'tema-' + id"
+                type="button"
+                class="tema-chip"
+                :class="{ active: settings.color_id === id }"
+                :title="themeMap[id]?.name || ('Tema ' + id)"
+                @click="settings.color_id = id"
+              >
+                <span class="tema-muestra" :style="{ background: themeMap[id]?.gradient }"></span>
+                <span class="tema-nombre">{{ themeMap[id]?.name || ('Tema ' + id) }}</span>
+              </button>
+            </div>
           </div>
 
           <!-- Acceso remoto -->
