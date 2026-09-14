@@ -31,7 +31,8 @@
               // Temas especiales del panel (ver temas-especiales.css).
               16: { primary: '#d1618f', accent: '#b79af5', bgBase: '#0d0a1e', bgTop: '#3a2568', surface: '#160f2d', surfaceLight: '#1d1539', border: '#2f2258', borderLight: '#41307a', iconBg: '#2f2163', glow: 'rgba(192, 81, 140, 0.20)', textDim: '#9086bb', gradient: 'linear-gradient(135deg, #5b45b0 0%, #c0518c 52%, #f0803c 100%)' },
               17: { primary: '#e0ff00', accent: '#00e5ff', bgBase: '#0a0a0c', bgTop: '#14161d', surface: '#16181e', surfaceLight: '#1e2029', border: '#272a33', borderLight: '#3a3e4a', iconBg: '#1f2230', glow: 'rgba(224, 255, 0, 0.18)', textDim: '#a0a5b5', gradient: 'linear-gradient(120deg, #e0ff00 0%, #a8f53c 42%, #00e5ff 100%)' },
-              18: { primary: '#e6ecef', accent: '#8fa4b5', bgBase: '#0f1c11', bgTop: '#2d5a27', surface: '#1a3318', surfaceLight: '#224021', border: '#3a5361', borderLight: '#5c768d', iconBg: '#26402c', glow: 'rgba(230, 236, 239, 0.16)', textDim: '#93a79b', gradient: 'linear-gradient(120deg, #e6ecef 0%, #b9c9d4 46%, #8fa4b5 100%)' }
+              18: { primary: '#e6ecef', accent: '#8fa4b5', bgBase: '#0f1c11', bgTop: '#2d5a27', surface: '#1a3318', surfaceLight: '#224021', border: '#3a5361', borderLight: '#5c768d', iconBg: '#26402c', glow: 'rgba(230, 236, 239, 0.16)', textDim: '#93a79b', gradient: 'linear-gradient(120deg, #e6ecef 0%, #b9c9d4 46%, #8fa4b5 100%)' },
+              19: { primary: '#f48fb1', accent: '#35867f', bgBase: '#faf8fc', bgTop: '#ffe9ef', surface: '#ffffff', surfaceLight: '#fff5f8', border: '#f0e3e9', borderLight: '#e3d4dd', iconBg: '#fdebf1', glow: 'rgba(244, 143, 177, 0.25)', textDim: '#8a7f8c', gradient: 'linear-gradient(120deg, #ffb7c5 0%, #f48fb1 52%, #a0e7e5 100%)' }
             };
             const theme = themeMap[user.color_id] || themeMap[5];
             const root = document.documentElement;
@@ -47,7 +48,7 @@
             root.style.setProperty('--user-glow', theme.glow);
             root.style.setProperty('--user-text-dim', theme.textDim);
             root.style.setProperty('--user-gradient', theme.gradient);
-            var clasesTemaEspecial = { 16: 'tema-twilight-comet', 17: 'tema-edge-runner', 18: 'tema-rainy-garden' };
+            var clasesTemaEspecial = { 16: 'tema-twilight-comet', 17: 'tema-edge-runner', 18: 'tema-rainy-garden', 19: 'tema-silent-cherry' };
             var claseTema = clasesTemaEspecial[themeMap[user.color_id] ? user.color_id : 5];
             if (claseTema) root.classList.add(claseTema);
           }
