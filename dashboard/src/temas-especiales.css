@@ -6,13 +6,16 @@
    adelante hay paletas propias, y esas sí pueden traer decorado: fondo, capas
    animadas y detalles que los temas de Telegram no tienen.
 
-   Todo lo de este archivo vive dentro de una clase (.tema-twilight-comet), que
-   App.vue pone y quita en el <html> al aplicar el tema. Con cualquier otro
-   color seleccionado no hay ni una regla activa, así que el panel de siempre
-   se comporta exactamente igual que antes de existir este archivo.
+   Cada tema vive entero dentro de su propia clase (.tema-twilight-comet,
+   .tema-edge-runner), que App.vue pone y quita en el <html> al aplicar el
+   tema. Con un color de Telegram seleccionado no hay ni una regla activa de
+   este archivo, así que el panel de siempre se comporta exactamente igual que
+   antes de que existiera.
 
    Para añadir otro tema especial: una paleta nueva en el themeMap de App.vue e
-   index.html, su clase en `clasesTemaEspecial` (App.vue) y un bloque aquí.
+   index.html, su clase en `clasesTemaEspecial` (en los dos archivos) y un
+   bloque aquí. La vista de Ajustes no hay que tocarla: saca sola los ids 16+
+   del themeMap.
    ========================================================================== */
 
 /* -----------------------------------------------------------------------------
@@ -369,4 +372,371 @@
   }
   .tema-twilight-comet .sidebar-nav button.selected::after { display: none }
   .tema-twilight-comet body::before { opacity: .35 }
+}
+
+/* -----------------------------------------------------------------------------
+   Edge Runner UI (color 17)
+   Night City: negro casi puro para que el neón pegue fuerte, amarillo ácido
+   como identidad, cian para lo interactivo y magenta reservado para lo que va
+   mal. El decorado es de HUD —rejilla, líneas de barrido, esquinas marcadas—
+   y no de "fondo bonito": nada tapa el contenido ni se mueve donde se lee.
+   -------------------------------------------------------------------------- */
+.tema-edge-runner {
+  /* El magenta no está en el themeMap porque no es un color de interfaz sino
+     de alarma: solo aparece en errores, desconexiones y acciones destructivas. */
+  --er-alerta: #ff0055;
+  --er-alerta-claro: #ff4d7d;
+  --er-lima: #a8f53c;
+}
+
+/* --- El fondo ------------------------------------------------------------- */
+
+.tema-edge-runner body {
+  background-image:
+    /* derrame de neón amarillo desde abajo a la izquierda */
+    radial-gradient(90% 60% at 6% 104%, color-mix(in srgb, var(--user-primary), transparent 92%) 0%, transparent 60%),
+    /* y de cian desde arriba a la derecha */
+    radial-gradient(80% 55% at 96% -4%, color-mix(in srgb, var(--user-accent), transparent 90%) 0%, transparent 58%),
+    radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 46%);
+  background-attachment: fixed;
+}
+
+/* Rejilla técnica de fondo. Va por detrás de todo (z-index -1) y los paneles
+   son opacos, así que solo asoma por los huecos: da la sensación de que la
+   interfaz está montada sobre una cuadrícula, sin estorbar la lectura. */
+.tema-edge-runner body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--user-primary), transparent 94%) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(0deg, color-mix(in srgb, var(--user-accent), transparent 95%) 0 1px, transparent 1px 48px);
+}
+
+.tema-edge-runner .app-shell { position: relative; z-index: 1 }
+
+/* Líneas de barrido de monitor viejo, sobre TODO lo demás. La clase está en el
+   <html>, así que este ::before es el del elemento raíz y queda por encima de
+   cualquier cosa de la página. La opacidad es deliberadamente mínima: a 1px de
+   cada 3 y al 4,5% se nota como textura, no como suciedad sobre el texto. */
+.tema-edge-runner::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(to bottom,
+    rgba(255, 255, 255, .045) 0 1px,
+    transparent 1px 3px);
+}
+
+/* Barrido de escáner: una banda que baja por la ventana cada 11 segundos y
+   tarda unos dos en pasar. Como el cometa del otro tema, va por encima del
+   contenido —detrás de los paneles opacos no se vería— y a media opacidad se
+   lee como el refresco de una pantalla, no como un elemento de la interfaz. */
+.tema-edge-runner body::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 130px;
+  z-index: 300;
+  pointer-events: none;
+  background-image: linear-gradient(to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--user-accent), transparent 94%) 60%,
+    color-mix(in srgb, var(--user-accent), transparent 86%) 97%,
+    color-mix(in srgb, var(--user-primary), transparent 45%) 99.3%,
+    transparent 100%);
+  opacity: 0;
+  animation: erBarrido 11s linear infinite;
+}
+
+@keyframes erBarrido {
+  0%        { transform: translateY(-130px); opacity: 0 }
+  2%        { opacity: .55 }
+  17%       { opacity: .5 }
+  20%       { transform: translateY(100vh); opacity: 0 }
+  100%      { transform: translateY(100vh); opacity: 0 }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tema-edge-runner body::after { display: none }
+  .tema-edge-runner .progress-fill::before,
+  .tema-edge-runner .disk-bar .fill::before { animation: none }
+}
+
+/* --- Paneles y esquinas HUD ----------------------------------------------- */
+/* Nada de cristal aquí: los paneles son chapa opaca sobre negro, que es lo que
+   deja que el neón destaque. Lo que los marca son las esquinas. */
+
+.tema-edge-runner .panel,
+.tema-edge-runner .stat-card,
+.tema-edge-runner .hero-card,
+.tema-edge-runner .logs-hero {
+  background-color: var(--user-surface);
+  border-color: var(--user-border);
+}
+
+.tema-edge-runner .hero-card {
+  background-image: linear-gradient(112deg,
+    var(--user-surface-light) 0%,
+    var(--user-surface) 58%,
+    color-mix(in srgb, var(--user-primary), var(--user-surface) 92%) 100%);
+  border-color: color-mix(in srgb, var(--user-primary), transparent 78%);
+}
+
+/* El halo de la esquina pasa a ser el resplandor de un rótulo de neón. */
+.tema-edge-runner .hero-card:after {
+  background: radial-gradient(circle, var(--user-primary) 0%, transparent 62%);
+  opacity: .12;
+  filter: blur(18px);
+}
+
+/* Escuadras en dos esquinas opuestas: amarillo arriba a la izquierda, cian
+   abajo a la derecha. El radio es el mismo del panel (15px) para que la
+   escuadra se pegue a la curva en vez de cruzarla. */
+.tema-edge-runner .panel { position: relative }
+
+.tema-edge-runner .panel::before,
+.tema-edge-runner .panel::after {
+  content: '';
+  position: absolute;
+  width: 17px;
+  height: 17px;
+  pointer-events: none;
+}
+
+.tema-edge-runner .panel::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--user-primary);
+  border-left: 2px solid var(--user-primary);
+  border-top-left-radius: 15px;
+}
+
+.tema-edge-runner .panel::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--user-accent);
+  border-right: 2px solid var(--user-accent);
+  border-bottom-right-radius: 15px;
+  opacity: .65;
+}
+
+/* Las tarjetas de cifras llevan un filo amarillo a la izquierda en vez de
+   escuadras: son cuatro seguidas y con escuadras quedaría recargado. */
+.tema-edge-runner .stat-card { box-shadow: inset 2px 0 0 var(--user-primary) }
+.tema-edge-runner .stat-card:hover {
+  box-shadow: inset 2px 0 0 var(--user-primary), 0 12px 28px rgba(0, 0, 0, .45);
+}
+
+/* --- Texto ---------------------------------------------------------------- */
+/* Los blancos del panel tiran a azul; sobre negro puro se ven sucios, así que
+   los títulos pasan a blanco y el texto secundario al gris de la paleta. El
+   tema no toca ninguna fuente. */
+
+.tema-edge-runner .brand,
+.tema-edge-runner .hero-card h2,
+.tema-edge-runner .panel-heading h2,
+.tema-edge-runner .logs-hero h2,
+.tema-edge-runner .stat-card strong,
+.tema-edge-runner .sidebar-bottom strong,
+.tema-edge-runner .setting-label,
+.tema-edge-runner .sidebar-user-badge,
+.tema-edge-runner .download-form input,
+.tema-edge-runner .speed-row input,
+.tema-edge-runner .token-row input { color: #fff }
+
+.tema-edge-runner .empty-state p,
+.tema-edge-runner .sidebar-status { color: var(--user-text-dim) }
+
+/* Aberración cromática en el título de la vista: el desdoble cian/magenta de
+   una señal mal sincronizada. Fija, no animada: un título que tiembla mientras
+   se lee cansa. */
+.tema-edge-runner .topbar h1 {
+  color: #fff;
+  text-shadow:
+     1.5px 0 0 color-mix(in srgb, var(--er-alerta), transparent 58%),
+    -1.5px 0 0 color-mix(in srgb, var(--user-accent), transparent 58%);
+}
+
+/* --- Navegación ----------------------------------------------------------- */
+
+.tema-edge-runner .sidebar {
+  background: var(--user-bg-base);
+  border-right: 1px solid color-mix(in srgb, var(--user-primary), transparent 88%);
+}
+
+.tema-edge-runner .sidebar-nav button:hover {
+  color: var(--user-accent);
+  background: color-mix(in srgb, var(--user-accent), transparent 94%);
+}
+
+.tema-edge-runner .sidebar-nav button.selected {
+  color: var(--user-primary);
+  background: color-mix(in srgb, var(--user-primary), transparent 92%) !important;
+  box-shadow: inset 3px 0 var(--user-primary), 0 0 18px color-mix(in srgb, var(--user-primary), transparent 88%);
+}
+.tema-edge-runner .sidebar-nav button.selected span { color: var(--user-primary) }
+
+@media (max-width: 900px) {
+  .tema-edge-runner .sidebar-nav button.selected {
+    box-shadow: inset 0 -3px var(--user-primary), 0 0 18px color-mix(in srgb, var(--user-primary), transparent 88%);
+  }
+}
+
+/* --- Barras de progreso --------------------------------------------------- */
+/* Segmentos de datos corriendo hacia delante. Misma técnica que el otro tema:
+   capa propia movida con transform y recorrido fijo, para que el avance se vea
+   igual con la barra corta que con la barra llena (el progressSheen original
+   escala con el ancho y a barra larga se emborrona). Aquí el patrón es
+   vertical, así que el periodo horizontal son los 10px exactos del degradado y
+   el recorrido, 20px, son dos periodos justos. */
+
+.tema-edge-runner .progress-fill,
+.tema-edge-runner .disk-bar .fill,
+.tema-edge-runner .update-progress-fill {
+  background-image: var(--user-gradient);
+  box-shadow:
+    inset -2px 0 0 rgba(255, 255, 255, .9),
+    0 0 10px var(--user-glow),
+    0 0 22px color-mix(in srgb, var(--user-primary), transparent 80%);
+}
+
+.tema-edge-runner .progress-track {
+  background: var(--user-bg-base);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--user-accent), transparent 90%);
+}
+
+.tema-edge-runner .progress-fill,
+.tema-edge-runner .disk-bar .fill {
+  position: relative;
+  overflow: hidden;
+}
+
+.tema-edge-runner .progress-fill::before,
+.tema-edge-runner .disk-bar .fill::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  /* Sobra por la izquierda, que es de donde viene el recorrido. */
+  left: -24px;
+  background-image:
+    repeating-linear-gradient(90deg,
+      rgba(10, 10, 12, .55) 0 3px,
+      transparent 3px 10px);
+  animation: erSegmentos 1.1s linear infinite;
+}
+
+@keyframes erSegmentos {
+  from { transform: translateX(0) }
+  to   { transform: translateX(20px) }
+}
+
+/* La barra del diálogo de actualización ya trae su propia animación dentro, así
+   que ahí los segmentos se quedan quietos, de fondo. */
+.tema-edge-runner .update-progress-fill {
+  background-image:
+    repeating-linear-gradient(90deg,
+      rgba(10, 10, 12, .55) 0 3px,
+      transparent 3px 10px),
+    var(--user-gradient);
+}
+
+/* --- Estados y alertas ---------------------------------------------------- */
+
+.tema-edge-runner .status-dot,
+.tema-edge-runner .live-dot {
+  background: var(--user-primary);
+  box-shadow: 0 0 12px var(--user-primary);
+}
+.tema-edge-runner .status-dot.disconnected {
+  background: var(--er-alerta);
+  box-shadow: 0 0 12px var(--er-alerta);
+}
+.tema-edge-runner .sidebar-status.is-disconnected {
+  color: var(--er-alerta-claro);
+  background: color-mix(in srgb, var(--er-alerta), transparent 94%);
+  border-color: color-mix(in srgb, var(--er-alerta), transparent 86%);
+}
+
+.tema-edge-runner .badge,
+.tema-edge-runner .save-state {
+  background: color-mix(in srgb, var(--user-accent), transparent 90%);
+  color: var(--user-accent);
+  border-color: color-mix(in srgb, var(--user-accent), transparent 80%);
+}
+
+.tema-edge-runner .sidebar-user-badge .user-icon { color: var(--user-accent) }
+
+/* Todo lo destructivo o roto, en magenta. */
+.tema-edge-runner .row-side button,
+.tema-edge-runner .delete-button,
+.tema-edge-runner .sidebar-user-badge .logout-btn { color: var(--er-alerta-claro) }
+.tema-edge-runner .row-side button:hover,
+.tema-edge-runner .delete-button:hover,
+.tema-edge-runner .sidebar-user-badge .logout-btn:hover {
+  color: #fff;
+  background: color-mix(in srgb, var(--er-alerta), transparent 82%);
+}
+.tema-edge-runner .row-side .pause-action { color: var(--user-primary) }
+.tema-edge-runner .row-side .resume-action { color: var(--er-lima) }
+
+.tema-edge-runner .toast.danger {
+  background: color-mix(in srgb, var(--er-alerta), var(--user-surface) 84%);
+  color: #ffd6e2;
+  border: 1px solid color-mix(in srgb, var(--er-alerta), transparent 60%);
+}
+.tema-edge-runner .toast.success {
+  background: var(--user-surface);
+  color: var(--user-primary);
+  border: 1px solid color-mix(in srgb, var(--user-primary), transparent 70%);
+}
+
+.tema-edge-runner .inline-link,
+.tema-edge-runner .inline-link:visited { color: var(--user-accent) }
+.tema-edge-runner .inline-link:hover { color: #fff }
+.tema-edge-runner .inline-link:focus-visible { outline-color: var(--user-accent) }
+
+/* --- Detalles ------------------------------------------------------------- */
+
+.tema-edge-runner .stat-icon.blue  { background: color-mix(in srgb, var(--user-primary), transparent 88%); color: var(--user-primary) }
+.tema-edge-runner .stat-icon.amber { background: color-mix(in srgb, var(--user-accent), transparent 88%);  color: var(--user-accent) }
+.tema-edge-runner .stat-icon.green { background: color-mix(in srgb, var(--er-lima), transparent 88%);      color: var(--er-lima) }
+.tema-edge-runner .stat-icon.gray  { background: color-mix(in srgb, var(--user-text-dim), transparent 90%); color: var(--user-text-dim) }
+
+/* Botón principal: rótulo de neón con el texto en negro recortado encima. */
+.tema-edge-runner .primary-button,
+.tema-edge-runner .save-button {
+  color: var(--user-bg-base);
+  font-weight: 700;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--user-primary), transparent 72%);
+}
+.tema-edge-runner .primary-button:hover:not(:disabled),
+.tema-edge-runner .save-button:hover:not(:disabled) {
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--user-accent), transparent 62%);
+}
+
+.tema-edge-runner ::-webkit-scrollbar { width: 9px; height: 9px }
+.tema-edge-runner ::-webkit-scrollbar-track { background: transparent }
+.tema-edge-runner ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--user-primary), transparent 60%);
+  border-radius: 0;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.tema-edge-runner ::-webkit-scrollbar-thumb:hover {
+  background: var(--user-primary);
+  background-clip: content-box;
+}
+
+.tema-edge-runner .boot-screen,
+.tema-edge-runner .update-required-overlay {
+  background-image: radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 46%);
 }
