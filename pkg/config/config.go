@@ -11,10 +11,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 const (
-	AppVersion = "2.4.2"
+	AppVersion = "2.4.3"
 	GithubRepo = "infinityxgame/tgdown"
 
 	// DefaultBindHost es la dirección en la que escucha el panel cuando el
@@ -595,6 +597,31 @@ func GenerateToken() (string, error) {
 		return "", fmt.Errorf("error generando token: %w", err)
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+// idFallbackCounter solo se usa si crypto/rand llegara a fallar. Va aparte del
+// reloj porque en Windows la marca de tiempo tiene una resolución de
+// milisegundos: al encolar un rango de mensajes en un bucle, varias llamadas
+// seguidas devolverían el mismo instante y, con él, el mismo identificador.
+var idFallbackCounter atomic.Uint64
+
+// NewID devuelve un identificador único para una descarga o un trabajo.
+//
+// Esto es lo que antes hacía github.com/google/uuid. Un identificador aquí solo
+// tiene que ser único y no adivinable —nunca se interpreta ni se compara por
+// partes—, así que 16 bytes de crypto/rand en hexadecimal sobran y evitan la
+// dependencia. El formato es distinto al de un UUID (sin guiones), pero los
+// identificadores ya guardados siguen siendo válidos: la columna es TEXT y
+// nadie comprueba su forma.
+func NewID() string {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		// crypto/rand no falla en la práctica. Si lo hiciera, preferimos un
+		// identificador previsible a no poder encolar nada.
+		return strconv.FormatInt(time.Now().UnixNano(), 36) + "-" +
+			strconv.FormatUint(idFallbackCounter.Add(1), 36)
+	}
+	return hex.EncodeToString(buf)
 }
 
 func ParseInt64(val any) int64 {

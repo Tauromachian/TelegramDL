@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -16,7 +17,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"uuid"
 
 	"github.com/gorilla/websocket"
 
@@ -106,7 +106,7 @@ func NewServer(
 			// admite.
 			CheckOrigin: func(r *http.Request) bool {
 				origin := r.Header.Get("Origin")
-				return origin == "" || isAllowedOrigin(origin)
+				return origin == "" || origenPermitido(origin, r)
 			},
 		},
 		exitCallback:   exitCb,
@@ -269,35 +269,57 @@ func (s *Server) Stop() {
 	}
 }
 
-// isAllowedOrigin restringe qué orígenes pueden leer las respuestas de la
-// API por CORS. En este proyecto el panel y la API siempre se sirven desde
-// el mismo origen (ventana de Wails o servidor --server en el mismo host y
-// puerto), así que en la práctica la mayoría de peticiones ni siquiera
-// llevan cabecera Origin. Esta lista solo cubre el servidor de desarrollo de
-// Vite (que corre en un puerto distinto al backend) y el propio host/puerto
-// configurado del servidor.
-func isAllowedOrigin(origin string) bool {
-	if origin == "" {
+// origenPermitido decide si una petición que llega con cabecera Origin puede
+// tocar la API. Son dos casos:
+//
+//  1. El panel se sirve desde la misma dirección y puerto que la API. Esto es
+//     lo normal, y cubre el acceso remoto entero —el móvil entrando por
+//     192.168.1.40:8000, un nombre de Tailscale, un túnel— sin tener que
+//     enumerar direcciones de antemano.
+//
+//  2. El panel corre en este mismo equipo con otra dirección: la ventana de
+//     Wails (wails.localhost), un navegador local, o el servidor de desarrollo
+//     de Vite, que usa otro puerto.
+//
+// Antes esto era una lista fija de nombres (localhost, 127.0.0.1 y el host
+// configurado). Como la dirección de escucha por defecto es 0.0.0.0, desde
+// cualquier IP real quedaban fuera los dos: el navegador manda
+// «Origin: http://192.168.1.40:8000», no coincidía con nada, y el WebSocket se
+// rechazaba con un 403. El panel cargaba pero no recibía estado nunca y se
+// quedaba reintentando la conexión cada dos segundos.
+func origenPermitido(origin string, r *http.Request) bool {
+	if strings.TrimSpace(origin) == "" {
 		return false
 	}
-	devOrigins := map[string]bool{
-		"http://localhost:8080": true,
-		"http://127.0.0.1:8080": true,
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Host == "" {
+		return false
 	}
-	if devOrigins[origin] {
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+
+	// Mismo origen: el panel y la API entraron por la misma puerta.
+	if r != nil && r.Host != "" && strings.EqualFold(parsed.Host, r.Host) {
 		return true
 	}
 
-	host := config.GetServerHost()
-	port := strconv.Itoa(config.GetServerPort())
-	hosts := []string{"127.0.0.1", "localhost"}
-	if host != "" && host != "0.0.0.0" {
-		hosts = append(hosts, host)
+	return esEquipoLocal(parsed.Host)
+}
+
+// esEquipoLocal indica si el host de una URL apunta a esta misma máquina.
+func esEquipoLocal(hostPuerto string) bool {
+	host := hostPuerto
+	if h, _, err := net.SplitHostPort(hostPuerto); err == nil {
+		host = h
 	}
-	for _, h := range hosts {
-		if origin == "http://"+h+":"+port || origin == "https://"+h+":"+port {
-			return true
-		}
+	host = strings.ToLower(strings.Trim(host, "[]"))
+
+	if host == "localhost" || host == "wails.localhost" || strings.HasSuffix(host, ".wails.localhost") {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return true
 	}
 	return false
 }
@@ -305,7 +327,7 @@ func isAllowedOrigin(origin string) bool {
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if isAllowedOrigin(origin) {
+		if origenPermitido(origin, r) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
@@ -391,7 +413,7 @@ func (s *Server) loadOrCreateToken() string {
 	if err != nil {
 		// Extremadamente improbable (fallo de crypto/rand), pero preferimos
 		// un token débil a dejar la API sin protección.
-		tok = uuid.New().String()
+		tok = config.NewID()
 	}
 	if s.storage != nil {
 		if err := s.storage.SaveAPIToken(tok); err != nil {
@@ -416,7 +438,7 @@ func (s *Server) APIToken() string {
 func (s *Server) RegenerateToken() string {
 	tok, err := config.GenerateToken()
 	if err != nil {
-		tok = uuid.New().String()
+		tok = config.NewID()
 	}
 	s.mu.Lock()
 	s.apiToken = tok
@@ -1083,11 +1105,11 @@ func (s *Server) handleStartDownload(w http.ResponseWriter, r *http.Request) {
 		chatID = resolvedID
 	}
 
-	jobID := uuid.New().String()
+	jobID := config.NewID()
 	// Crear items para el rango de mensajes
 	for msgID := parsed.StartMsgID; msgID <= parsed.EndMsgID; msgID++ {
 		item := storage.DownloadItem{
-			ID:        uuid.New().String(),
+			ID:        config.NewID(),
 			JobID:     jobID,
 			MessageID: int64(msgID),
 			ChatID:    chatID,
@@ -1426,9 +1448,9 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSpeedLimit(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		SpeedLimit config.SpeedLimit `json:"speed_limit"`
-		Value      *float64          `json:"value"`
-		Unit       *string           `json:"unit"`
+		SpeedLimit *config.SpeedLimit `json:"speed_limit"`
+		Value      *float64           `json:"value"`
+		Unit       *string            `json:"unit"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		s.errorResponse(w, http.StatusUnprocessableEntity, "Datos inválidos")
@@ -1437,15 +1459,23 @@ func (s *Server) handleSpeedLimit(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.Lock()
 	previousCfg := s.config
+
+	// Se parte del límite actual y solo se cambia lo que venga en la petición.
+	// La condición anterior («unidad != "" o valor >= 0») era cierta siempre,
+	// porque cualquier número no negativo la cumple: un cuerpo con solo la
+	// unidad ponía el valor a cero y borraba el límite sin querer.
+	limite := s.config.SpeedLimit
+	if body.SpeedLimit != nil {
+		limite = *body.SpeedLimit
+	}
 	if body.Value != nil {
-		body.SpeedLimit.Value = *body.Value
+		limite.Value = *body.Value
 	}
 	if body.Unit != nil {
-		body.SpeedLimit.Unit = *body.Unit
+		limite.Unit = *body.Unit
 	}
-	if body.SpeedLimit.Unit != "" || body.SpeedLimit.Value >= 0 {
-		s.config.SpeedLimit = body.SpeedLimit
-	}
+	s.config.SpeedLimit = limite
+
 	s.config = config.NormalizeConfig(s.config)
 	cfg := s.config
 	s.mu.Unlock()

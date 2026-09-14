@@ -286,29 +286,61 @@ func (e *Engine) GetItem(id string) (*storage.DownloadItem, bool) {
 	return &cp, true
 }
 
+// olvidarEstadoDe borra el estado por tarea que el motor guarda en mapas
+// aparte. Debe llamarse con e.mu tomado.
+//
+// No toca cancelFuncs ni jobsInFlight: esos dos los administra el job que esté
+// corriendo y borrarlos desde fuera lo dejaría huérfano o permitiría arrancar
+// otro en paralelo.
+//
+// Antes cada sitio que quitaba una descarga borraba solo algunos de estos
+// mapas, así que las entradas de los demás se quedaban para siempre.
+func (e *Engine) olvidarEstadoDe(id string) {
+	delete(e.pauseStates, id)
+	delete(e.startTimes, id)
+	delete(e.lastBroadcastTimes, id)
+	delete(e.lastSaveTimes, id)
+	delete(e.itemSpeeds, id)
+	delete(e.seenChunks, id)
+	delete(e.lastProgressBytes, id)
+	delete(e.lastProgressTimes, id)
+	delete(e.pendingChunks, id)
+	delete(e.forceDuplicate, id)
+	delete(e.cancelledForLimit, id)
+	delete(e.messageCache, id)
+	delete(e.queuedIDs, id)
+}
+
 func (e *Engine) ClearHistory() (int64, error) {
 	e.mu.Lock()
-	defer e.mu.Unlock()
-
+	temporales := make([]string, 0, len(e.downloads))
 	for id, item := range e.downloads {
 		if item.Status == "completed" || item.Status == "failed" || item.Status == "cancelled" || item.Status == "skipped" || item.Status == "duplicate" {
-			// Eliminar archivos temporales de descargas no terminadas o canceladas
+			// Los archivos temporales se borran después, fuera del candado.
 			if item.FilePath != "" {
-				_ = os.Remove(item.FilePath + ".temp")
+				temporales = append(temporales, item.FilePath+".temp")
 			}
 
 			key := fmt.Sprintf("%d:%d", item.ChatID, item.MessageID)
 			delete(e.chatMsgMap, key)
 			delete(e.downloads, id)
-			delete(e.forceDuplicate, id)
-			delete(e.messageCache, id)
-			delete(e.pendingChunks, id)
+			e.olvidarEstadoDe(id)
 		}
+	}
+	e.mu.Unlock()
+
+	// Eliminar archivos temporales de descargas no terminadas o canceladas
+	for _, ruta := range temporales {
+		_ = os.Remove(ruta)
 	}
 
 	if e.storage == nil {
 		return 0, nil
 	}
+	// Fuera del mutex a propósito: ClearFinishedDownloads termina con un VACUUM,
+	// que en una base de datos grande tarda segundos. Con el candado del motor
+	// tomado, durante todo ese rato se congelaban las descargas en curso, el
+	// progreso y el panel entero.
 	return e.storage.ClearFinishedDownloads()
 }
 
@@ -349,6 +381,7 @@ func (e *Engine) DeleteDownload(id string, deleteFile bool) error {
 	key := fmt.Sprintf("%d:%d", item.ChatID, item.MessageID)
 	delete(e.chatMsgMap, key)
 	delete(e.downloads, id)
+	e.olvidarEstadoDe(id)
 	e.mu.Unlock()
 
 	if e.storage != nil {
@@ -400,9 +433,7 @@ func (e *Engine) discardDownload(id string) {
 		delete(e.chatMsgMap, key)
 	}
 	delete(e.downloads, id)
-	delete(e.forceDuplicate, id)
-	delete(e.queuedIDs, id)
-	delete(e.messageCache, id)
+	e.olvidarEstadoDe(id)
 	e.mu.Unlock()
 
 	if e.storage != nil {

@@ -86,6 +86,14 @@ func runDesktopMode() {
 	defer release()
 
 	app := NewApp(assets)
+	if app == nil {
+		// NewApp solo devuelve nil cuando no consigue abrir ninguna base de
+		// datos. Abierta con doble clic no hay consola donde leer el motivo, así
+		// que el aviso tiene que ser una ventana del sistema.
+		mostrarAviso("TelegramDL no pudo abrir su base de datos en " + config.DataDir +
+			".\n\nComprueba que la carpeta existe y que tienes permiso de escritura en ella.")
+		return
+	}
 
 	err := wails.Run(&options.App{
 		Title:     "Telegram DL",
@@ -140,6 +148,10 @@ func runServerMode() int {
 	defer release()
 
 	app := NewApp(assets)
+	if app == nil {
+		fmt.Fprintf(os.Stderr, "Error: no se pudo abrir la base de datos de TelegramDL en %s.\n", config.DataDir)
+		return 1
+	}
 	if app.server == nil {
 		fmt.Fprintln(os.Stderr, "Error: no se pudo inicializar el servidor")
 		return 1

@@ -137,11 +137,11 @@ func ExtractMediaInfo(msg *tg.Message) *MediaInfo {
 	caption := msg.Message
 	firstCaptionLine := ""
 	if caption != "" {
-		lines := strings.Split(caption, "\n")
-		firstCaptionLine = strings.TrimSpace(lines[0])
-		if len(firstCaptionLine) > 50 {
-			firstCaptionLine = firstCaptionLine[:50]
-		}
+		primeraLinea, _, _ := strings.Cut(caption, "\n")
+		// El recorte va por runas, no por bytes. Cortando a 50 bytes, un texto
+		// con acentos o con un emoji justo en el límite se partía por la mitad y
+		// el nombre del archivo acababa con UTF-8 inválido.
+		firstCaptionLine = strings.TrimSpace(truncateRunes(strings.TrimSpace(primeraLinea), 50))
 	}
 
 	switch m := msg.Media.(type) {

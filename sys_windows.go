@@ -51,8 +51,15 @@ func tryAcquireInstanceLock() (func(), bool) {
 
 // notifyAlreadyRunning avisa al usuario cuando intenta abrir una segunda instancia.
 func notifyAlreadyRunning() {
+	mostrarAviso("TelegramDL ya se está ejecutando. Revisa la ventana abierta o la bandeja del sistema.")
+}
+
+// mostrarAviso enseña un mensaje sin depender de que exista la ventana de la
+// aplicación ni una consola. Hace falta para los fallos de arranque: abierta con
+// doble clic, la aplicación no tiene dónde escribir.
+func mostrarAviso(msg string) {
 	user32 := syscall.NewLazyDLL("user32.dll")
-	text, _ := syscall.UTF16PtrFromString("TelegramDL ya se está ejecutando. Revisa la ventana abierta o la bandeja del sistema.")
+	text, _ := syscall.UTF16PtrFromString(msg)
 	title, _ := syscall.UTF16PtrFromString("TelegramDL")
 	user32.NewProc("MessageBoxW").Call(0,
 		uintptr(unsafe.Pointer(text)),
@@ -68,6 +75,17 @@ func registerConsoleCtrlHandler(sigCh chan os.Signal) {
 		return 1
 	})
 	_, _, _ = setHandler.Call(cb, 1)
+
+	// Vigilar Stdin solo si de verdad hay una consola detrás.
+	//
+	// Antes se lanzaba siempre, y cuando el primer Read fallaba se daba por
+	// hecho que la consola se había cerrado. Lanzado sin consola —un acceso
+	// directo con --server, una tarea programada, el servicio arrancando al
+	// inicio— ese primer Read falla en el acto, así que el servidor se apagaba
+	// solo un instante después de arrancar.
+	if !hayConsola() {
+		return
+	}
 
 	// Detectar pérdida de consola o señales de interrupción a través de Stdin
 	go func() {
@@ -86,4 +104,21 @@ func registerConsoleCtrlHandler(sigCh chan os.Signal) {
 			}
 		}
 	}()
+}
+
+// hayConsola comprueba que Stdin sea una consola de verdad. GetConsoleMode solo
+// funciona con un manejador de consola: con una entrada redirigida, cerrada o
+// inexistente devuelve error, que es exactamente lo que hay que distinguir.
+func hayConsola() bool {
+	handle, err := syscall.GetStdHandle(syscall.STD_INPUT_HANDLE)
+	if err != nil || handle == 0 || handle == syscall.InvalidHandle {
+		return false
+	}
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	var modo uint32
+	ret, _, _ := kernel32.NewProc("GetConsoleMode").Call(
+		uintptr(handle),
+		uintptr(unsafe.Pointer(&modo)),
+	)
+	return ret != 0
 }

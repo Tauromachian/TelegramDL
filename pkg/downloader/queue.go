@@ -11,8 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"uuid"
 
+	"tgdown/pkg/config"
 	"tgdown/pkg/logbus"
 	"tgdown/pkg/storage"
 )
@@ -55,7 +55,7 @@ func (e *Engine) enforceConcurrencyLimit() {
 func (e *Engine) QueueItem(item storage.DownloadItem) string {
 	e.mu.Lock()
 	if item.ID == "" {
-		item.ID = uuid.New().String()
+		item.ID = config.NewID()
 	}
 
 	// Evitar duplicados por ID único
@@ -136,10 +136,10 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 		e.activeCond.Wait()
 		// Si mientras esperaba fue cancelada, pausada o ya no existe, salir
 		if it, exists := e.downloads[itemID]; !exists || (it.Status != "queued" && it.Status != "downloading") || e.pauseStates[itemID] {
-				e.mu.Unlock()
-				e.activeCond.Broadcast()
-				return false
-			}
+			e.mu.Unlock()
+			e.activeCond.Broadcast()
+			return false
+		}
 	}
 
 	item, ok := e.downloads[itemID]
@@ -212,10 +212,13 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 	if err != nil && strings.Contains(err.Error(), "mensaje no encontrado en Telegram") {
 		// Caso típico al descargar un rango: algunos IDs del intervalo no
 		// corresponden a ningún mensaje (borrados o inexistentes).
+		//
+		// Se usa la copia (cp), no el elemento del mapa: aquí ya no tenemos el
+		// mutex y el propio motor puede estar escribiendo en él.
 		logbus.Warn(logbus.CatDownloads,
-			fmt.Sprintf("El mensaje %d no existe en Telegram", item.MessageID),
+			fmt.Sprintf("El mensaje %d no existe en Telegram", cp.MessageID),
 			fmt.Sprintf("Chat: %s · Se descarta de la cola (borrado o nunca existió)",
-				e.chatLabel(item.ChatID)))
+				e.chatLabel(cp.ChatID)))
 		e.discardDownload(itemID)
 		return false
 	}

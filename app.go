@@ -53,9 +53,20 @@ func NewApp(assets fs.FS) *App {
 	dbPath := filepath.Join(config.DataDir, "tgdown.sqlite3")
 	st, err := storage.NewStorage(dbPath)
 	if err != nil {
+		logbus.Warn(logbus.CatSystem, "No se pudo abrir la base de datos principal", err.Error())
 		// Fallback si no se puede abrir tgdown.sqlite3
 		dbPath = filepath.Join(config.DataDir, "tgdown.db")
-		st, _ = storage.NewStorage(dbPath)
+		var errRespaldo error
+		st, errRespaldo = storage.NewStorage(dbPath)
+		if errRespaldo != nil {
+			// Antes el error del respaldo se descartaba, así que se seguía con
+			// un puntero nil y la aplicación reventaba en la línea siguiente sin
+			// decir por qué. Sin base de datos no hay nada que arrancar.
+			logbus.Error(logbus.CatSystem,
+				"No se pudo abrir ninguna base de datos; TelegramDL no puede arrancar",
+				errRespaldo.Error())
+			return nil
+		}
 	}
 
 	// 1.b Volcar a la base de datos lo que quedara en el .env de una versión
@@ -89,8 +100,8 @@ func NewApp(assets fs.FS) *App {
 	}
 
 	srv := server.NewServer(cm, st, eng, le, up, cfg, assets, func() {
-		if app.ctx != nil {
-			wailsRuntime.Quit(app.ctx)
+		if ctx := app.context(); ctx != nil {
+			wailsRuntime.Quit(ctx)
 		}
 	})
 	app.server = srv
@@ -100,7 +111,7 @@ func NewApp(assets fs.FS) *App {
 	// de la aplicación: así el selector es siempre el mismo en local. El
 	// servidor solo atiende esta llamada desde el propio equipo.
 	srv.SetFolderPicker(func() (string, error) {
-		if app.ctx == nil {
+		if app.context() == nil {
 			return "", fmt.Errorf("la ventana de la aplicación todavía no está lista")
 		}
 		return app.SelectDirectory()
@@ -129,18 +140,34 @@ func NewApp(assets fs.FS) *App {
 	return app
 }
 
-func (a *App) startup(ctx context.Context) {
+// setContext y context guardan el contexto de Wails detrás del mutex. Lo
+// escribe startup (el hilo de la interfaz) y lo leen los observadores de estado
+// de los motores de descarga y escucha, que corren en otras goroutines: sin el
+// candado eso es una carrera de datos, y el campo mu existía sin usarse.
+func (a *App) setContext(ctx context.Context) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.ctx = ctx
+}
+
+func (a *App) context() context.Context {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.ctx
+}
+
+func (a *App) startup(ctx context.Context) {
+	a.setContext(ctx)
 
 	// Emitir cambios de estado directamente a la interfaz nativa de Wails
 	a.downloader.OnStateChange(func(item storage.DownloadItem) {
-		if a.ctx != nil && a.server != nil {
-			wailsRuntime.EventsEmit(a.ctx, "tgdl:state", a.server.BuildStateSnapshot())
+		if c := a.context(); c != nil && a.server != nil {
+			wailsRuntime.EventsEmit(c, "tgdl:state", a.server.BuildStateSnapshot())
 		}
 	})
 	a.listener.OnStateChange(func(item listener.ListenerItem) {
-		if a.ctx != nil && a.server != nil {
-			wailsRuntime.EventsEmit(a.ctx, "tgdl:state", a.server.BuildStateSnapshot())
+		if c := a.context(); c != nil && a.server != nil {
+			wailsRuntime.EventsEmit(c, "tgdl:state", a.server.BuildStateSnapshot())
 		}
 	})
 }
@@ -171,7 +198,11 @@ func (a *App) Handler() http.Handler {
 
 // SelectDirectory abre el diálogo nativo del sistema para seleccionar carpetas
 func (a *App) SelectDirectory() (string, error) {
-	selected, err := wailsRuntime.OpenDirectoryDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+	ctx := a.context()
+	if ctx == nil {
+		return "", fmt.Errorf("la ventana de la aplicación todavía no está lista")
+	}
+	selected, err := wailsRuntime.OpenDirectoryDialog(ctx, wailsRuntime.OpenDialogOptions{
 		Title:            "Seleccionar carpeta de descargas",
 		DefaultDirectory: a.config.DownloadFolder,
 	})

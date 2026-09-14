@@ -34,12 +34,16 @@ func tryAcquireInstanceLock() (func(), bool) {
 }
 
 func notifyAlreadyRunning() {
-	const msg = "TelegramDL ya se está ejecutando. Revisa la ventana abierta o la bandeja del sistema."
-	// En Windows el aviso usa un MessageBox nativo (ver sys_windows.go), visible
-	// aunque el usuario haya abierto la app haciendo doble clic sin consola. Aquí
-	// intentamos un aviso equivalente con las herramientas de notificación/dialogo
-	// habituales de cada escritorio; si ninguna está disponible, caemos al mensaje
-	// por consola (útil al menos cuando se lanza desde una terminal).
+	mostrarAviso("TelegramDL ya se está ejecutando. Revisa la ventana abierta o la bandeja del sistema.")
+}
+
+// mostrarAviso enseña un mensaje sin depender de que exista la ventana de la
+// aplicación. En Windows es un MessageBox nativo (ver sys_windows.go), visible
+// aunque el usuario haya abierto la app haciendo doble clic sin consola. Aquí
+// intentamos el aviso equivalente con las herramientas de notificación o diálogo
+// habituales de cada escritorio; si ninguna está disponible, caemos al mensaje
+// por consola (útil al menos cuando se lanza desde una terminal).
+func mostrarAviso(msg string) {
 	if trySystemNotification(msg) {
 		return
 	}

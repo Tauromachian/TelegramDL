@@ -1,5 +1,15 @@
 package updater
 
+// Comprobación e instalación de actualizaciones.
+//
+// Aquí no se usa ninguna librería de terceros a propósito. Lo que hace falta es
+// una petición a la API de releases de GitHub, comparar dos números de versión y
+// cambiar de sitio un archivo; las tres cosas están en la biblioteca estándar.
+// Antes esto lo hacían github.com/creativeprojects/go-selfupdate y
+// github.com/minio/selfupdate, que entre las dos arrastraban los SDK de GitHub,
+// GitLab y Gitea, OAuth2 y media docena de módulos más para, en la práctica,
+// una llamada HTTP y un os.Rename.
+
 import (
 	"archive/tar"
 	"archive/zip"
@@ -8,22 +18,23 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	goupdate "github.com/creativeprojects/go-selfupdate"
-	"github.com/minio/selfupdate"
 	"tgdown/pkg/config"
 	"tgdown/pkg/logbus"
 )
@@ -45,7 +56,10 @@ type ReleaseInfo struct {
 	TagName string         `json:"tag_name"`
 	Body    string         `json:"body"`
 	Assets  []ReleaseAsset `json:"assets"`
-	release *goupdate.Release
+
+	// asset es el archivo que corresponde a este sistema, ya elegido durante la
+	// comprobación. InstallUpdate no vuelve a buscarlo.
+	asset ReleaseAsset
 }
 
 type AppUpdater struct {
@@ -65,6 +79,51 @@ type AppUpdater struct {
 	// rateLimitUntil marca hasta cuándo GitHub nos tiene cortados por exceso de
 	// peticiones. Mientras no pase esa hora no tiene sentido volver a preguntar.
 	rateLimitUntil time.Time
+}
+
+// errCuotaAgotada distingue el "GitHub no nos deja preguntar ahora mismo" de un
+// fallo de verdad, para no llenar el registro de avisos por algo que se arregla
+// solo con el tiempo.
+var errCuotaAgotada = errors.New("GitHub limitó las peticiones de actualización")
+
+const (
+	githubAPI = "https://api.github.com"
+
+	// esperaSinDatos es cuánto se tolera que una descarga no reciba un solo
+	// byte antes de darla por colgada. Sin esto, una conexión que se queda a
+	// medias dejaba la actualización en "descargando" para siempre.
+	esperaSinDatos = 60 * time.Second
+)
+
+// transporteActualizador acota cada fase de la conexión por separado. Un
+// Timeout global del cliente no sirve para la descarga del instalador: cortaría
+// un archivo grande por una línea lenta aunque estuviera avanzando bien.
+var transporteActualizador = &http.Transport{
+	Proxy: http.ProxyFromEnvironment,
+	DialContext: (&net.Dialer{
+		Timeout:   15 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext,
+	TLSHandshakeTimeout:   15 * time.Second,
+	ResponseHeaderTimeout: 30 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
+	ForceAttemptHTTP2:     true,
+}
+
+// clienteAPI es para las consultas cortas (la release y el checksums.txt).
+var clienteAPI = &http.Client{
+	Transport: transporteActualizador,
+	Timeout:   30 * time.Second,
+}
+
+// clienteDescarga no lleva Timeout global: la descarga se vigila por
+// inactividad dentro de downloadWithProgress.
+var clienteDescarga = &http.Client{Transport: transporteActualizador}
+
+// agenteDeUsuario identifica a la aplicación. La API de GitHub rechaza con 403
+// cualquier petición que no lo lleve.
+func agenteDeUsuario() string {
+	return "TelegramDL/" + config.AppVersion + " (+https://github.com/" + config.GithubRepo + ")"
 }
 
 func NewAppUpdater() *AppUpdater {
@@ -90,7 +149,8 @@ func (u *AppUpdater) CleanOldVersion() {
 	dir := filepath.Dir(exePath)
 	base := filepath.Base(exePath)
 
-	// Intentar detectar archivos .old (estándar de selfupdate y variantes con punto inicial)
+	// Se contemplan las dos formas en que ha podido quedar la versión anterior:
+	// la que deja aplicarBinario y la variante oculta con punto delante.
 	targets := []string{
 		exePath + ".old",
 		filepath.Join(dir, "."+base+".old"),
@@ -154,14 +214,6 @@ func (u *AppUpdater) routineLog(first bool, message, detail string) {
 	}
 }
 
-var (
-	// GitHub añade al error una cuenta atrás ("[rate reset in 23m20s]") que
-	// cambia a cada segundo. Hay que quitarla para comparar errores, o el mismo
-	// fallo parecería distinto cada vez y se avisaría una y otra vez.
-	cuotaCuentaAtras = regexp.MustCompile(`\[rate reset in [^\]]*\]`)
-	cuotaEspera      = regexp.MustCompile(`rate reset in ([0-9hms.]+)`)
-)
-
 // checkErrorLog evita repetir el mismo fallo: avisa la primera vez y cada vez
 // que el error cambia de verdad, y el resto queda en nivel detalle.
 func (u *AppUpdater) checkErrorLog(first bool, message string, err error) {
@@ -169,11 +221,10 @@ func (u *AppUpdater) checkErrorLog(first bool, message string, err error) {
 	if err != nil {
 		text = err.Error()
 	}
-	clave := cuotaCuentaAtras.ReplaceAllString(text, "[rate reset]")
 
 	u.mu.Lock()
-	changed := u.lastCheckError != clave
-	u.lastCheckError = clave
+	changed := u.lastCheckError != text
+	u.lastCheckError = text
 	u.mu.Unlock()
 
 	if first || changed {
@@ -183,25 +234,51 @@ func (u *AppUpdater) checkErrorLog(first bool, message string, err error) {
 	logbus.Debug(logbus.CatUpdater, message, text)
 }
 
-// anotarLimiteDeCuota detecta si GitHub rechazó la petición por haber agotado
-// las peticiones por hora y, en ese caso, apunta hasta cuándo no merece la pena
-// volver a preguntar. GitHub dice en el propio error cuánto falta; si no se
-// puede leer, se espera un cuarto de hora.
-func (u *AppUpdater) anotarLimiteDeCuota(err error) bool {
-	if err == nil {
-		return false
-	}
-	texto := err.Error()
-	if !strings.Contains(strings.ToLower(texto), "rate limit") {
+// ---------------------------------------------------------------------------
+// Consulta a la API de GitHub
+// ---------------------------------------------------------------------------
+
+// releaseGitHub es la parte de la respuesta de
+// /repos/{owner}/{repo}/releases/latest que nos interesa. El resto de campos se
+// descartan solos al decodificar.
+type releaseGitHub struct {
+	TagName    string        `json:"tag_name"`
+	Name       string        `json:"name"`
+	Body       string        `json:"body"`
+	Draft      bool          `json:"draft"`
+	Prerelease bool          `json:"prerelease"`
+	Assets     []assetGitHub `json:"assets"`
+}
+
+type assetGitHub struct {
+	Name string `json:"name"`
+	URL  string `json:"browser_download_url"`
+	Size int64  `json:"size"`
+}
+
+// anotarLimiteDeCuota apunta hasta cuándo no merece la pena volver a preguntar
+// cuando GitHub responde que se agotó la cuota de peticiones por hora. El propio
+// GitHub lo dice en las cabeceras, así que no hay que adivinar nada.
+func (u *AppUpdater) anotarLimiteDeCuota(resp *http.Response) bool {
+	reintentar := resp.Header.Get("Retry-After")
+	agotada := resp.Header.Get("X-RateLimit-Remaining") == "0"
+	if !agotada && reintentar == "" {
 		return false
 	}
 
 	espera := 15 * time.Minute
-	if m := cuotaEspera.FindStringSubmatch(texto); m != nil {
-		if d, perr := time.ParseDuration(m[1]); perr == nil && d > 0 {
-			espera = d + 30*time.Second // un margen por si el reloj va justo
+	if reintentar != "" {
+		if segundos, err := strconv.Atoi(strings.TrimSpace(reintentar)); err == nil && segundos > 0 {
+			espera = time.Duration(segundos) * time.Second
+		}
+	} else if reset := strings.TrimSpace(resp.Header.Get("X-RateLimit-Reset")); reset != "" {
+		if epoch, err := strconv.ParseInt(reset, 10, 64); err == nil {
+			if falta := time.Until(time.Unix(epoch, 0)); falta > 0 {
+				espera = falta
+			}
 		}
 	}
+	espera += 30 * time.Second // un margen por si el reloj va justo
 
 	u.mu.Lock()
 	u.rateLimitUntil = time.Now().Add(espera)
@@ -213,6 +290,213 @@ func (u *AppUpdater) anotarLimiteDeCuota(err error) bool {
 			espera.Round(time.Second)))
 	return true
 }
+
+// consultarUltimaRelease pide a GitHub la última versión publicada. Devuelve
+// (nil, nil) cuando el repositorio todavía no tiene ninguna.
+func (u *AppUpdater) consultarUltimaRelease(ctx context.Context) (*releaseGitHub, error) {
+	slug := strings.Trim(strings.TrimSpace(u.repoURL), "/")
+	if slug == "" || !strings.Contains(slug, "/") {
+		return nil, fmt.Errorf("repositorio mal configurado: %q", u.repoURL)
+	}
+
+	peticion, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		fmt.Sprintf("%s/repos/%s/releases/latest", githubAPI, slug), nil)
+	if err != nil {
+		return nil, err
+	}
+	peticion.Header.Set("Accept", "application/vnd.github+json")
+	peticion.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	peticion.Header.Set("User-Agent", agenteDeUsuario())
+
+	resp, err := clienteAPI.Do(peticion)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		// El repositorio existe pero no ha publicado ninguna versión.
+		return nil, nil
+	case http.StatusForbidden, http.StatusTooManyRequests:
+		if u.anotarLimiteDeCuota(resp) {
+			return nil, errCuotaAgotada
+		}
+		return nil, fmt.Errorf("GitHub rechazó la consulta (código %d)", resp.StatusCode)
+	default:
+		return nil, fmt.Errorf("GitHub respondió con el código %d", resp.StatusCode)
+	}
+
+	// Una respuesta legítima son unos pocos kilobytes; el límite evita que una
+	// respuesta enorme agote la memoria.
+	var rel releaseGitHub
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&rel); err != nil {
+		return nil, fmt.Errorf("no se pudo leer la respuesta de GitHub: %w", err)
+	}
+	return &rel, nil
+}
+
+// extensionesNoEjecutables son archivos que acompañan a la release pero no son
+// la aplicación: sumas de verificación, firmas y notas.
+var extensionesNoEjecutables = map[string]bool{
+	".txt": true, ".md": true, ".sig": true, ".minisig": true,
+	".asc": true, ".sha256": true, ".sha512": true, ".pem": true,
+}
+
+// palabrasDelSistema son los trozos de nombre con los que se publica el archivo
+// de cada plataforma.
+func palabrasDelSistema() []string {
+	switch runtime.GOOS {
+	case "windows":
+		return []string{"windows", "win", ".exe"}
+	case "darwin":
+		return []string{"darwin", "macos", "mac", "osx"}
+	case "linux":
+		return []string{"linux"}
+	default:
+		return []string{runtime.GOOS}
+	}
+}
+
+// palabrasDeArquitectura permite preferir el archivo de la arquitectura correcta
+// cuando la release publica varios para el mismo sistema.
+func palabrasDeArquitectura() []string {
+	switch runtime.GOARCH {
+	case "amd64":
+		return []string{"amd64", "x86_64", "x64"}
+	case "arm64":
+		return []string{"arm64", "aarch64"}
+	case "386":
+		return []string{"386", "i386", "x86"}
+	default:
+		return []string{runtime.GOARCH}
+	}
+}
+
+func contieneAlguna(texto string, palabras []string) bool {
+	for _, palabra := range palabras {
+		if strings.Contains(texto, palabra) {
+			return true
+		}
+	}
+	return false
+}
+
+// assetParaEsteSistema elige de la release el archivo que corresponde a esta
+// plataforma. Si hay varios del mismo sistema, gana el que además coincide en
+// arquitectura.
+func assetParaEsteSistema(assets []assetGitHub) *ReleaseAsset {
+	sistema := palabrasDelSistema()
+	arquitectura := palabrasDeArquitectura()
+
+	var candidato *assetGitHub
+	for i := range assets {
+		asset := &assets[i]
+		if asset.URL == "" {
+			continue
+		}
+		nombre := strings.ToLower(asset.Name)
+		if extensionesNoEjecutables[strings.ToLower(filepath.Ext(nombre))] {
+			continue
+		}
+		if !contieneAlguna(nombre, sistema) {
+			continue
+		}
+		if contieneAlguna(nombre, arquitectura) {
+			candidato = asset
+			break
+		}
+		if candidato == nil {
+			candidato = asset
+		}
+	}
+
+	if candidato == nil {
+		return nil
+	}
+	return &ReleaseAsset{
+		Name:        candidato.Name,
+		DownloadURL: candidato.URL,
+		Size:        candidato.Size,
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Comparación de versiones
+//
+// Basta con el orden semántico habitual (mayor.menor.parche) y con que una
+// versión de prueba (2.5.0-rc1) valga menos que la definitiva (2.5.0). No hace
+// falta una librería para eso.
+// ---------------------------------------------------------------------------
+
+// prefijoNumerico devuelve los dígitos del principio de una cadena, para que un
+// "4a" o un "3 " no tumben la comparación entera.
+func prefijoNumerico(s string) int {
+	fin := 0
+	for fin < len(s) && s[fin] >= '0' && s[fin] <= '9' {
+		fin++
+	}
+	if fin == 0 {
+		return 0
+	}
+	n, err := strconv.Atoi(s[:fin])
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// normalizarVersion parte "v2.5.0-rc1+build" en [2 5 0] y "rc1".
+func normalizarVersion(v string) (numeros [3]int, prueba string) {
+	v = strings.TrimSpace(v)
+	v = strings.TrimPrefix(v, "v")
+	v = strings.TrimPrefix(v, "V")
+
+	if i := strings.IndexByte(v, '+'); i >= 0 {
+		v = v[:i]
+	}
+	if i := strings.IndexByte(v, '-'); i >= 0 {
+		prueba = v[i+1:]
+		v = v[:i]
+	}
+
+	for i, parte := range strings.SplitN(v, ".", 3) {
+		numeros[i] = prefijoNumerico(strings.TrimSpace(parte))
+	}
+	return numeros, prueba
+}
+
+// compararVersiones devuelve -1 si a es anterior a b, 1 si es posterior y 0 si
+// son la misma.
+func compararVersiones(a, b string) int {
+	na, pruebaA := normalizarVersion(a)
+	nb, pruebaB := normalizarVersion(b)
+
+	for i := 0; i < len(na); i++ {
+		if na[i] != nb[i] {
+			if na[i] < nb[i] {
+				return -1
+			}
+			return 1
+		}
+	}
+
+	switch {
+	case pruebaA == "" && pruebaB == "":
+		return 0
+	case pruebaA == "":
+		// 2.5.0 es posterior a 2.5.0-rc1.
+		return 1
+	case pruebaB == "":
+		return -1
+	}
+	return strings.Compare(pruebaA, pruebaB)
+}
+
+// ---------------------------------------------------------------------------
+// Comprobación
+// ---------------------------------------------------------------------------
 
 func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 	u.mu.Lock()
@@ -234,74 +518,34 @@ func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 	u.routineLog(first, fmt.Sprintf("Comprobando actualizaciones de %s", u.repoURL),
 		fmt.Sprintf("Versión instalada: v%s", u.currentVersion))
 
-	// 1. Intentar detección automática primero
-	updater, err := goupdate.NewUpdater(goupdate.Config{})
-	if err != nil {
-		u.checkErrorLog(first, "No se pudo preparar el buscador de actualizaciones", err)
-		return nil, nil, err
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
 
-	latest, found, err := updater.DetectLatest(context.Background(), goupdate.ParseSlug(u.repoURL))
+	rel, err := u.consultarUltimaRelease(ctx)
 	if err != nil {
-		if !u.anotarLimiteDeCuota(err) {
+		// El aviso de cuota agotada ya lo dio anotarLimiteDeCuota; repetirlo
+		// aquí solo duplicaría la línea en el registro.
+		if !errors.Is(err, errCuotaAgotada) {
 			u.checkErrorLog(first, "No se pudo consultar la última versión publicada", err)
 		}
 		return nil, nil, err
 	}
-
-	// 2. Validar si el asset detectado es para nuestra plataforma
-	if found {
-		assetName := strings.ToLower(latest.AssetName)
-		isWin := strings.Contains(assetName, "win") || strings.Contains(assetName, "exe")
-		isLin := strings.Contains(assetName, "linux")
-		isMac := strings.Contains(assetName, "darwin") || strings.Contains(assetName, "mac")
-
-		currentOS := runtime.GOOS
-		if (currentOS == "windows" && !isWin) || (currentOS == "linux" && !isLin) || (currentOS == "darwin" && !isMac) {
-			logbus.Debug(logbus.CatUpdater,
-				fmt.Sprintf("El archivo detectado (%s) no parece de %s; se reintenta con filtros", latest.AssetName, currentOS), "")
-			found = false
-		}
-	}
-
-	// 3. Si no se encontró o no era válido, forzar con filtros específicos
-	if !found {
-		var filters []string
-		switch runtime.GOOS {
-		case "windows":
-			filters = []string{"win"}
-		case "darwin":
-			filters = []string{"mac"}
-		case "linux":
-			filters = []string{"linux"}
-		}
-
-		updater, _ = goupdate.NewUpdater(goupdate.Config{
-			Filters: filters,
-		})
-		latest, found, err = updater.DetectLatest(context.Background(), goupdate.ParseSlug(u.repoURL))
-		if err != nil {
-			// Este segundo intento también gasta cuota, así que su fallo se
-			// trata igual que el primero en vez de pasar por "no hay versión
-			// compatible", que es lo que parecía antes.
-			if !u.anotarLimiteDeCuota(err) {
-				u.checkErrorLog(first, "No se pudo consultar la última versión publicada", err)
-			}
-			return nil, nil, err
-		}
-	}
-
-	if !found || latest == nil {
-		u.routineLog(first, "No se encontró ninguna versión compatible con este sistema", "")
+	if rel == nil || rel.Draft || strings.TrimSpace(rel.TagName) == "" {
+		u.routineLog(first, "Todavía no hay ninguna versión publicada", "")
 		return nil, nil, nil
 	}
 
-	u.routineLog(first, fmt.Sprintf("Última versión publicada: %s", latest.Version()),
-		"Archivo: "+latest.AssetName)
+	asset := assetParaEsteSistema(rel.Assets)
+	if asset == nil {
+		u.routineLog(first, "No se encontró ningún archivo compatible con este sistema",
+			fmt.Sprintf("Versión publicada: %s (%d archivos)", rel.TagName, len(rel.Assets)))
+		return nil, nil, nil
+	}
 
-	// Comparar versiones (normalizando)
-	currV := strings.TrimPrefix(u.currentVersion, "v")
-	if latest.LessOrEqual(currV) {
+	u.routineLog(first, fmt.Sprintf("Última versión publicada: %s", rel.TagName),
+		"Archivo: "+asset.Name)
+
+	if compararVersiones(rel.TagName, u.currentVersion) <= 0 {
 		u.routineLog(first, fmt.Sprintf("TelegramDL está al día (v%s)", u.currentVersion), "")
 		return nil, nil, nil
 	}
@@ -309,38 +553,37 @@ func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 	// La novedad se anuncia una sola vez por versión: la comprobación se repite
 	// cada pocos minutos y no tiene sentido repetir el aviso en cada ronda.
 	u.mu.Lock()
-	alreadyAnnounced := u.announcedVersion == latest.Version()
-	u.announcedVersion = latest.Version()
+	alreadyAnnounced := u.announcedVersion == rel.TagName
+	u.announcedVersion = rel.TagName
 	u.mu.Unlock()
 
 	if alreadyAnnounced {
 		logbus.Debug(logbus.CatUpdater,
-			fmt.Sprintf("Sigue disponible la versión %s", latest.Version()), "")
+			fmt.Sprintf("Sigue disponible la versión %s", rel.TagName), "")
 	} else {
 		logbus.Success(logbus.CatUpdater,
-			fmt.Sprintf("¡Nueva versión disponible: %s!", latest.Version()),
+			fmt.Sprintf("¡Nueva versión disponible: %s!", rel.TagName),
 			fmt.Sprintf("Tienes la v%s · Puedes actualizar desde Ajustes", u.currentVersion))
 	}
 
-	rel := &ReleaseInfo{
-		TagName: latest.Version(),
-		Body:    latest.ReleaseNotes,
-		release: latest,
+	info := &ReleaseInfo{
+		TagName: rel.TagName,
+		Body:    rel.Body,
+		Assets:  []ReleaseAsset{*asset},
+		asset:   *asset,
 	}
-	asset := &ReleaseAsset{
-		Name:        latest.AssetName,
-		DownloadURL: latest.AssetURL,
-		Size:        int64(latest.AssetByteSize),
-	}
-	rel.Assets = []ReleaseAsset{*asset}
-
-	return rel, asset, nil
+	return info, &info.Assets[0], nil
 }
 
+// ---------------------------------------------------------------------------
+// Instalación
+// ---------------------------------------------------------------------------
+
 func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
-	if rel.release == nil {
+	if rel == nil || strings.TrimSpace(rel.asset.DownloadURL) == "" {
 		return fmt.Errorf("información de actualización no válida")
 	}
+	asset := rel.asset
 
 	go func() {
 		u.setProgress("starting", 0, 0, 0)
@@ -353,20 +596,20 @@ func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 		defer os.RemoveAll(tempDir)
 
 		// 1. Descarga con progreso manual
-		archivePath := filepath.Join(tempDir, rel.release.AssetName)
-		u.setProgress("downloading", 0, int64(rel.release.AssetByteSize), 0)
+		archivePath := filepath.Join(tempDir, filepath.Base(asset.Name))
+		u.setProgress("downloading", 0, asset.Size, 0)
 
-		if err := u.downloadWithProgress(rel.release.AssetURL, archivePath); err != nil {
+		if err := u.downloadWithProgress(asset.DownloadURL, archivePath); err != nil {
 			u.setProgress("error: descarga fallida: "+err.Error(), 0, 0, 0)
 			return
 		}
 
 		// 1.a Comprobar que lo descargado es exactamente lo que se publicó.
-		// Antes se instalaba lo que viniera: HTTPS cubre a un intermediario en
-		// la red, pero no a nadie que consiga publicar en el repositorio, y el
-		// archivo acaba ejecutándose en la máquina del usuario.
+		// HTTPS cubre a un intermediario en la red, pero no a nadie que consiga
+		// publicar en el repositorio, y el archivo acaba ejecutándose en la
+		// máquina del usuario.
 		u.setProgress("verifying", 0, 0, 100)
-		if err := verifyChecksum(archivePath, rel.release.AssetURL, rel.release.AssetName); err != nil {
+		if err := verifyChecksum(archivePath, asset.DownloadURL, asset.Name); err != nil {
 			u.setProgress("error: "+err.Error(), 0, 0, 0)
 			logbus.Error(logbus.CatUpdater, "Actualización rechazada por no superar la verificación", err.Error())
 			return
@@ -413,7 +656,7 @@ func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 			return
 		}
 
-		// 4. Aplicar actualización atómica (reemplazo seguro)
+		// 4. Sustituir el ejecutable en marcha
 		u.setProgress("finishing", 0, 0, 100)
 		exePath, err := os.Executable()
 		if err != nil {
@@ -421,22 +664,14 @@ func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 			return
 		}
 
-		newBinaryFile, err := os.Open(newBinaryPath)
-		if err != nil {
-			u.setProgress("error: no se pudo abrir nuevo binario", 0, 0, 0)
-			return
-		}
-		defer newBinaryFile.Close()
-
 		log.Printf("[UPDATER] Aplicando actualización sobre: %s", exePath)
-		err = selfupdate.Apply(newBinaryFile, selfupdate.Options{
-			TargetPath: exePath,
-		})
-		if err != nil {
+		if err := aplicarBinario(newBinaryPath, exePath); err != nil {
 			u.setProgress("error: fallo al aplicar actualización: "+err.Error(), 0, 0, 0)
+			logbus.Error(logbus.CatUpdater, "No se pudo aplicar la actualización", err.Error())
 			return
 		}
 
+		logbus.Success(logbus.CatUpdater, "Actualización aplicada", exePath)
 		u.setProgress("finishing", 0, 0, 100)
 		time.Sleep(2 * time.Second)
 
@@ -446,8 +681,105 @@ func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 	return nil
 }
 
-func (u *AppUpdater) downloadWithProgress(url, dest string) error {
-	resp, err := http.Get(url)
+// aplicarBinario sustituye el ejecutable en marcha por el recién descargado.
+//
+// Esto es lo que hacía github.com/minio/selfupdate. El mecanismo es el mismo que
+// usa cualquier actualizador en Windows: un ejecutable en ejecución no se puede
+// borrar ni sobrescribir, pero sí se puede *renombrar*, así que el actual se
+// aparta a «.old», el nuevo ocupa su sitio y el viejo se borra en el siguiente
+// arranque desde CleanOldVersion.
+//
+// Si algo falla a mitad se deshace el cambio: el usuario se queda con la versión
+// que tenía, nunca sin aplicación.
+func aplicarBinario(origen, destino string) error {
+	// Los permisos del ejecutable actual se conservan. En Windows esto no
+	// significa nada (mandan las ACL), pero en Linux y macOS sí.
+	permisos := os.FileMode(0o755)
+	if fi, err := os.Stat(destino); err == nil {
+		if p := fi.Mode().Perm(); p&0o100 != 0 {
+			permisos = p
+		}
+	}
+
+	entrada, err := os.Open(origen)
+	if err != nil {
+		return fmt.Errorf("no se pudo leer la nueva versión: %w", err)
+	}
+	defer entrada.Close()
+
+	// El temporal se crea en la MISMA carpeta que el destino: renombrar entre
+	// volúmenes distintos falla, y todo esto depende de que el último cambio de
+	// nombre sea atómico.
+	temporal, err := os.CreateTemp(filepath.Dir(destino), ".tgdown-nuevo-*")
+	if err != nil {
+		return fmt.Errorf("no se pudo escribir en %s; comprueba que tienes permiso en esa carpeta: %w",
+			filepath.Dir(destino), err)
+	}
+	rutaTemporal := temporal.Name()
+	limpiarTemporal := true
+	defer func() {
+		if limpiarTemporal {
+			_ = os.Remove(rutaTemporal)
+		}
+	}()
+
+	if _, err := io.Copy(temporal, entrada); err != nil {
+		_ = temporal.Close()
+		return fmt.Errorf("no se pudo copiar la nueva versión: %w", err)
+	}
+	// Sin esto, un corte de corriente justo después del cambio de nombre podría
+	// dejar en su sitio un ejecutable a medio escribir.
+	_ = temporal.Sync()
+	if err := temporal.Close(); err != nil {
+		return fmt.Errorf("no se pudo cerrar la nueva versión: %w", err)
+	}
+	if err := os.Chmod(rutaTemporal, permisos); err != nil {
+		return fmt.Errorf("no se pudieron ajustar los permisos de la nueva versión: %w", err)
+	}
+
+	antiguo := destino + ".old"
+	_ = os.Remove(antiguo)
+	if err := os.Rename(destino, antiguo); err != nil {
+		return fmt.Errorf("no se pudo apartar la versión actual (%s); comprueba que tienes permiso de escritura en esa carpeta: %w",
+			destino, err)
+	}
+
+	if err := os.Rename(rutaTemporal, destino); err != nil {
+		// Deshacer.
+		if errVuelta := os.Rename(antiguo, destino); errVuelta != nil {
+			return fmt.Errorf("la actualización falló (%v) y además no se pudo restaurar la versión anterior; "+
+				"el ejecutable de siempre está en %s y basta con quitarle el «.old»: %w", err, antiguo, errVuelta)
+		}
+		return fmt.Errorf("no se pudo poner la nueva versión en su sitio: %w", err)
+	}
+	limpiarTemporal = false
+
+	// En Windows el archivo apartado sigue en uso mientras este proceso viva, así
+	// que no poder borrarlo ahora es lo normal y no es un fallo.
+	if err := os.Remove(antiguo); err != nil {
+		log.Printf("[UPDATER] La versión anterior se eliminará en el próximo arranque: %v", err)
+	}
+	return nil
+}
+
+func (u *AppUpdater) downloadWithProgress(descarga, dest string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Vigilante de inactividad: si no llega un solo byte en esperaSinDatos, se
+	// corta la conexión. El cliente no lleva Timeout global a propósito, para no
+	// abortar una descarga grande que va lenta pero avanza.
+	vigilante := time.AfterFunc(esperaSinDatos, cancel)
+	defer vigilante.Stop()
+
+	peticion, err := http.NewRequestWithContext(ctx, http.MethodGet, descarga, nil)
+	if err != nil {
+		return err
+	}
+	peticion.Header.Set("User-Agent", agenteDeUsuario())
+	peticion.Header.Set("Accept", "application/octet-stream")
+
+	resp, err := clienteDescarga.Do(peticion)
 	if err != nil {
 		return err
 	}
@@ -470,6 +802,7 @@ func (u *AppUpdater) downloadWithProgress(url, dest string) error {
 	for {
 		n, err := resp.Body.Read(buffer)
 		if n > 0 {
+			vigilante.Reset(esperaSinDatos)
 			if _, werr := out.Write(buffer[:n]); werr != nil {
 				return werr
 			}
@@ -484,8 +817,17 @@ func (u *AppUpdater) downloadWithProgress(url, dest string) error {
 			break
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				return fmt.Errorf("la descarga se quedó sin respuesta durante %s", esperaSinDatos)
+			}
 			return err
 		}
+	}
+
+	// Si el servidor anunció un tamaño y llegó otra cosa, el archivo está
+	// incompleto: mejor decirlo aquí que fallar luego al verificar la firma.
+	if total > 0 && downloaded != total {
+		return fmt.Errorf("la descarga quedó incompleta (%d de %d bytes)", downloaded, total)
 	}
 	return nil
 }
@@ -541,14 +883,7 @@ func (u *AppUpdater) findExecutable(path string) string {
 func (u *AppUpdater) restartApp(exePath string) {
 	// Usamos la ruta original donde instalamos el nuevo binario
 	// En lugar de os.Executable() que podría devolver la ruta del archivo .old en Windows
-
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		// En Windows, ejecutar el binario directamente suele funcionar si no heredamos nada
-		cmd = exec.Command(exePath, os.Args[1:]...)
-	} else {
-		cmd = exec.Command(exePath, os.Args[1:]...)
-	}
+	cmd := exec.Command(exePath, os.Args[1:]...)
 
 	log.Printf("[UPDATER] Lanzando nueva versión: %s", exePath)
 	err := cmd.Start()
@@ -646,7 +981,13 @@ func descargarChecksum(assetURL, assetName string) (string, error) {
 		return "", err
 	}
 
-	resp, err := http.Get(checksumURL)
+	peticion, err := http.NewRequest(http.MethodGet, checksumURL, nil)
+	if err != nil {
+		return "", err
+	}
+	peticion.Header.Set("User-Agent", agenteDeUsuario())
+
+	resp, err := clienteAPI.Do(peticion)
 	if err != nil {
 		return "", fmt.Errorf("no se pudo descargar %s: %w", checksumsFileName, err)
 	}

@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 
 	"tgdown/pkg/config"
 	"tgdown/pkg/logbus"
+	"tgdown/pkg/storage"
 )
 
 func (e *Engine) resolveItemMetadata(itemID string) {
@@ -38,18 +40,22 @@ func (e *Engine) resolveItemMetadata(itemID string) {
 		e.mu.RUnlock()
 		return
 	}
+	// Copia bajo el mutex: fuera de él, el elemento del mapa lo escriben otras
+	// goroutines (el progreso de la descarga, una pausa, el propio motor), así
+	// que leer sus campos sin el candado es una carrera de datos.
+	datos := *item
+	e.mu.RUnlock()
+
 	// Si ya tiene nombre real y tamaño, no hacer nada
-	if item.FileName != "" && !strings.HasPrefix(strings.ToLower(item.FileName), "mensaje_") && item.TotalBytes > 0 {
-		e.mu.RUnlock()
+	if datos.FileName != "" && !strings.HasPrefix(strings.ToLower(datos.FileName), "mensaje_") && datos.TotalBytes > 0 {
 		return
 	}
-	e.mu.RUnlock()
 
 	if err := e.clientMgr.WaitReady(ctx); err != nil {
 		return
 	}
 
-	msg, err := e.fetchMessage(ctx, item.ChatID, int(item.MessageID))
+	msg, err := e.fetchMessage(ctx, datos.ChatID, int(datos.MessageID))
 	if err != nil {
 		return
 	}
@@ -85,13 +91,21 @@ func (e *Engine) resolveItemMetadata(itemID string) {
 
 func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	e.mu.RLock()
-	item := e.downloads[itemID]
+	item, existe := e.downloads[itemID]
+	var datos storage.DownloadItem
+	if existe {
+		// Igual que en resolveItemMetadata: se trabaja sobre una copia y cada
+		// escritura vuelve a tomar el mutex y a buscar el elemento en el mapa.
+		// Guardarse el puntero y seguir leyéndolo sin candado era una carrera
+		// con la goroutine que resuelve los metadatos y con la del progreso.
+		datos = *item
+	}
 	downloadFolder := e.config.DownloadFolder
 	parallelChunks := e.config.ParallelChunks
 	chunkWorkers := e.config.ChunkWorkers
 	allowDuplicate := e.forceDuplicate[itemID]
 	e.mu.RUnlock()
-	if item == nil {
+	if !existe {
 		return errors.New("descarga no encontrada")
 	}
 
@@ -118,18 +132,18 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 		logbus.Debug(logbus.CatDownloads,
 			fmt.Sprintf("Reutilizando el mensaje ya descargado de Telegram para la tarea %s", itemID), "")
 	} else {
-		log.Printf("[DOWNLOAD] Obteniendo mensaje %d del chat %d en Telegram...", item.MessageID, item.ChatID)
+		log.Printf("[DOWNLOAD] Obteniendo mensaje %d del chat %d en Telegram...", datos.MessageID, datos.ChatID)
 		var err error
-		msg, err = e.fetchMessage(ctx, item.ChatID, int(item.MessageID))
+		msg, err = e.fetchMessage(ctx, datos.ChatID, int(datos.MessageID))
 		if err != nil {
-			log.Printf("[DOWNLOAD ERROR] Error al obtener mensaje %d: %v", item.MessageID, err)
+			log.Printf("[DOWNLOAD ERROR] Error al obtener mensaje %d: %v", datos.MessageID, err)
 			return fmt.Errorf("error al obtener mensaje: %w", err)
 		}
 	}
 
 	mediaInfo := ExtractMediaInfo(msg)
 	if mediaInfo == nil {
-		log.Printf("[DOWNLOAD ERROR] El mensaje %d no contiene multimedia descargable", item.MessageID)
+		log.Printf("[DOWNLOAD ERROR] El mensaje %d no contiene multimedia descargable", datos.MessageID)
 		return errors.New("el mensaje no contiene multimedia descargable")
 	}
 
@@ -137,27 +151,34 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 		fmt.Sprintf("Multimedia extraída: %s (%s, %d bytes)", mediaInfo.FileName, mediaInfo.Kind, mediaInfo.FileSize), "")
 
 	e.mu.Lock()
-	currentFileName := item.FileName
+	currentFileName := datos.FileName
 	// Si el nombre actual es un placeholder, lo actualizamos al nombre real extraído
 	if strings.HasPrefix(strings.ToLower(currentFileName), "mensaje_") || currentFileName == "" {
-		item.FileName = mediaInfo.FileName
 		currentFileName = mediaInfo.FileName
+		if actual, ok := e.downloads[itemID]; ok {
+			actual.FileName = currentFileName
+		}
 	}
 	e.mu.Unlock()
 
 	finalPath, finalName, alreadyExists := e.reservations.ReservePath(
-		downloadFolder, currentFileName, item.MessageID, mediaInfo.FileSize, allowDuplicate,
+		downloadFolder, currentFileName, datos.MessageID, mediaInfo.FileSize, allowDuplicate,
 	)
 	defer e.reservations.ReleasePath(finalPath)
 
 	if alreadyExists {
 		e.mu.Lock()
-		item.FilePath = finalPath
-		item.FileName = finalName
-		item.Status = "duplicate"
-		item.Progress = 100.0
-		item.Speed = "0 B/s"
-		cp := *item
+		actual, ok := e.downloads[itemID]
+		if !ok {
+			e.mu.Unlock()
+			return errDownloadAlreadyExists
+		}
+		actual.FilePath = finalPath
+		actual.FileName = finalName
+		actual.Status = "duplicate"
+		actual.Progress = 100.0
+		actual.Speed = "0 B/s"
+		cp := *actual
 		e.mu.Unlock()
 		if e.storage != nil {
 			if err := e.storage.SaveDownload(cp); err != nil {
@@ -169,14 +190,26 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	}
 
 	e.mu.Lock()
-	item.FilePath = finalPath
-	item.FileName = finalName
-	item.Kind = string(mediaInfo.Kind)
-	if mediaInfo.FileSize > 0 {
-		item.TotalBytes = mediaInfo.FileSize
-		item.TotalStr = config.FormatBytes(float64(mediaInfo.FileSize))
+	actual, ok := e.downloads[itemID]
+	if !ok {
+		e.mu.Unlock()
+		return errors.New("descarga no encontrada")
 	}
-	cp := *item
+	// El tamaño que teníamos antes de pisarlo con el del mensaje: es lo que más
+	// abajo permite darse cuenta de que el archivo cambió y de que los
+	// fragmentos ya descargados no valen. Antes se comparaba item.TotalBytes
+	// después de haberlo sobrescrito aquí mismo, así que la comprobación no
+	// saltaba nunca.
+	totalAnterior := actual.TotalBytes
+
+	actual.FilePath = finalPath
+	actual.FileName = finalName
+	actual.Kind = string(mediaInfo.Kind)
+	if mediaInfo.FileSize > 0 {
+		actual.TotalBytes = mediaInfo.FileSize
+		actual.TotalStr = config.FormatBytes(float64(mediaInfo.FileSize))
+	}
+	cp := *actual
 	e.mu.Unlock()
 
 	if e.storage != nil {
@@ -201,7 +234,7 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 			}
 		}
 	}
-	if item.TotalBytes > 0 && mediaInfo.FileSize > 0 && item.TotalBytes != mediaInfo.FileSize {
+	if totalAnterior > 0 && mediaInfo.FileSize > 0 && totalAnterior != mediaInfo.FileSize {
 		// El mensaje puede haber sido editado o sustituido desde la última
 		// ejecución; los offsets anteriores ya no son confiables.
 		resumeChunks = make(map[int64]struct{})
@@ -325,10 +358,10 @@ func (e *Engine) fetchMessage(ctx context.Context, chatID int64, msgID int) (*tg
 	if chatID < 0 {
 		isChannel := false
 		channelID := -chatID
-		s := fmt.Sprintf("%d", chatID)
+		s := strconv.FormatInt(chatID, 10)
 		if strings.HasPrefix(s, "-100") && len(s) > 4 {
 			isChannel = true
-			if parsed, err := strconvParse(s[4:]); err == nil {
+			if parsed, err := strconv.ParseInt(s[4:], 10, 64); err == nil {
 				channelID = parsed
 			}
 		}
@@ -438,12 +471,6 @@ func (e *Engine) fetchMessage(ctx context.Context, chatID int64, msgID int) (*tg
 	return nil, errors.New("el mensaje no contiene datos válidos o fue eliminado en Telegram")
 }
 
-func strconvParse(s string) (int64, error) {
-	var n int64
-	_, err := fmt.Sscanf(s, "%d", &n)
-	return n, err
-}
-
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -455,8 +482,13 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
 
-	_, err = io.Copy(out, in)
-	return err
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		return err
+	}
+	// El error de Close no se descarta: es justo donde asoma un disco lleno o
+	// una escritura que nunca llegó a tocar el archivo. Descartándolo, una copia
+	// incompleta se daba por buena.
+	return out.Close()
 }
