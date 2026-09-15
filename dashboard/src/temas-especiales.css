@@ -1100,50 +1100,317 @@
 }
 
 
-/* -----------------------------------------------------------------------------
-   Silent Cherry (color 19)
-   El único tema claro del panel: marfil lavanda, rosa de cerezo y verde agua,
-   con luz difusa y pétalos cayendo despacio.
 
-   ATENCIÓN AL PREFIJO. Los otros temas empiezan sus reglas por `.tema-x`; este
-   empieza por `html.tema-silent-cherry`, y es a propósito. El panel tiene 103
-   colores de texto y de fondo fijos en su CSS —repartidos entre style.css,
-   App.vue y siete vistas y componentes— escritos todos para fondo oscuro:
-   blancos azulados para los títulos, rojos y verdes encendidos para los
-   estados, cajas oscuras para los avisos. Sobre marfil, esos blancos
-   desaparecen. Hay que pisarlos uno a uno, y varios viven en bloques `<style
-   scoped>`, que Vue compila con un selector de atributo extra y por tanto
-   pesan más que una clase suelta. Añadir el elemento `html` al principio da a
+/* =============================================================================
+   BASE DE LOS TEMAS CLAROS  ·  html.tema-claro
+   -----------------------------------------------------------------------------
+   El panel está escrito para fondo oscuro: tiene más de cien colores de texto
+   y de fondo fijos repartidos entre style.css, App.vue y siete vistas y
+   componentes —blancos azulados en los títulos, rojos y verdes encendidos en
+   los estados, cajas oscuras en los avisos— que sobre fondo claro desaparecen
+   o chillan. Este bloque los pisa TODOS de una vez, agrupados por el color al
+   que van y no por el archivo del que vienen.
+
+   App.vue añade la clase `tema-claro` en el <html> además de la del tema
+   cuando el tema elegido es de fondo claro (ver `temasClaros`). Cada tema
+   claro solo tiene que declarar las variables --claro-* de aquí abajo y
+   ocuparse de su propia personalidad: fondo, superficies, iconos y acentos.
+
+   POR QUÉ EL PREFIJO `html`. Varios de esos colores viven en bloques
+   `<style scoped>`, que Vue compila con un selector de atributo extra y por
+   tanto pesan más que una clase suelta. Añadir el elemento `html` delante da a
    estas reglas la especificidad justa para ganar siempre, sin repartir
    `!important` por todo el archivo.
 
-   Si algún día se añade otro tema claro, lo suyo es sacar toda la sección
-   "Texto y estados" de aquí a un sitio común: el trabajo ya está hecho, solo
-   habría que cambiarle los colores.
+   Variables que hay que declarar en cada tema claro:
+     --claro-tinta          texto principal
+     --claro-tinta-suave    texto secundario
+     --claro-ok             verde de "todo bien" (texto)
+     --claro-ok-fondo       su relleno
+     --claro-ok-borde       su borde
+     --claro-alerta         rojo de aviso (texto)
+     --claro-alerta-fondo   su relleno
+     --claro-ambar          ámbar de "atención" (texto)
+     --claro-ambar-fondo    su relleno
+     --claro-info-fondo     relleno del nivel "info" del registro
+     --claro-debug-fondo    relleno del nivel "debug" del registro
+     --claro-pista          pista del control deslizante
+     --claro-aro            aro de las muestras de color
+     --claro-enlace         enlaces de ayuda
+     --claro-enlace-hover   enlaces con el cursor encima
+     --claro-boton-texto    texto encima de los botones de acción
+   ========================================================================== */
+
+html.tema-claro {
+  /* Sin esto el navegador sigue pintando los controles nativos —desplegables,
+     cursor de texto, barras— en su versión oscura, y sobre fondo claro se ven
+     como manchas negras. */
+  color-scheme: light;
+}
+
+/* --- Tinta: todo lo que era blanco azulado -------------------------------- */
+html.tema-claro,
+html.tema-claro .brand,
+html.tema-claro .sidebar-nav button:hover,
+html.tema-claro .sidebar-nav button.selected,
+html.tema-claro .sidebar-bottom strong,
+html.tema-claro .topbar h1,
+html.tema-claro .hero-card h2,
+html.tema-claro .stat-card strong,
+html.tema-claro .panel-heading h2,
+html.tema-claro .setting-label,
+html.tema-claro .sidebar-user-badge,
+html.tema-claro .retry-button:hover,
+html.tema-claro .download-form input,
+html.tema-claro .speed-row input,
+html.tema-claro .speed-row select,
+html.tema-claro .token-row input,
+html.tema-claro .update-card h2,
+html.tema-claro .update-status-text,
+html.tema-claro .listener-hero h2,
+html.tema-claro .listener-add input,
+html.tema-claro .chat-chip strong,
+html.tema-claro .bulk-download,
+html.tema-claro .bulk-delete,
+html.tema-claro .topic-picker-head strong,
+html.tema-claro .topic-select,
+html.tema-claro .ghost-button:hover,
+html.tema-claro .logs-hero h2,
+html.tema-claro .counter strong,
+html.tema-claro .level-chip.active,
+html.tema-claro .cat-select,
+html.tema-claro .search-box input,
+html.tema-claro .tool-button,
+html.tema-claro .log-message,
+html.tema-claro .auth-logo,
+html.tema-claro .auth-header h2,
+html.tema-claro .step-label,
+html.tema-claro .step-intro h3,
+html.tema-claro .form-group input,
+html.tema-claro .auth-button.secondary:hover:not(:disabled),
+html.tema-claro .auth-button.ghost,
+html.tema-claro .auth-button.ghost:not(:disabled):hover,
+html.tema-claro .token-input-row input,
+html.tema-claro .ghost-icon-btn:hover,
+html.tema-claro .modal-header h3,
+html.tema-claro .cancel-btn:hover,
+html.tema-claro .folder-current,
+html.tema-claro .folder-dialog-header h3,
+html.tema-claro .folder-entry,
+html.tema-claro .folder-entry:hover,
+html.tema-claro .icon-button:hover,
+html.tema-claro .secondary-button:hover,
+html.tema-claro .tema-chip:hover,
+html.tema-claro .tema-chip.active { color: var(--claro-tinta) }
+
+/* El logotipo de la barra lateral es texto SVG: se pinta con fill y stroke, no
+   con color, así que no le vale la regla de arriba. */
+html.tema-claro .brand-logo-text { fill: var(--claro-tinta) }
+html.tema-claro .brand-logo-text tspan,
+html.tema-claro .brand-version-text tspan { stroke: var(--claro-tinta) }
+
+/* --- Texto secundario ----------------------------------------------------- */
+html.tema-claro .sidebar-status,
+html.tema-claro .empty-state p,
+html.tema-claro .download-form input::placeholder { color: var(--claro-tinta-suave) }
+
+/* --- Verde de "todo bien" ------------------------------------------------- */
+html.tema-claro .save-state,
+html.tema-claro .badge,
+html.tema-claro .sidebar-user-badge .user-icon,
+html.tema-claro .success-icon,
+html.tema-claro .auth-alert.success,
+html.tema-claro .media-song,
+html.tema-claro .row-side .resume-action { color: var(--claro-ok) }
+
+html.tema-claro .badge,
+html.tema-claro .save-state {
+  background: var(--claro-ok-fondo);
+  border-color: var(--claro-ok-borde);
+}
+
+/* --- Rojo de alerta ------------------------------------------------------- */
+html.tema-claro .sidebar-status.is-disconnected,
+html.tema-claro .row-side button,
+html.tema-claro .row-side button:hover,
+html.tema-claro .delete-button,
+html.tema-claro .delete-button:hover,
+html.tema-claro .toast.danger,
+html.tema-claro .sidebar-user-badge .logout-btn,
+html.tema-claro .sidebar-user-badge .logout-btn:hover,
+html.tema-claro .clear-history-button,
+html.tema-claro .action-btn-mini.danger:hover,
+html.tema-claro .header-icon.danger,
+html.tema-claro .folder-error,
+html.tema-claro .auth-alert.danger,
+html.tema-claro .logs-error,
+html.tema-claro .tool-button.danger:hover,
+html.tema-claro .bulk-delete:hover,
+html.tema-claro .delete-small,
+html.tema-claro .delete-small:hover,
+html.tema-claro .level-chip.active.error { color: var(--claro-alerta) }
+
+/* Las cajas oscuras de aviso pasan al relleno claro del tema. */
+html.tema-claro .toast.danger,
+html.tema-claro .delete-button:hover,
+html.tema-claro .sidebar-user-badge .logout-btn:hover,
+html.tema-claro .header-icon.danger,
+html.tema-claro .folder-error,
+html.tema-claro .auth-alert.danger,
+html.tema-claro .logs-error,
+html.tema-claro .tool-button.danger:hover,
+html.tema-claro .bulk-delete:hover,
+html.tema-claro .delete-small,
+html.tema-claro .delete-small:hover,
+html.tema-claro .level-chip.active.error,
+html.tema-claro .clear-history-button {
+  background: var(--claro-alerta-fondo);
+  border-color: color-mix(in srgb, var(--claro-alerta), transparent 78%);
+}
+
+/* --- Ámbar de "atención" -------------------------------------------------- */
+html.tema-claro .row-side .pause-action,
+html.tema-claro .icon-amber,
+html.tema-claro .counter.warn strong,
+html.tema-claro .log-level.warn,
+html.tema-claro .level-chip.active.warn { color: var(--claro-ambar) }
+
+html.tema-claro .level-chip.active.warn { background: var(--claro-ambar-fondo) }
+html.tema-claro .level-chip.active.success { background: var(--claro-ok-fondo) }
+html.tema-claro .level-chip.active.info { background: var(--claro-info-fondo) }
+html.tema-claro .level-chip.active.debug { background: var(--claro-debug-fondo) }
+html.tema-claro .auth-button.secondary:hover:not(:disabled) { background: var(--claro-info-fondo) }
+
+/* Barritas de nivel del registro: son de 2px sobre fila clara, así que el
+   contraste mejora en vez de empeorar; se repintan solo por coherencia. */
+html.tema-claro .log-row.error::before { background: var(--claro-alerta) }
+html.tema-claro .log-row.debug::before { background: var(--claro-tinta-suave) }
+
+/* --- Botones de acción ---------------------------------------------------- */
+/* Encima del relleno del tema el blanco fijo puede perderse (pastel) o ser lo
+   correcto (azul saturado), así que el color lo decide cada tema. */
+html.tema-claro .primary-button,
+html.tema-claro .save-button,
+html.tema-claro .auth-button.primary,
+html.tema-claro .update-btn {
+  color: var(--claro-boton-texto) !important;
+  font-weight: 700;
+  text-shadow: none;
+}
+
+/* --- Controles nativos ---------------------------------------------------- */
+
+/* El interruptor: botón blanco con sombra, que sobre una pista clara es lo que
+   lo hace visible. */
+html.tema-claro .switch span:after {
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(60, 60, 70, .3);
+}
+
+/* El deslizante. `color-scheme: light` arregla casi todos los controles
+   nativos, pero no este: con `accent-color` puesto, Chromium pinta la parte no
+   rellena de la pista casi negra pase lo que pase, y sobre fondo claro es una
+   mancha. La única salida es pintar la pista a mano, y al hacerlo se pierde el
+   relleno de color hasta el tirador (Chromium no tiene un pseudo-elemento para
+   esa parte; Firefox sí, y por eso lleva su regla aparte). No se pierde
+   información: el valor sale en cifras al lado de la etiqueta. */
+html.tema-claro .range-input {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 18px;
+}
+html.tema-claro .range-input::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 6px;
+  background: var(--claro-pista);
+}
+html.tema-claro .range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--user-primary);
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(60, 60, 70, .35);
+  cursor: pointer;
+}
+html.tema-claro .range-input::-moz-range-track {
+  height: 6px;
+  border-radius: 6px;
+  background: var(--claro-pista);
+}
+html.tema-claro .range-input::-moz-range-progress {
+  height: 6px;
+  border-radius: 6px;
+  background: var(--user-primary);
+}
+html.tema-claro .range-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--user-primary);
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(60, 60, 70, .35);
+  cursor: pointer;
+}
+
+/* La flecha del desplegable de velocidad no es un carácter sino dos degradados
+   cruzados en azul acero; sobre fondo claro hay que repintarla. */
+html.tema-claro .speed-row select {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--claro-tinta-suave) 50%),
+    linear-gradient(135deg, var(--claro-tinta-suave) 50%, transparent 50%);
+}
+
+/* El aro interior de las muestras de color de Ajustes es blanco: sobre un
+   relleno claro no se ve y el círculo queda sin borde. */
+html.tema-claro .tema-muestra { box-shadow: inset 0 0 0 1px var(--claro-aro) }
+
+/* --- Enlaces -------------------------------------------------------------- */
+html.tema-claro .inline-link,
+html.tema-claro .inline-link:visited { color: var(--claro-enlace) }
+html.tema-claro .inline-link:hover { color: var(--claro-enlace-hover) }
+html.tema-claro .inline-link:focus-visible { outline-color: var(--claro-enlace) }
+
+
+/* -----------------------------------------------------------------------------
+   Silent Cherry (color 19)   ·   tema claro
+   Marfil lavanda, rosa de cerezo y verde agua, con luz difusa y pétalos
+   cayendo despacio. Las correcciones de fondo claro están en el bloque común
+   de arriba; aquí solo va lo que hace a este tema ser este tema.
    -------------------------------------------------------------------------- */
 html.tema-silent-cherry {
-  /* Sin esto el navegador sigue pintando los controles nativos —la pista del
-     deslizante, el desplegable, el cursor de texto— en su version oscura, y
-     sobre marfil se ven como manchas negras. */
-  color-scheme: light;
-
   --sc-sakura: #ffb7c5;
   --sc-sakura-honda: #f48fb1;
   --sc-agua: #a0e7e5;
   --sc-menta: #80cbc4;
-  /* Tinta: el texto no es negro sino un ciruela agrisado, que es lo que deja
-     la pantalla suave en vez de dura. */
+  /* La tinta no es negra sino un ciruela agrisado, que es lo que deja la
+     pantalla suave en vez de dura. */
   --sc-tinta: #463a57;
-  --sc-tinta-suave: #8a7f8c;
-  /* Los estados necesitan versiones oscurecidas: los tonos pastel de la paleta
+  --sc-sombra: rgba(176, 138, 160, .16);
+
+  /* Los estados necesitan versiones oscurecidas: los pasteles de la paleta
      valen para rellenos, pero como texto sobre marfil no llegan al contraste
      mínimo para leerse. */
-  --sc-menta-texto: #2f8f7f;
-  --sc-alerta: #c8506b;
-  --sc-alerta-suave: #fdeaef;
-  --sc-ambar: #b5822a;
-  --sc-ambar-suave: #fdf3e3;
-  --sc-sombra: rgba(176, 138, 160, .16);
+  --claro-tinta: #463a57;
+  --claro-tinta-suave: #8a7f8c;
+  --claro-ok: #2f8f7f;
+  --claro-ok-fondo: color-mix(in srgb, var(--sc-agua), transparent 72%);
+  --claro-ok-borde: color-mix(in srgb, var(--sc-menta), transparent 60%);
+  --claro-alerta: #c8506b;
+  --claro-alerta-fondo: #fdeaef;
+  --claro-ambar: #b5822a;
+  --claro-ambar-fondo: #fdf3e3;
+  --claro-info-fondo: color-mix(in srgb, var(--sc-sakura), transparent 80%);
+  --claro-debug-fondo: #f1eef5;
+  --claro-pista: color-mix(in srgb, var(--sc-sakura), transparent 62%);
+  --claro-aro: rgba(70, 58, 87, .14);
+  --claro-enlace: #c8506b;
+  --claro-enlace-hover: #a83b56;
+  /* Los botones llevan el degradado pastel: encima, el blanco se pierde. */
+  --claro-boton-texto: #463a57;
 }
 
 /* --- El jardín en flor ---------------------------------------------------- */
@@ -1152,8 +1419,8 @@ html.tema-silent-cherry body {
   background-image:
     /* Rama de cerezo en la esquina de arriba. Es un SVG dibujado a mano dentro
        del propio CSS (codificado como URL, no en base64, para que se pueda
-       seguir leyendo y retocando desde aquí). Va al 55% de opacidad dentro del
-       propio SVG y encima queda tapado por los paneles, así que se lee como
+       seguir leyendo y retocando desde aquí). Lleva su opacidad dentro del
+       propio SVG y encima queda tapada por los paneles, así que se lee como
        una marca de agua y no como una ilustración. */
     url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20240%20180'%3E%3Cg%20opacity='.5'%3E%3Cg%20fill='none'%20stroke='%23cba3ab'%20stroke-width='2.6'%20stroke-linecap='round'%3E%3Cpath%20d='M240%2012%20C198%2018%20168%2034%20138%2058%20C116%2076%2096%2088%2074%2094'/%3E%3Cpath%20d='M176%2030%20C170%2048%20166%2064%20168%2082'/%3E%3Cpath%20d='M140%2056%20C128%2044%20116%2038%20100%2034'/%3E%3Cpath%20d='M196%2062%20C206%2076%20210%2092%20208%20110'/%3E%3Cpath%20d='M118%2078%20C114%2092%20116%20104%20124%20114'/%3E%3C/g%3E%3Cg%20fill='%23f8c2ce'%3E%3Cellipse%20cx='187.7'%20cy='13.8'%20rx='7.8'%20ry='11.7'%20transform='rotate(8%20187.7%2013.8)'/%3E%3Cellipse%20cx='198.1'%20cy='23.9'%20rx='7.8'%20ry='11.7'%20transform='rotate(80%20198.1%2023.9)'/%3E%3Cellipse%20cx='191.8'%20cy='36.9'%20rx='7.8'%20ry='11.7'%20transform='rotate(152%20191.8%2036.9)'/%3E%3Cellipse%20cx='177.5'%20cy='34.8'%20rx='7.8'%20ry='11.7'%20transform='rotate(224%20177.5%2034.8)'/%3E%3Cellipse%20cx='174.9'%20cy='20.6'%20rx='7.8'%20ry='11.7'%20transform='rotate(296%20174.9%2020.6)'/%3E%3Ccircle%20cx='186.0'%20cy='26.0'%20r='3.9'%20fill='%23f0a8bd'/%3E%3Cellipse%20cx='155.5'%20cy='49.8'%20rx='6.2'%20ry='9.4'%20transform='rotate(34%20155.5%2049.8)'/%3E%3Cellipse%20cx='159.5'%20cy='60.7'%20rx='6.2'%20ry='9.4'%20transform='rotate(106%20159.5%2060.7)'/%3E%3Cellipse%20cx='150.3'%20cy='67.8'%20rx='6.2'%20ry='9.4'%20transform='rotate(178%20150.3%2067.8)'/%3E%3Cellipse%20cx='140.8'%20cy='61.4'%20rx='6.2'%20ry='9.4'%20transform='rotate(250%20140.8%2061.4)'/%3E%3Cellipse%20cx='143.9'%20cy='50.2'%20rx='6.2'%20ry='9.4'%20transform='rotate(322%20143.9%2050.2)'/%3E%3Ccircle%20cx='150.0'%20cy='58.0'%20r='3.1'%20fill='%23f0a8bd'/%3E%3Cellipse%20cx='204.0'%20cy='69.8'%20rx='5.7'%20ry='8.6'%20transform='rotate(62%20204.0%2069.8)'/%3E%3Cellipse%20cx='202.5'%20cy='80.3'%20rx='5.7'%20ry='8.6'%20transform='rotate(134%20202.5%2080.3)'/%3E%3Cellipse%20cx='192.0'%20cy='82.1'%20rx='5.7'%20ry='8.6'%20transform='rotate(206%20192.0%2082.1)'/%3E%3Cellipse%20cx='187.1'%20cy='72.7'%20rx='5.7'%20ry='8.6'%20transform='rotate(278%20187.1%2072.7)'/%3E%3Cellipse%20cx='194.4'%20cy='65.1'%20rx='5.7'%20ry='8.6'%20transform='rotate(350%20194.4%2065.1)'/%3E%3Ccircle%20cx='196.0'%20cy='74.0'%20r='2.9'%20fill='%23f0a8bd'/%3E%3Cellipse%20cx='120.1'%20cy='32.1'%20rx='5.2'%20ry='7.8'%20transform='rotate(15%20120.1%2032.1)'/%3E%3Cellipse%20cx='126.2'%20cy='39.6'%20rx='5.2'%20ry='7.8'%20transform='rotate(87%20126.2%2039.6)'/%3E%3Cellipse%20cx='120.9'%20cy='47.7'%20rx='5.2'%20ry='7.8'%20transform='rotate(159%20120.9%2047.7)'/%3E%3Cellipse%20cx='111.6'%20cy='45.2'%20rx='5.2'%20ry='7.8'%20transform='rotate(231%20111.6%2045.2)'/%3E%3Cellipse%20cx='111.1'%20cy='35.5'%20rx='5.2'%20ry='7.8'%20transform='rotate(303%20111.1%2035.5)'/%3E%3Ccircle%20cx='118.0'%20cy='40.0'%20r='2.6'%20fill='%23f0a8bd'/%3E%3Cellipse%20cx='169.8'%20cy='96.7'%20rx='6.8'%20ry='10.1'%20transform='rotate(47%20169.8%2096.7)'/%3E%3Cellipse%20cx='171.3'%20cy='109.2'%20rx='6.8'%20ry='10.1'%20transform='rotate(119%20171.3%20109.2)'/%3E%3Cellipse%20cx='160.0'%20cy='114.5'%20rx='6.8'%20ry='10.1'%20transform='rotate(191%20160.0%20114.5)'/%3E%3Cellipse%20cx='151.4'%20cy='105.3'%20rx='6.8'%20ry='10.1'%20transform='rotate(263%20151.4%20105.3)'/%3E%3Cellipse%20cx='157.5'%20cy='94.3'%20rx='6.8'%20ry='10.1'%20transform='rotate(335%20157.5%2094.3)'/%3E%3Ccircle%20cx='162.0'%20cy='104.0'%20r='3.4'%20fill='%23f0a8bd'/%3E%3Cellipse%20cx='208.5'%20cy='115.1'%20rx='4.7'%20ry='7.0'%20transform='rotate(20%20208.5%20115.1)'/%3E%3Cellipse%20cx='213.4'%20cy='122.3'%20rx='4.7'%20ry='7.0'%20transform='rotate(92%20213.4%20122.3)'/%3E%3Cellipse%20cx='208.0'%20cy='129.1'%20rx='4.7'%20ry='7.0'%20transform='rotate(164%20208.0%20129.1)'/%3E%3Cellipse%20cx='199.9'%20cy='126.1'%20rx='4.7'%20ry='7.0'%20transform='rotate(236%20199.9%20126.1)'/%3E%3Cellipse%20cx='200.2'%20cy='117.5'%20rx='4.7'%20ry='7.0'%20transform='rotate(308%20200.2%20117.5)'/%3E%3Ccircle%20cx='206.0'%20cy='122.0'%20r='2.3'%20fill='%23f0a8bd'/%3E%3Cellipse%20cx='98.9'%20cy='71.5'%20rx='4.7'%20ry='7.0'%20transform='rotate(70%2098.9%2071.5)'/%3E%3Cellipse%20cx='96.5'%20cy='79.8'%20rx='4.7'%20ry='7.0'%20transform='rotate(142%2096.5%2079.8)'/%3E%3Cellipse%20cx='87.9'%20cy='80.1'%20rx='4.7'%20ry='7.0'%20transform='rotate(214%2087.9%2080.1)'/%3E%3Cellipse%20cx='84.9'%20cy='72.0'%20rx='4.7'%20ry='7.0'%20transform='rotate(286%2084.9%2072.0)'/%3E%3Cellipse%20cx='91.7'%20cy='66.6'%20rx='4.7'%20ry='7.0'%20transform='rotate(358%2091.7%2066.6)'/%3E%3Ccircle%20cx='92.0'%20cy='74.0'%20r='2.3'%20fill='%23f0a8bd'/%3E%3Cellipse%20cx='131.3'%20cy='90.3'%20rx='4.2'%20ry='6.2'%20transform='rotate(30%20131.3%2090.3)'/%3E%3Cellipse%20cx='134.4'%20cy='97.4'%20rx='4.2'%20ry='6.2'%20transform='rotate(102%20134.4%2097.4)'/%3E%3Cellipse%20cx='128.7'%20cy='102.5'%20rx='4.2'%20ry='6.2'%20transform='rotate(174%20128.7%20102.5)'/%3E%3Cellipse%20cx='122.0'%20cy='98.7'%20rx='4.2'%20ry='6.2'%20transform='rotate(246%20122.0%2098.7)'/%3E%3Cellipse%20cx='123.6'%20cy='91.1'%20rx='4.2'%20ry='6.2'%20transform='rotate(318%20123.6%2091.1)'/%3E%3Ccircle%20cx='128.0'%20cy='96.0'%20r='2.1'%20fill='%23f0a8bd'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"),
     /* Luz difusa: tres manchas grandes y desenfocadas. */
@@ -1289,191 +1556,29 @@ html.tema-silent-cherry .hero-card {
   box-shadow: 0 16px 40px var(--sc-sombra);
 }
 
-/* El halo de la esquina pasa a ser un claro de luz entre las flores. */
 html.tema-silent-cherry .hero-card:after {
   background: radial-gradient(circle, var(--sc-sakura) 0%, transparent 66%);
   opacity: .28;
   filter: blur(22px);
 }
 
-html.tema-silent-cherry .toast {
-  box-shadow: 0 12px 34px var(--sc-sombra);
-}
+html.tema-silent-cherry .toast { box-shadow: 0 12px 34px var(--sc-sombra) }
 
-/* --- Texto y estados ------------------------------------------------------ */
-/* Aquí es donde se pisan los 103 colores fijos del panel. Agrupados por el
-   color al que van, no por el archivo del que vienen. */
-
-/* Tinta: todo lo que era blanco azulado. */
-html.tema-silent-cherry,
-html.tema-silent-cherry .brand,
-html.tema-silent-cherry .sidebar-nav button:hover,
-html.tema-silent-cherry .sidebar-nav button.selected,
-html.tema-silent-cherry .sidebar-bottom strong,
-html.tema-silent-cherry .topbar h1,
-html.tema-silent-cherry .hero-card h2,
-html.tema-silent-cherry .stat-card strong,
-html.tema-silent-cherry .panel-heading h2,
-html.tema-silent-cherry .setting-label,
-html.tema-silent-cherry .sidebar-user-badge,
-html.tema-silent-cherry .retry-button:hover,
-html.tema-silent-cherry .download-form input,
-html.tema-silent-cherry .speed-row input,
-html.tema-silent-cherry .speed-row select,
-html.tema-silent-cherry .token-row input,
-html.tema-silent-cherry .update-card h2,
-html.tema-silent-cherry .update-status-text,
-html.tema-silent-cherry .listener-hero h2,
-html.tema-silent-cherry .listener-add input,
-html.tema-silent-cherry .chat-chip strong,
-html.tema-silent-cherry .bulk-download,
-html.tema-silent-cherry .bulk-delete,
-html.tema-silent-cherry .topic-picker-head strong,
-html.tema-silent-cherry .topic-select,
-html.tema-silent-cherry .ghost-button:hover,
-html.tema-silent-cherry .logs-hero h2,
-html.tema-silent-cherry .counter strong,
-html.tema-silent-cherry .level-chip.active,
-html.tema-silent-cherry .cat-select,
-html.tema-silent-cherry .search-box input,
-html.tema-silent-cherry .tool-button,
-html.tema-silent-cherry .log-message,
-html.tema-silent-cherry .auth-logo,
-html.tema-silent-cherry .auth-header h2,
-html.tema-silent-cherry .step-label,
-html.tema-silent-cherry .step-intro h3,
-html.tema-silent-cherry .form-group input,
-html.tema-silent-cherry .auth-button.secondary:hover:not(:disabled),
-html.tema-silent-cherry .auth-button.ghost,
-html.tema-silent-cherry .auth-button.ghost:not(:disabled):hover,
-html.tema-silent-cherry .token-input-row input,
-html.tema-silent-cherry .ghost-icon-btn:hover,
-html.tema-silent-cherry .modal-header h3,
-html.tema-silent-cherry .cancel-btn:hover,
-html.tema-silent-cherry .folder-current,
-html.tema-silent-cherry .folder-dialog-header h3,
-html.tema-silent-cherry .folder-entry,
-html.tema-silent-cherry .folder-entry:hover,
-html.tema-silent-cherry .icon-button:hover,
-html.tema-silent-cherry .secondary-button:hover,
-html.tema-silent-cherry .tema-chip:hover,
-html.tema-silent-cherry .tema-chip.active { color: var(--sc-tinta) }
-
-/* El aro interior de la muestra de color es blanco: sobre un pastel claro no
-   se ve y el circulo queda sin borde. */
-html.tema-silent-cherry .tema-muestra {
-  box-shadow: inset 0 0 0 1px rgba(70, 58, 87, .14);
-}
-
-/* Las barritas de nivel del registro son tonos oscuros sobre fila clara: se
-   siguen viendo, pero puestas en la paleta del tema pegan mejor. */
-html.tema-silent-cherry .log-row.error::before { background: var(--sc-alerta) }
-html.tema-silent-cherry .log-row.debug::before { background: var(--sc-tinta-suave) }
-
-/* El logotipo de la barra lateral es texto SVG: se pinta con fill y stroke, no
-   con color, así que no le sirve la regla de arriba. */
-html.tema-silent-cherry .brand-logo-text { fill: var(--sc-tinta) }
-html.tema-silent-cherry .brand-logo-text tspan,
-html.tema-silent-cherry .brand-version-text tspan { stroke: var(--sc-tinta) }
-
-/* Texto secundario. */
-html.tema-silent-cherry .sidebar-status,
-html.tema-silent-cherry .empty-state p,
-html.tema-silent-cherry .download-form input::placeholder { color: var(--sc-tinta-suave) }
-
-/* Verdes de "todo bien" → verde agua oscurecido lo justo para leerse. */
-html.tema-silent-cherry .save-state,
-html.tema-silent-cherry .badge,
-html.tema-silent-cherry .sidebar-user-badge .user-icon,
-html.tema-silent-cherry .success-icon,
-html.tema-silent-cherry .auth-alert.success,
-html.tema-silent-cherry .media-song,
-html.tema-silent-cherry .row-side .resume-action { color: var(--sc-menta-texto) }
-
-html.tema-silent-cherry .badge,
-html.tema-silent-cherry .save-state {
-  background: color-mix(in srgb, var(--sc-agua), transparent 72%);
-  border-color: color-mix(in srgb, var(--sc-menta), transparent 60%);
-}
-
-/* Rojos de alerta → rosa oscuro, que es el rojo que le pega a esta paleta. */
-html.tema-silent-cherry .sidebar-status.is-disconnected,
-html.tema-silent-cherry .row-side button,
-html.tema-silent-cherry .row-side button:hover,
-html.tema-silent-cherry .delete-button,
-html.tema-silent-cherry .delete-button:hover,
-html.tema-silent-cherry .toast.danger,
-html.tema-silent-cherry .sidebar-user-badge .logout-btn,
-html.tema-silent-cherry .sidebar-user-badge .logout-btn:hover,
-html.tema-silent-cherry .clear-history-button,
-html.tema-silent-cherry .action-btn-mini.danger:hover,
-html.tema-silent-cherry .header-icon.danger,
-html.tema-silent-cherry .folder-error,
-html.tema-silent-cherry .auth-alert.danger,
-html.tema-silent-cherry .logs-error,
-html.tema-silent-cherry .tool-button.danger:hover,
-html.tema-silent-cherry .bulk-delete:hover,
-html.tema-silent-cherry .delete-small,
-html.tema-silent-cherry .delete-small:hover,
-html.tema-silent-cherry .level-chip.active.error { color: var(--sc-alerta) }
-
-/* Las cajas oscuras de aviso pasan a rosa pálido. */
-html.tema-silent-cherry .toast.danger,
-html.tema-silent-cherry .delete-button:hover,
-html.tema-silent-cherry .sidebar-user-badge .logout-btn:hover,
-html.tema-silent-cherry .header-icon.danger,
-html.tema-silent-cherry .folder-error,
-html.tema-silent-cherry .auth-alert.danger,
-html.tema-silent-cherry .logs-error,
-html.tema-silent-cherry .tool-button.danger:hover,
-html.tema-silent-cherry .bulk-delete:hover,
-html.tema-silent-cherry .delete-small,
-html.tema-silent-cherry .delete-small:hover,
-html.tema-silent-cherry .level-chip.active.error,
-html.tema-silent-cherry .clear-history-button {
-  background: var(--sc-alerta-suave);
-  border-color: color-mix(in srgb, var(--sc-alerta), transparent 78%);
-}
-
-/* Ámbar de "atención". */
-html.tema-silent-cherry .row-side .pause-action,
-html.tema-silent-cherry .icon-amber,
-html.tema-silent-cherry .counter.warn strong,
-html.tema-silent-cherry .log-level.warn,
-html.tema-silent-cherry .level-chip.active.warn { color: var(--sc-ambar) }
-
-html.tema-silent-cherry .level-chip.active.warn { background: var(--sc-ambar-suave) }
-html.tema-silent-cherry .level-chip.active.success { background: color-mix(in srgb, var(--sc-agua), transparent 78%) }
-html.tema-silent-cherry .level-chip.active.info { background: color-mix(in srgb, var(--sc-sakura), transparent 80%) }
-html.tema-silent-cherry .level-chip.active.debug { background: #f1eef5 }
-html.tema-silent-cherry .auth-button.secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--sc-agua), transparent 80%) }
-
-/* Los botones de acción llevan el degradado pastel: el texto tiene que ser
-   tinta, no blanco, o se pierde encima del rosa. */
-html.tema-silent-cherry .primary-button,
-html.tema-silent-cherry .save-button,
-html.tema-silent-cherry .auth-button.primary,
-html.tema-silent-cherry .update-btn {
-  color: var(--sc-tinta) !important;
-  font-weight: 700;
-  text-shadow: none;
-}
-
-/* --- Detalles ------------------------------------------------------------- */
+/* --- Acentos -------------------------------------------------------------- */
 
 /* Los cuatro iconos de cifras, en pastel: cerezo, lavanda, agua y gris suave. */
 html.tema-silent-cherry .stat-icon.blue  { background: color-mix(in srgb, var(--sc-sakura), transparent 62%); color: #c2607f }
 html.tema-silent-cherry .stat-icon.amber { background: #ece6f7; color: #7a6aa8 }
-html.tema-silent-cherry .stat-icon.green { background: color-mix(in srgb, var(--sc-agua), transparent 58%); color: var(--sc-menta-texto) }
-html.tema-silent-cherry .stat-icon.gray  { background: #efecf2; color: var(--sc-tinta-suave) }
+html.tema-silent-cherry .stat-icon.green { background: color-mix(in srgb, var(--sc-agua), transparent 58%); color: var(--claro-ok) }
+html.tema-silent-cherry .stat-icon.gray  { background: #efecf2; color: var(--claro-tinta-suave) }
 
-/* La pestaña activa, en verde agua: en la referencia es el único sitio donde
-   el menta manda, y deja el rosa para los botones de acción. */
+/* La pestaña activa, en verde agua: es el único sitio donde el menta manda, y
+   deja el rosa para los botones de acción. */
 html.tema-silent-cherry .sidebar-nav button.selected {
   background: color-mix(in srgb, var(--sc-agua), transparent 66%) !important;
   box-shadow: inset 3px 0 var(--sc-menta), 0 6px 18px var(--sc-sombra);
 }
-html.tema-silent-cherry .sidebar-nav button.selected span { color: var(--sc-menta-texto) }
+html.tema-silent-cherry .sidebar-nav button.selected span { color: var(--claro-ok) }
 html.tema-silent-cherry .sidebar-nav button:hover {
   background: color-mix(in srgb, var(--sc-sakura), transparent 78%);
 }
@@ -1486,83 +1591,13 @@ html.tema-silent-cherry .sidebar-nav button:hover {
 
 html.tema-silent-cherry .status-dot,
 html.tema-silent-cherry .live-dot {
-  background: var(--sc-menta-texto);
+  background: var(--claro-ok);
   box-shadow: 0 0 10px color-mix(in srgb, var(--sc-menta), transparent 40%);
 }
 html.tema-silent-cherry .status-dot.disconnected {
-  background: var(--sc-alerta);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--sc-alerta), transparent 55%);
+  background: var(--claro-alerta);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--claro-alerta), transparent 55%);
 }
-
-/* El botón del interruptor: blanco con sombra, que sobre una pista clara es lo
-   que lo hace visible. */
-html.tema-silent-cherry .switch span:after {
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(120, 90, 110, .35);
-}
-
-/* El deslizante. `color-scheme: light` arregla casi todos los controles
-   nativos, pero no este: con `accent-color` puesto, Chromium pinta la parte no
-   rellena de la pista casi negra pase lo que pase, y sobre marfil es una
-   mancha. La única salida es pintar la pista a mano, y al hacerlo se pierde el
-   relleno de color hasta el tirador (Chromium no tiene un pseudo-elemento para
-   esa parte; Firefox sí, y por eso lleva su regla aparte). No se pierde
-   información: el valor sale en cifras al lado de la etiqueta y los extremos
-   debajo. */
-html.tema-silent-cherry .range-input {
-  -webkit-appearance: none;
-  appearance: none;
-  background: transparent;
-  height: 18px;
-}
-html.tema-silent-cherry .range-input::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--sc-sakura), transparent 62%);
-}
-html.tema-silent-cherry .range-input::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  margin-top: -5px;
-  border-radius: 50%;
-  background: var(--sc-sakura-honda);
-  border: 2px solid #ffffff;
-  box-shadow: 0 1px 4px rgba(150, 100, 125, .45);
-  cursor: pointer;
-}
-html.tema-silent-cherry .range-input::-moz-range-track {
-  height: 6px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--sc-sakura), transparent 62%);
-}
-html.tema-silent-cherry .range-input::-moz-range-progress {
-  height: 6px;
-  border-radius: 6px;
-  background: var(--sc-sakura-honda);
-}
-html.tema-silent-cherry .range-input::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--sc-sakura-honda);
-  border: 2px solid #ffffff;
-  box-shadow: 0 1px 4px rgba(150, 100, 125, .45);
-  cursor: pointer;
-}
-
-/* La flecha del desplegable de velocidad no es un carácter sino dos degradados
-   cruzados en azul acero; sobre marfil hay que repintarla en tinta. */
-html.tema-silent-cherry .speed-row select {
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--sc-tinta-suave) 50%),
-    linear-gradient(135deg, var(--sc-tinta-suave) 50%, transparent 50%);
-}
-
-html.tema-silent-cherry .inline-link,
-html.tema-silent-cherry .inline-link:visited { color: var(--sc-alerta) }
-html.tema-silent-cherry .inline-link:hover { color: #a83b56 }
-html.tema-silent-cherry .inline-link:focus-visible { outline-color: var(--sc-alerta) }
 
 /* --- Barras de progreso --------------------------------------------------- */
 /* Pétalos flotando en la corriente. Misma técnica que los otros temas: capa
@@ -1632,4 +1667,288 @@ html.tema-silent-cherry ::-webkit-scrollbar-thumb:hover {
 html.tema-silent-cherry .boot-screen,
 html.tema-silent-cherry .update-required-overlay {
   background-image: radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 52%);
+}
+
+
+/* -----------------------------------------------------------------------------
+   osX (color 20)   ·   tema oscuro
+   Liquid Glass, el lenguaje visual de iOS 26/27, en su versión oscura: vidrio
+   ahumado sobre casi negro, borde apagado por fuera y brillo especular en el
+   filo de arriba, esquinas muy redondeadas y botones en cápsula.
+
+   El filo es la novedad que iOS 27 trajo sobre iOS 26: Apple oscureció el
+   borde de las superficies de vidrio y subió los brillos especulares para que
+   se separen mejor de lo que tienen detrás. En oscuro eso se traduce en un
+   borde blanco al 8% y una línea blanca al 14% en el canto superior; es lo que
+   hace que la superficie parezca tener grosor en vez de ser una mancha
+   translúcida.
+
+   EL PRESUPUESTO DE RENDIMIENTO, que aquí manda tanto como el aspecto.
+   `backdrop-filter` es de lo más caro que se le puede pedir a un webview: cada
+   superficie difuminada obliga a la GPU a recomponer lo que tiene debajo en
+   cada fotograma en que algo se mueva. Por eso este tema:
+
+     - NO tiene ninguna capa animada de fondo. Ni una. Es el único de los cinco
+       sin `@keyframes`, y también el más barato de los cinco. Es además lo
+       fiel: iOS está quieto hasta que lo tocas.
+     - Difumina solo las superficies grandes: barra lateral, paneles y tarjeta
+       principal. Las cuatro tarjetas de cifras van opacas, que a ese tamaño el
+       desenfoque no se aprecia y son cuatro capas menos.
+     - No difumina nada pequeño: chips, botones, píldoras y avisos van opacos.
+     - No anima NUNCA el propio desenfoque, que es el caso patológico.
+     - No usa `will-change`: fuerza capas de composición permanentes y en un
+       panel con esta cantidad de superficies sale caro.
+
+   El fondo lleva tres manchas de color muy diluidas, y no es decoración
+   gratuita: el vidrio necesita algo detrás que difuminar. Sobre negro plano el
+   desenfoque no se ve y se paga igual.
+
+   Y respeta `prefers-reduced-transparency` y `prefers-contrast: more` quitando
+   el vidrio del todo: es lo que hace iOS con esos mismos ajustes, y de paso es
+   la salida para una máquina que vaya justa.
+   -------------------------------------------------------------------------- */
+html.tema-osx {
+  /* La contraparte oscura de lo que hacen los temas claros: sin esto el
+     navegador pinta los controles nativos en modo claro y, por ejemplo, la
+     parte no rellena del deslizante sale blanca sobre el casi negro. Con esto
+     se pone gris translúcido, que es como la dibuja iOS, y de paso la lista
+     desplegable del selector de unidades y el cursor de texto también salen
+     oscuros. */
+  color-scheme: dark;
+
+  /* Colores de sistema de iOS en su variante oscura, que son más luminosos que
+     los de claro: el mismo azul de día se apaga sobre negro. */
+  --osx-azul: #0a84ff;
+  --osx-cian: #64d2ff;
+  --osx-verde: #30d158;
+  --osx-rojo: #ff453a;
+  --osx-naranja: #ff9f0a;
+  --osx-vidrio: rgba(28, 28, 30, .62);
+  --osx-filo: inset 0 1px 0 rgba(255, 255, 255, .14);
+  --osx-sombra: 0 10px 30px rgba(0, 0, 0, .45);
+}
+
+/* --- Fondo ---------------------------------------------------------------- */
+/* Estático y de una sola pasada, sin pseudo-elementos y sin animación. */
+html.tema-osx body {
+  background-image:
+    radial-gradient(58% 42% at 84% -8%, rgba(10, 132, 255, .22) 0%, transparent 62%),
+    radial-gradient(52% 40% at 4% 102%, rgba(94, 92, 230, .20) 0%, transparent 62%),
+    radial-gradient(46% 34% at 62% 58%, rgba(100, 210, 255, .07) 0%, transparent 66%),
+    radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 54%);
+  background-attachment: fixed;
+}
+
+/* --- Liquid Glass --------------------------------------------------------- */
+
+html.tema-osx .sidebar {
+  background: rgba(22, 22, 24, .6);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-right: 1px solid rgba(255, 255, 255, .07);
+}
+
+html.tema-osx .panel,
+html.tema-osx .hero-card,
+html.tema-osx .logs-hero,
+html.tema-osx .listener-hero {
+  background-color: var(--osx-vidrio);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-color: rgba(255, 255, 255, .08);
+  border-radius: 20px;
+  box-shadow: var(--osx-filo), var(--osx-sombra);
+}
+
+html.tema-osx .hero-card {
+  border-radius: 24px;
+  background-image: linear-gradient(180deg,
+    rgba(255, 255, 255, .06) 0%,
+    rgba(10, 132, 255, .10) 100%);
+}
+
+/* El halo de la esquina, como un reflejo en el vidrio. Sin animación. */
+html.tema-osx .hero-card:after {
+  background: radial-gradient(circle, var(--osx-azul) 0%, transparent 66%);
+  opacity: .22;
+  filter: blur(24px);
+}
+
+/* Las tarjetas de cifras van opacas a propósito: son cuatro, son pequeñas y el
+   desenfoque ahí no se nota, pero sí se paga. */
+html.tema-osx .stat-card {
+  background-color: #1c1c1e;
+  border-color: rgba(255, 255, 255, .07);
+  border-radius: 18px;
+  box-shadow: var(--osx-filo), 0 4px 16px rgba(0, 0, 0, .3);
+}
+html.tema-osx .stat-card:hover {
+  border-color: rgba(255, 255, 255, .14);
+  box-shadow: var(--osx-filo), 0 10px 26px rgba(0, 0, 0, .45);
+}
+
+html.tema-osx .toast {
+  background: rgba(36, 36, 38, .92);
+  border-radius: 16px;
+  box-shadow: var(--osx-filo), 0 12px 34px rgba(0, 0, 0, .55);
+}
+
+/* Cuando el sistema pide menos transparencia o más contraste, el vidrio se va
+   entero: superficies opacas y fondo plano. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html.tema-osx .sidebar,
+  html.tema-osx .panel,
+  html.tema-osx .hero-card,
+  html.tema-osx .logs-hero,
+  html.tema-osx .listener-hero {
+    background-color: #1c1c1e;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-color: rgba(255, 255, 255, .24);
+  }
+  html.tema-osx body { background-image: none }
+}
+
+/* --- Formas --------------------------------------------------------------- */
+/* Cápsulas y esquinas grandes, que es lo que más delata a iOS. */
+
+html.tema-osx .primary-button,
+html.tema-osx .save-button,
+html.tema-osx .auth-button,
+html.tema-osx .clear-history-button {
+  border-radius: 999px;
+}
+
+/* El botón relleno de iOS lleva el texto en blanco. Aquí hay que decirlo
+   expresamente: el panel lo pinta con `var(--user-bg-base)`, que en un tema
+   oscuro es casi negro y sobre el azul no se leería. */
+html.tema-osx .primary-button,
+html.tema-osx .save-button,
+html.tema-osx .auth-button.primary,
+html.tema-osx .update-btn {
+  color: #ffffff !important;
+  font-weight: 600;
+  text-shadow: none;
+}
+
+html.tema-osx .primary-button,
+html.tema-osx .save-button {
+  box-shadow: 0 2px 12px rgba(10, 132, 255, .4);
+}
+html.tema-osx .primary-button:hover:not(:disabled),
+html.tema-osx .save-button:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(10, 132, 255, .5);
+}
+
+/* Los campos de iOS en oscuro no son cajas negras con borde, sino un gris
+   translúcido sin contorno. */
+html.tema-osx .download-form input,
+html.tema-osx .speed-row input,
+html.tema-osx .speed-row select,
+html.tema-osx .token-row input {
+  border-radius: 12px;
+  background: rgba(118, 118, 128, .24);
+  border-color: transparent;
+}
+
+/* La pestaña activa: relleno azul diluido y etiqueta azul, sin la barra
+   lateral de los otros temas. */
+html.tema-osx .sidebar-nav button { border-radius: 10px }
+html.tema-osx .sidebar-nav button:hover { background: rgba(255, 255, 255, .06) }
+html.tema-osx .sidebar-nav button.selected {
+  background: rgba(10, 132, 255, .22) !important;
+  box-shadow: none;
+  color: #ffffff;
+}
+html.tema-osx .sidebar-nav button.selected span { color: var(--osx-cian) }
+
+@media (max-width: 900px) {
+  html.tema-osx .sidebar-nav button.selected { box-shadow: none }
+}
+
+/* --- Acentos de sistema --------------------------------------------------- */
+
+html.tema-osx .stat-icon.blue  { background: rgba(10, 132, 255, .18); color: var(--osx-azul) }
+html.tema-osx .stat-icon.amber { background: rgba(255, 159, 10, .18); color: var(--osx-naranja) }
+html.tema-osx .stat-icon.green { background: rgba(48, 209, 88, .18);  color: var(--osx-verde) }
+html.tema-osx .stat-icon.gray  { background: rgba(142, 142, 147, .18); color: #aeaeb2 }
+
+/* El interruptor de iOS es verde, no del color de acento. */
+html.tema-osx .switch span { background: rgba(120, 120, 128, .32) }
+html.tema-osx .switch input:checked + span { background: var(--osx-verde) }
+html.tema-osx .switch span:after { background: #ffffff; box-shadow: 0 2px 5px rgba(0, 0, 0, .45) }
+
+html.tema-osx .status-dot,
+html.tema-osx .live-dot {
+  background: var(--osx-verde);
+  box-shadow: 0 0 8px rgba(48, 209, 88, .55);
+}
+html.tema-osx .status-dot.disconnected {
+  background: var(--osx-rojo);
+  box-shadow: 0 0 8px rgba(255, 69, 58, .55);
+}
+
+html.tema-osx .badge,
+html.tema-osx .save-state {
+  background: rgba(48, 209, 88, .16);
+  color: var(--osx-verde);
+  border-color: rgba(48, 209, 88, .3);
+}
+
+html.tema-osx .count-pill {
+  background: rgba(10, 132, 255, .18);
+  color: var(--osx-cian);
+}
+
+html.tema-osx .row-side button,
+html.tema-osx .delete-button,
+html.tema-osx .sidebar-user-badge .logout-btn { color: var(--osx-rojo) }
+html.tema-osx .row-side .pause-action { color: var(--osx-naranja) }
+html.tema-osx .row-side .resume-action { color: var(--osx-verde) }
+html.tema-osx .sidebar-user-badge .user-icon { color: var(--osx-verde) }
+
+html.tema-osx .inline-link,
+html.tema-osx .inline-link:visited { color: var(--osx-azul) }
+html.tema-osx .inline-link:hover { color: var(--osx-cian) }
+html.tema-osx .inline-link:focus-visible { outline-color: var(--osx-azul) }
+
+/* --- Barras de progreso --------------------------------------------------- */
+/* Cápsula lisa, sin capa animada encima. Las de iOS no llevan textura, y de
+   paso es el único tema que no paga nada por su barra. */
+
+html.tema-osx .progress-track {
+  background: rgba(120, 120, 128, .28);
+  border-radius: 999px;
+}
+
+html.tema-osx .progress-fill,
+html.tema-osx .disk-bar .fill,
+html.tema-osx .update-progress-fill {
+  background-image: var(--user-gradient);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+
+html.tema-osx .disk-bar {
+  background: rgba(120, 120, 128, .28);
+  border-color: transparent;
+  border-radius: 999px;
+}
+
+html.tema-osx ::-webkit-scrollbar { width: 9px; height: 9px }
+html.tema-osx ::-webkit-scrollbar-track { background: transparent }
+html.tema-osx ::-webkit-scrollbar-thumb {
+  background: rgba(235, 235, 245, .22);
+  border-radius: 9px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+html.tema-osx ::-webkit-scrollbar-thumb:hover {
+  background: rgba(235, 235, 245, .4);
+  background-clip: content-box;
+}
+
+html.tema-osx .boot-screen,
+html.tema-osx .update-required-overlay {
+  background-image: radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 54%);
 }
