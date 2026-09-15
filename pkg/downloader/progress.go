@@ -4,6 +4,7 @@ package downloader
 // descargas en curso.
 
 import (
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -11,6 +12,35 @@ import (
 
 	"tgdown/pkg/config"
 )
+
+// formatearETA pasa los segundos que faltan a algo que se lee de un vistazo.
+// El tope de un día es a propósito: con la descarga casi parada la cuenta se
+// dispara a cifras que no dicen nada, y es más honesto decir que no se sabe.
+func formatearETA(segundos float64) string {
+	if math.IsNaN(segundos) || math.IsInf(segundos, 0) || segundos < 0 {
+		return ""
+	}
+	if segundos < 1 {
+		return "menos de 1 s"
+	}
+	if segundos >= 24*3600 {
+		return "más de 1 día"
+	}
+
+	total := int(segundos + 0.5)
+	horas := total / 3600
+	minutos := (total % 3600) / 60
+	segs := total % 60
+
+	switch {
+	case horas > 0:
+		return fmt.Sprintf("%d h %d min", horas, minutos)
+	case minutos > 0:
+		return fmt.Sprintf("%d min %d s", minutos, segs)
+	default:
+		return fmt.Sprintf("%d s", segs)
+	}
+}
 
 // creditoMaximoSeg limita cuánto crédito puede acumular el limitador de
 // velocidad, medido en segundos al límite configurado.
@@ -137,6 +167,17 @@ func (e *Engine) onProgress(itemID string, bytesWritten int64, totalBytes int64,
 			speedVal := e.itemSpeeds[itemID] + alpha*(instantSpeed-e.itemSpeeds[itemID])
 			item.Speed = config.FormatBytes(speedVal) + "/s"
 			e.itemSpeeds[itemID] = speedVal
+		}
+	}
+
+	// Tiempo restante, calculado con el mismo ritmo suavizado que la velocidad
+	// que se muestra al lado: así las dos cifras cuentan lo mismo y no se
+	// contradicen. Aquí el estado siempre es "downloading" (arriba hay una
+	// salida temprana para el resto).
+	item.ETA = ""
+	if ritmo := e.itemSpeeds[itemID]; ritmo > 0 && totalBytes > 0 {
+		if restante := totalBytes - item.CurrentBytes; restante > 0 {
+			item.ETA = formatearETA(float64(restante) / ritmo)
 		}
 	}
 	if bytesWritten > 0 {

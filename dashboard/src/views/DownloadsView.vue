@@ -324,7 +324,9 @@ const allActivePaused = computed(() => {
           <div class="file-symbol"><FileDown :size="16" /></div>
           <div class="file-info">
             <strong :title="item.file_name">{{ item.file_name }}</strong>
-            <span>{{ item.current_str }} / {{ item.total_str }} · {{ item.speed }}</span>
+            <!-- El ETA solo se pinta mientras descarga de verdad: en pausa o en
+                 cola la última estimación ya no vale para nada. -->
+            <span>{{ item.current_str }} / {{ item.total_str }} · {{ item.speed }}<template v-if="item.status === 'downloading' && item.eta"> · falta <b class="eta">{{ item.eta }}</b></template></span>
             <div class="progress-track">
               <div class="progress-fill" :style="{ width: `${progress(item)}%` }"></div>
             </div>

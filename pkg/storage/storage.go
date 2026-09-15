@@ -36,6 +36,13 @@ type DownloadItem struct {
 	CreatedAt    float64 `json:"created_at"`
 	TotalBytes   int64   `json:"total_bytes"`
 	CurrentBytes int64   `json:"current_bytes"`
+
+	// ETA es lo que falta para terminar, ya formateado ("2 min 30 s"). Solo
+	// vive en memoria: no tiene columna en SQLite y no se guarda a propósito,
+	// porque una estimación de hace tres días no le sirve a nadie. Las
+	// consultas de esta tabla nombran sus columnas una a una, así que añadir
+	// este campo no afecta a lo que se guarda ni a lo que se lee.
+	ETA string `json:"eta"`
 }
 
 type Storage struct {

@@ -122,6 +122,9 @@ button, input, select { transition: background .2s ease, border-color .2s ease, 
 .file-info { min-width: 0; flex: 1 }
 .file-info strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px }
 .file-info span { font-size: 11px; color: var(--user-text-dim) }
+/* El tiempo restante se resalta un punto sobre el resto de la línea, que va en
+   gris apagado, para que se encuentre de un vistazo sin robarle sitio a nada. */
+.file-info span .eta { font-weight: 600; color: var(--user-accent) }
 .progress-track { height: 5px; background: var(--user-icon-bg); border-radius: 8px; margin-top: 9px; overflow: hidden }
 .progress-fill { height: 100%; background: var(--user-gradient); border-radius: 8px; background-size: 200% 100%; animation: progressSheen 2.3s linear infinite }
 .row-side { display: flex; align-items: flex-end; flex-direction: column; gap: 3px; min-width: 72px }

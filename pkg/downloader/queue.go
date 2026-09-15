@@ -169,6 +169,9 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 	delete(e.lastProgressBytes, itemID)
 	delete(e.lastProgressTimes, itemID)
 	item.Speed = "0 B/s"
+	// Se limpia el tiempo restante de la vez anterior: al reanudar una tarea
+	// pausada se vería la estimación vieja hasta que llegue el primer bloque.
+	item.ETA = ""
 	e.itemSpeeds[itemID] = 0
 	// El aviso visible de "descarga iniciada" lo emite el observador de estados
 	// (applog.go), que sí conoce el nombre del archivo y del chat. Aquí solo
