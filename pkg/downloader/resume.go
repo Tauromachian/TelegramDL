@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/gotd/td/tg"
+
+	"tgdown/pkg/logbus"
 )
 
 const downloadPartSize int64 = 512 * 1024
@@ -143,6 +145,15 @@ func downloadMissingParts(
 
 				espera := time.Duration(attempt+1) * 300 * time.Millisecond
 				if esperaFlood, esFlood := esperaPorFlood(requestErr); esFlood {
+					// Se avisa en el registro porque es la única forma de saber
+					// desde el panel que una descarga lenta es Telegram
+					// frenándonos y no un problema del programa. Si esto sale
+					// repetido, sobran peticiones en paralelo: hay que bajar
+					// workers o descargas simultáneas.
+					logbus.Warn(logbus.CatDownloads,
+						fmt.Sprintf("Telegram pide esperar %s antes de seguir", esperaFlood),
+						fmt.Sprintf("Bloque en el byte %d · intento %d de %d · baja los workers o las descargas simultáneas si se repite",
+							offset, attempt+1, intentosPorBloque))
 					// Telegram dice exactamente cuántos segundos hay que parar.
 					// Con el backoff de 300 ms se agotaban los intentos en menos
 					// de un segundo y la tarea moría por un límite que era

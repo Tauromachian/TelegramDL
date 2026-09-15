@@ -131,6 +131,15 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 	// Adquirir slot de concurrencia respetando el orden de la cola
 	logbus.Debug(logbus.CatDownloads, fmt.Sprintf("Solicitando turno de descarga para la tarea %s", itemID), "")
 	e.mu.Lock()
+	// Puede que el resolutor de metadatos ya la haya descartado por ser un ID
+	// que no existe. Se comprueba antes de entrar a esperar, porque dentro del
+	// bucle la salida solo se evalúa después de un Wait y quedaría dormida hasta
+	// el siguiente aviso de la cola.
+	if _, existe := e.downloads[itemID]; !existe {
+		e.mu.Unlock()
+		e.activeCond.Broadcast()
+		return false
+	}
 	for (e.runningJobs >= e.config.MaxConcurrentDownloads || !e.isNextInQueue(itemID)) && !e.stopping {
 		e.activeCond.Wait()
 		// Si mientras esperaba fue cancelada, pausada o ya no existe, salir

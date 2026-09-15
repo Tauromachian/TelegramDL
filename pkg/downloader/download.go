@@ -66,6 +66,17 @@ func (e *Engine) resolveItemMetadata(itemID string) {
 
 	msg, err := e.fetchMessage(ctx, datos.ChatID, int(datos.MessageID))
 	if err != nil {
+		// Aquí es donde se descubre, mientras la tarea todavía espera turno en
+		// la cola, que ese ID del rango no existe. Se descarta ya, en vez de
+		// dejarla en la lista ocupando sitio hasta que le toque descargar para
+		// entonces darse cuenta de lo mismo.
+		if errors.Is(err, errMensajeInexistente) {
+			logbus.Warn(logbus.CatDownloads,
+				fmt.Sprintf("El mensaje %d no existe en Telegram", datos.MessageID),
+				fmt.Sprintf("Chat: %s · Se quita de la lista (borrado o nunca existió)",
+					e.chatLabel(datos.ChatID)))
+			e.discardDownload(itemID)
+		}
 		return
 	}
 
@@ -320,6 +331,15 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	e.persistSeenChunks(itemID)
 
 	if err != nil {
+		// Se deja constancia en el registro del motivo real por el que Telegram
+		// cortó. Sin esto, cuando una descarga se ralentiza o muere no hay forma
+		// de saber desde el panel si fue un límite de Telegram, la red o un
+		// problema nuestro. Una pausa o cancelación no se avisa: no es un fallo.
+		if !errors.Is(err, context.Canceled) {
+			logbus.Warn(logbus.CatDownloads,
+				fmt.Sprintf("Telegram cortó la descarga de %s", finalName),
+				fmt.Sprintf("Motivo: %v", err))
+		}
 		return err
 	}
 

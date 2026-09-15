@@ -453,6 +453,11 @@ func (e *Engine) discardDownload(id string) {
 	delete(e.downloads, id)
 	e.olvidarEstadoDe(id)
 	e.mu.Unlock()
+	// Despertar a la cola: si el job de esta tarea estaba esperando turno, tiene
+	// que ver que ya no existe y salir en vez de seguir dormido hasta que otra
+	// descarga termine. Con un rango entero de IDs borrados no habría ningún
+	// otro aviso que lo despertase.
+	e.activeCond.Broadcast()
 
 	if e.storage != nil {
 		if err := e.storage.DeleteDownload(id); err != nil {
