@@ -1318,6 +1318,19 @@ html.tema-claro .pager-btn.active {
   text-shadow: none;
 }
 
+/* Mismo problema, al revés: Edge Runner (lima) y Rainy Garden (gris muy claro)
+   son temas OSCUROS pero con el color principal clarísimo, así que el relleno
+   del botón sale casi blanco. .auth-button.primary trae el texto en #fff fijo
+   desde el propio componente y ahí no se lee nada; el resto de botones de
+   acción ya usan var(--user-bg-base) y por eso no les pasa.
+   Los estilos del componente van con scope (.auth-button.primary[data-v-…]),
+   de ahí el !important: sin él ganaría el del componente. El color va por
+   variable para que cada tema ponga su propio negro. */
+html.tema-edge-runner .auth-button.primary,
+html.tema-rainy-garden .auth-button.primary {
+  color: var(--user-bg-base) !important;
+}
+
 /* --- Controles nativos ---------------------------------------------------- */
 
 /* El interruptor: botón blanco con sombra, que sobre una pista clara es lo que
