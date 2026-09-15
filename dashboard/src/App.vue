@@ -1385,11 +1385,28 @@ onUnmounted(() => {
 }
 .gradient-dot { position: relative; }
 
+/* Separa un bloque entero de ajustes del anterior (el color del loader del
+   color de acento). */
+.seccion-separada { margin-top: 30px; border-top: 1px solid var(--user-border); padding-top: 20px; }
+
+/* Título de cada grupo de colores dentro de un bloque: "Telegram" para los
+   0-15 y "Colores temáticos" para los propios del panel. Es una etiqueta de
+   procedencia, más discreta que el título del bloque. */
+.grupo-color-titulo {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--user-text-dim);
+  margin: 16px 0 -2px;
+}
+
 /* Colores temáticos (ids 16+). Se presentan con el nombre a la vista y no como
    un punto más: son pocos, no vienen de Telegram y el nombre es lo que los
-   distingue. */
-.seccion-temas { margin-top: 30px; border-top: 1px solid var(--user-border); padding-top: 20px; }
-.temas-nota { font-size: 11px; color: var(--user-text-dim); line-height: 1.5; margin-top: -6px; }
+   distingue. En el loader sí van como punto suelto, porque de un tema el
+   loader solo aprovecha el color. */
+.temas-nota { font-size: 11px; color: var(--user-text-dim); line-height: 1.5; margin-top: 6px; }
 .temas-lista { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 20px; }
 .tema-chip {
   display: flex;

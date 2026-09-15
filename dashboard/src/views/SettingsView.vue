@@ -281,6 +281,11 @@ const onImportFile = async (event) => {
           <!-- Paleta de Color y Tema -->
           <div class="settings-group color-group">
             <span class="setting-label">Color de Acento y Tema</span>
+
+            <!-- Los 0-15 vienen de Telegram Premium; del 16 en adelante son las
+                 paletas propias del panel. Van separados con su propio título
+                 para que se vea de dónde sale cada grupo. -->
+            <span class="grupo-color-titulo">Telegram</span>
             <div class="color-selector-container">
               <div class="color-row">
                 <button
@@ -310,12 +315,38 @@ const onImportFile = async (event) => {
               </div>
             </div>
 
+            <!-- Colores temáticos: paletas propias del panel. Se guardan en el
+                 mismo ajuste (color_id) que los de arriba: elegir uno sustituye
+                 al color de la cuenta, y "Restablecer color de la cuenta"
+                 vuelve a dejar el de Telegram. -->
+            <span class="grupo-color-titulo">Colores temáticos</span>
+            <small class="temas-nota">
+              Paletas propias del panel, con fondo y detalles animados. No vienen de tu cuenta
+              de Telegram: al elegir una sustituye al color de la cuenta hasta que vuelvas a
+              uno de los de arriba.
+            </small>
+            <div class="temas-lista">
+              <button
+                v-for="id in temasEspeciales"
+                :key="'tema-' + id"
+                type="button"
+                class="tema-chip"
+                :class="{ active: settings.color_id === id }"
+                :title="themeMap[id]?.name || ('Tema ' + id)"
+                @click="settings.color_id = id"
+              >
+                <span class="tema-muestra" :style="{ background: themeMap[id]?.gradient }"></span>
+                <span class="tema-nombre">{{ themeMap[id]?.name || ('Tema ' + id) }}</span>
+              </button>
+            </div>
+
             <button type="button" class="reset-button-alt" @click="emit('reset-color')">
               <Zap :size="14" /> Restablecer color de la cuenta
             </button>
 
             <!-- Color del Loader -->
-            <span class="setting-label compact" style="margin-top: 30px; border-top: 1px solid var(--user-border); padding-top: 20px;">Color de Loader</span>
+            <span class="setting-label compact seccion-separada">Color de Loader</span>
+            <span class="grupo-color-titulo">Telegram</span>
             <div class="color-selector-container">
               <div class="color-row">
                 <button
@@ -345,36 +376,28 @@ const onImportFile = async (event) => {
               </div>
             </div>
 
+            <!-- Aquí solo va el círculo con el degradado del tema, sin nombre:
+                 del tema especial el loader únicamente toma el color, no el
+                 decorado, así que no hay nada más que enseñar. -->
+            <span class="grupo-color-titulo">Temáticos</span>
+            <div class="color-selector-container">
+              <div class="color-row">
+                <button
+                  v-for="id in temasEspeciales"
+                  :key="'loader-tema-' + id"
+                  type="button"
+                  class="color-dot"
+                  :class="{ active: settings.loader_color_id === id }"
+                  :style="{ background: themeMap[id]?.gradient }"
+                  :title="themeMap[id]?.name || ('Tema ' + id)"
+                  @click="settings.loader_color_id = id"
+                ></button>
+              </div>
+            </div>
+
             <button type="button" class="reset-button-alt" @click="emit('reset-loader-color')">
               <Zap :size="14" /> Restablecer color del loader
             </button>
-
-            <!-- Colores temáticos: paletas propias del panel. Van aquí, al final
-                 del mismo grupo y detrás de la misma línea separadora que el
-                 color del loader, porque se guardan en el mismo ajuste
-                 (color_id) que los colores de arriba: elegir uno de estos
-                 sustituye al color de la cuenta, y "Restablecer color de la
-                 cuenta" vuelve a dejar el de Telegram. -->
-            <span class="setting-label compact seccion-temas">Colores temáticos</span>
-            <small class="temas-nota">
-              Paletas propias del panel, con fondo y detalles animados. No vienen de tu cuenta
-              de Telegram: al elegir una sustituye al color de la cuenta hasta que vuelvas a
-              uno de los de arriba.
-            </small>
-            <div class="temas-lista">
-              <button
-                v-for="id in temasEspeciales"
-                :key="'tema-' + id"
-                type="button"
-                class="tema-chip"
-                :class="{ active: settings.color_id === id }"
-                :title="themeMap[id]?.name || ('Tema ' + id)"
-                @click="settings.color_id = id"
-              >
-                <span class="tema-muestra" :style="{ background: themeMap[id]?.gradient }"></span>
-                <span class="tema-nombre">{{ themeMap[id]?.name || ('Tema ' + id) }}</span>
-              </button>
-            </div>
           </div>
 
           <!-- Acceso remoto -->
