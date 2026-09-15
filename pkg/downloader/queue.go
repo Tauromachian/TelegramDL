@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strings"
 	"time"
 
 	"tgdown/pkg/config"
@@ -209,9 +208,16 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 
 	err := e.executeDownloadWithRetry(ctx, itemID)
 	logbus.Debug(logbus.CatDownloads, fmt.Sprintf("Tarea %s finalizada (err=%v)", itemID, err), "")
-	if err != nil && strings.Contains(err.Error(), "mensaje no encontrado en Telegram") {
+	if errors.Is(err, errMensajeInexistente) {
 		// Caso típico al descargar un rango: algunos IDs del intervalo no
-		// corresponden a ningún mensaje (borrados o inexistentes).
+		// corresponden a ningún mensaje descargable (borrados, inexistentes o
+		// avisos de servicio del chat). Se descartan en silencio en vez de
+		// dejarlos en el historial como fallidos: no hay nada que reintentar.
+		//
+		// La comprobación va con errors.Is y no comparando el texto del error:
+		// así entran los dos caminos por los que fetchMessage se rinde, no solo
+		// uno. Antes el caso del mensaje borrado, que es el más común, se
+		// escapaba y acababa marcado como fallido.
 		//
 		// Se usa la copia (cp), no el elemento del mapa: aquí ya no tenemos el
 		// mutex y el propio motor puede estar escribiendo en él.

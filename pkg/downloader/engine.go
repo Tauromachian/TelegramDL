@@ -31,6 +31,21 @@ type DownloadStateListener func(item storage.DownloadItem)
 
 var errDownloadAlreadyExists = errors.New("el archivo ya existe")
 
+// errMensajeInexistente marca los mensajes que Telegram no va a entregar nunca:
+// borrados, IDs que jamás existieron, o entradas que no son un mensaje de
+// usuario (avisos de servicio del chat, por ejemplo).
+//
+// Es lo normal al pedir un rango: en 100-103 el 102 puede estar borrado. Eso no
+// es un fallo de descarga y no tiene sentido dejarlo en el historial como
+// fallido, porque no hay nada que reintentar. La tarea se descarta y ya.
+//
+// Antes esto se detectaba comparando el texto del error, y solo acertaba con
+// uno de los dos caminos por los que fetchMessage da un mensaje por perdido: el
+// otro (el que se da precisamente cuando el mensaje está borrado) se escapaba y
+// acababa en "fallido". Con un error centinela y errors.Is ya no depende de
+// cómo esté redactado el mensaje.
+var errMensajeInexistente = errors.New("mensaje no encontrado en Telegram")
+
 type Engine struct {
 	clientMgr    *telegram.ClientManager
 	storage      *storage.Storage

@@ -468,7 +468,7 @@ func (e *Engine) fetchMessage(ctx context.Context, chatID int64, msgID int) (*tg
 	}
 
 	if len(messages) == 0 {
-		return nil, errors.New("mensaje no encontrado en Telegram")
+		return nil, errMensajeInexistente
 	}
 
 	for _, m := range messages {
@@ -477,7 +477,11 @@ func (e *Engine) fetchMessage(ctx context.Context, chatID int64, msgID int) (*tg
 		}
 	}
 
-	return nil, errors.New("el mensaje no contiene datos válidos o fue eliminado en Telegram")
+	// Telegram sí respondió, pero lo que devuelve no es un mensaje de usuario:
+	// para un mensaje borrado manda un MessageEmpty, y para un aviso del chat un
+	// MessageService. En los dos casos no hay nada que descargar y nunca lo
+	// habrá, así que va por el mismo camino que un ID inexistente.
+	return nil, fmt.Errorf("el mensaje fue eliminado en Telegram o no contiene datos válidos: %w", errMensajeInexistente)
 }
 
 func copyFile(src, dst string) error {
