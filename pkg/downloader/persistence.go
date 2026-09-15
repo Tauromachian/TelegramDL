@@ -34,6 +34,31 @@ func (e *Engine) enqueuePersist(item storage.DownloadItem) {
 	}
 }
 
+// chunkFlushLoop vuelca los chunks pendientes fuera de la goroutine que está
+// descargando. Los avisos llegan por chunkFlushCh.
+func (e *Engine) chunkFlushLoop() {
+	for itemID := range e.chunkFlushCh {
+		e.persistSeenChunks(itemID)
+	}
+}
+
+// requestChunkFlush pide ese volcado sin bloquear nunca. Si el volcador está
+// ocupado el aviso se descarta y no pasa nada: los chunks pendientes siguen en
+// memoria y el siguiente tick, o el volcado síncrono del final de la tarea, los
+// recoge igual.
+func (e *Engine) requestChunkFlush(itemID string) {
+	if e.storage == nil {
+		return
+	}
+	select {
+	case e.chunkFlushCh <- itemID:
+	default:
+	}
+}
+
+// persistSeenChunks es la versión síncrona. Se sigue llamando tal cual al
+// terminar, pausar o cancelar una tarea, que son los momentos en los que sí
+// hace falta que los chunks estén en disco antes de seguir.
 func (e *Engine) persistSeenChunks(itemID string) {
 	if e.storage == nil {
 		return

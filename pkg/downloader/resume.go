@@ -3,6 +3,8 @@ package downloader
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,6 +12,50 @@ import (
 )
 
 const downloadPartSize int64 = 512 * 1024
+
+// intentosPorBloque es cuántas veces se reintenta un bloque antes de dar la
+// descarga entera por perdida.
+const intentosPorBloque = 5
+
+// esperaMaximaFlood es el tope de lo que se espera cuando Telegram pide una
+// pausa. Más allá de eso se prefiere fallar y que el usuario reintente, en
+// lugar de dejar una tarea colgada media hora.
+const esperaMaximaFlood = 5 * time.Minute
+
+// esperaPorFlood lee cuánto pide esperar Telegram cuando responde
+// FLOOD_WAIT_x.
+//
+// Se saca del texto del error a propósito: así no hace falta importar nada
+// nuevo, y funciona igual cuando el error viene envuelto por capas de arriba.
+// El código de Telegram es estable y no va a cambiar de nombre.
+func esperaPorFlood(err error) (time.Duration, bool) {
+	if err == nil {
+		return 0, false
+	}
+	const marca = "FLOOD_WAIT_"
+	texto := err.Error()
+	pos := strings.Index(texto, marca)
+	if pos < 0 {
+		return 0, false
+	}
+	resto := texto[pos+len(marca):]
+	fin := 0
+	for fin < len(resto) && resto[fin] >= '0' && resto[fin] <= '9' {
+		fin++
+	}
+	if fin == 0 {
+		return 0, false
+	}
+	segundos, convErr := strconv.Atoi(resto[:fin])
+	if convErr != nil || segundos <= 0 {
+		return 0, false
+	}
+	espera := time.Duration(segundos) * time.Second
+	if espera > esperaMaximaFlood {
+		return 0, false
+	}
+	return espera, true
+}
 
 // downloadMissingParts descarga únicamente las partes que no aparecen en
 // completed. UploadGetFile acepta offsets arbitrarios, por lo que no vuelve a
@@ -61,7 +107,7 @@ func downloadMissingParts(
 
 			var data []byte
 			var err error
-			for attempt := 0; attempt < 3; attempt++ {
+			for attempt := 0; attempt < intentosPorBloque; attempt++ {
 				if workCtx.Err() != nil {
 					return
 				}
@@ -82,15 +128,32 @@ func downloadMissingParts(
 					}
 				}
 				if requestErr == nil {
+					// Limpiar el error del intento anterior es imprescindible:
+					// sin esto, un fallo pasajero seguido de un reintento
+					// correcto salía del bucle con err distinto de nil y la
+					// comprobación de abajo mataba la descarga entera aunque el
+					// bloque se hubiera traído bien.
+					err = nil
 					break
 				}
 				err = requestErr
-				if attempt < 2 {
-					select {
-					case <-workCtx.Done():
-						return
-					case <-time.After(time.Duration(attempt+1) * 300 * time.Millisecond):
-					}
+				if attempt == intentosPorBloque-1 {
+					break
+				}
+
+				espera := time.Duration(attempt+1) * 300 * time.Millisecond
+				if esperaFlood, esFlood := esperaPorFlood(requestErr); esFlood {
+					// Telegram dice exactamente cuántos segundos hay que parar.
+					// Con el backoff de 300 ms se agotaban los intentos en menos
+					// de un segundo y la tarea moría por un límite que era
+					// temporal. El segundo extra es margen para no volver justo
+					// en el borde y que nos lo repitan.
+					espera = esperaFlood + time.Second
+				}
+				select {
+				case <-workCtx.Done():
+					return
+				case <-time.After(espera):
 				}
 			}
 			if err != nil {

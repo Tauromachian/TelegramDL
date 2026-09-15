@@ -12,6 +12,21 @@ import (
 	"tgdown/pkg/config"
 )
 
+// creditoMaximoSeg limita cuánto crédito puede acumular el limitador de
+// velocidad, medido en segundos al límite configurado.
+//
+// El contador (throttleTime/bytesSince) es de toda la vida del motor y no se
+// reinicia nunca, a propósito: así el ritmo medio a largo plazo sale exacto.
+// El problema era que tampoco tenía tope. Cada rato sin descargar sumaba
+// crédito, porque el reloj seguía corriendo y los bytes no: tras diez minutos
+// parado con un límite de 5 MB/s había 3 GB de crédito, y la siguiente descarga
+// corría sin ningún freno hasta gastarlos. Eso es lo que se ve como "empieza
+// rapidísimo y luego se desploma".
+//
+// Con el tope, como mucho se permite la ráfaga de un segundo al límite. La
+// deuda, en cambio, sigue sin tope: lo que se pasa de rosca se paga entero.
+const creditoMaximoSeg = 1.0
+
 func (e *Engine) throttle(bytesCount int64) {
 	e.mu.RLock()
 	sp := e.config.SpeedLimit
@@ -23,15 +38,28 @@ func (e *Engine) throttle(bytesCount int64) {
 
 	mult := config.SpeedMultipliers[sp.Unit]
 	limitBps := sp.Value * mult
+	if limitBps <= 0 {
+		return
+	}
 
 	e.throttleMu.Lock()
+	ahora := time.Now()
 	if e.throttleTime.IsZero() {
-		e.throttleTime = time.Now()
+		e.throttleTime = ahora
 		e.bytesSince = 0
 	}
 	e.bytesSince += bytesCount
-	elapsed := time.Since(e.throttleTime).Seconds()
+	elapsed := ahora.Sub(e.throttleTime).Seconds()
 	expectedTime := float64(e.bytesSince) / limitBps
+
+	if elapsed-expectedTime > creditoMaximoSeg {
+		// Vamos muy por delante del reloj: se adelanta la marca de tiempo para
+		// dejar el crédito justo en el tope, en lugar de reiniciar el contador,
+		// que perdonaría también la deuda pendiente.
+		elapsed = expectedTime + creditoMaximoSeg
+		e.throttleTime = ahora.Add(-time.Duration(elapsed * float64(time.Second)))
+	}
+
 	sleepSec := expectedTime - elapsed
 	e.throttleMu.Unlock()
 
@@ -133,7 +161,12 @@ func (e *Engine) onProgress(itemID string, bytesWritten int64, totalBytes int64,
 
 	if shouldSave && e.storage != nil {
 		e.enqueuePersist(cp)
-		e.persistSeenChunks(itemID)
+		// Aviso en vez de llamada directa: persistSeenChunks abre una
+		// transacción en SQLite y toma el candado global de Storage, y aquí
+		// estamos en la goroutine del worker, la que debería estar pidiendo el
+		// siguiente bloque a Telegram. Con la base ocupada (otro guardado, un
+		// VACUUM al limpiar historial) el worker se quedaba esperando.
+		e.requestChunkFlush(itemID)
 	}
 
 	if shouldBroadcast {

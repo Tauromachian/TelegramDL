@@ -23,17 +23,6 @@ import (
 )
 
 func (e *Engine) resolveItemMetadata(itemID string) {
-	// Limitar concurrencia de resolución de metadatos
-	select {
-	case e.metadataSem <- struct{}{}:
-		defer func() { <-e.metadataSem }()
-	case <-time.After(1 * time.Minute):
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	e.mu.RLock()
 	item, ok := e.downloads[itemID]
 	if !ok {
@@ -46,10 +35,30 @@ func (e *Engine) resolveItemMetadata(itemID string) {
 	datos := *item
 	e.mu.RUnlock()
 
-	// Si ya tiene nombre real y tamaño, no hacer nada
+	// Si ya tiene nombre real y tamaño, no hacer nada.
+	//
+	// La comprobación va ANTES del semáforo. Antes iba después, así que un rango
+	// de 500 mensajes dejaba 500 goroutines haciendo cola por un turno que la
+	// mayoría ni necesitaba, cada una con un temporizador de un minuto vivo. De
+	// `datos` solo se usan ChatID y MessageID más abajo, y esos no cambian
+	// nunca, así que leerlo aquí es igual de válido que leerlo después.
 	if datos.FileName != "" && !strings.HasPrefix(strings.ToLower(datos.FileName), "mensaje_") && datos.TotalBytes > 0 {
 		return
 	}
+
+	// Limitar concurrencia de resolución de metadatos. El temporizador se para
+	// al salir; con time.After quedaban vivos hasta cumplir el minuto.
+	espera := time.NewTimer(1 * time.Minute)
+	defer espera.Stop()
+	select {
+	case e.metadataSem <- struct{}{}:
+		defer func() { <-e.metadataSem }()
+	case <-espera.C:
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	if err := e.clientMgr.WaitReady(ctx); err != nil {
 		return

@@ -53,6 +53,7 @@ type Engine struct {
 	lastProgressBytes  map[string]int64
 	lastProgressTimes  map[string]time.Time
 	persistCh          chan storage.DownloadItem
+	chunkFlushCh       chan string
 	pendingChunks      map[string][]int64
 	forceDuplicate     map[string]bool
 	jobsWG             sync.WaitGroup
@@ -88,6 +89,7 @@ func NewEngine(cm *telegram.ClientManager, st *storage.Storage, cfg config.Confi
 		lastProgressBytes:  make(map[string]int64),
 		lastProgressTimes:  make(map[string]time.Time),
 		persistCh:          make(chan storage.DownloadItem, 256),
+		chunkFlushCh:       make(chan string, 64),
 		pendingChunks:      make(map[string][]int64),
 		forceDuplicate:     make(map[string]bool),
 		cancelledForLimit:  make(map[string]bool),
@@ -100,6 +102,7 @@ func NewEngine(cm *telegram.ClientManager, st *storage.Storage, cfg config.Confi
 	eng.activeCond = sync.NewCond(&eng.mu)
 	if st != nil {
 		go eng.persistenceLoop()
+		go eng.chunkFlushLoop()
 	}
 
 	// Cargar descargas previas desde SQLite
