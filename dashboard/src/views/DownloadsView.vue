@@ -1,7 +1,9 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   Activity,
+  ArrowLeft,
+  ArrowRight,
   ArrowUpRight,
   CheckCircle2,
   Clock3,
@@ -103,11 +105,46 @@ const pendingDownloads = computed(() =>
   orderedDownloads.value.filter(item => ['pending', 'queued'].includes(item.status))
 )
 
-const recentDownloads = computed(() =>
+// --- Historial paginado -----------------------------------------------------
+// Antes solo se veían las 15 últimas. Ahora está el historial completo, pero
+// repartido en páginas de 10 para que la vista no crezca sin control.
+const TAMANO_PAGINA = 10
+const paginaHistorial = ref(1)
+
+const historyDownloads = computed(() =>
   orderedDownloads.value
     .filter(item => ['completed', 'skipped', 'failed', 'cancelled'].includes(item.status))
-    .slice(0, 15)
 )
+
+const totalPaginas = computed(() =>
+  Math.max(1, Math.ceil(historyDownloads.value.length / TAMANO_PAGINA))
+)
+
+// Al borrar elementos la última página puede desaparecer: si estábamos en ella,
+// retrocedemos para no quedarnos mirando una lista vacía.
+watch(totalPaginas, total => {
+  if (paginaHistorial.value > total) paginaHistorial.value = total
+})
+
+const recentDownloads = computed(() => {
+  const inicio = (paginaHistorial.value - 1) * TAMANO_PAGINA
+  return historyDownloads.value.slice(inicio, inicio + TAMANO_PAGINA)
+})
+
+// Como mucho 5 botones de página alrededor de la actual, para que el paginador
+// no se desborde cuando el historial es largo.
+const paginasVisibles = computed(() => {
+  const total = totalPaginas.value
+  const maximo = 5
+  if (total <= maximo) return Array.from({ length: total }, (_, i) => i + 1)
+  const fin = Math.min(total, Math.max(1, paginaHistorial.value - 2) + maximo - 1)
+  const inicio = Math.max(1, fin - maximo + 1)
+  return Array.from({ length: fin - inicio + 1 }, (_, i) => inicio + i)
+})
+
+const irAPagina = pagina => {
+  paginaHistorial.value = Math.min(totalPaginas.value, Math.max(1, pagina))
+}
 
 const completedCount = computed(() =>
   props.downloads.filter(item => item.status === 'completed').length
@@ -302,6 +339,9 @@ const allActivePaused = computed(() => {
           <span class="eyebrow">HISTORIAL</span>
           <h2>Últimas descargas</h2>
         </div>
+        <div class="header-actions">
+          <span class="count-pill">{{ historyDownloads.length }} en total</span>
+        </div>
       </div>
       <div v-if="!recentDownloads.length" class="empty-small">
         Todavía no hay descargas terminadas.
@@ -347,6 +387,42 @@ const allActivePaused = computed(() => {
         >
           <Trash2 :size="14" />
         </button>
+      </div>
+
+      <!-- Paginador del historial -->
+      <div v-if="totalPaginas > 1" class="history-pager">
+        <button
+          class="pager-btn"
+          type="button"
+          title="Página anterior"
+          aria-label="Página anterior"
+          :disabled="paginaHistorial === 1"
+          @click="irAPagina(paginaHistorial - 1)"
+        >
+          <ArrowLeft :size="14" />
+        </button>
+        <button
+          v-for="pagina in paginasVisibles"
+          :key="pagina"
+          class="pager-btn"
+          :class="{ active: pagina === paginaHistorial }"
+          type="button"
+          :aria-current="pagina === paginaHistorial ? 'page' : undefined"
+          @click="irAPagina(pagina)"
+        >
+          {{ pagina }}
+        </button>
+        <button
+          class="pager-btn"
+          type="button"
+          title="Página siguiente"
+          aria-label="Página siguiente"
+          :disabled="paginaHistorial === totalPaginas"
+          @click="irAPagina(paginaHistorial + 1)"
+        >
+          <ArrowRight :size="14" />
+        </button>
+        <span class="pager-info">Página {{ paginaHistorial }} de {{ totalPaginas }}</span>
       </div>
     </section>
   </div>

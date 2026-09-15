@@ -1311,7 +1311,8 @@ html.tema-claro .log-row.debug::before { background: var(--claro-tinta-suave) }
 html.tema-claro .primary-button,
 html.tema-claro .save-button,
 html.tema-claro .auth-button.primary,
-html.tema-claro .update-btn {
+html.tema-claro .update-btn,
+html.tema-claro .pager-btn.active {
   color: var(--claro-boton-texto) !important;
   font-weight: 700;
   text-shadow: none;

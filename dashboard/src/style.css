@@ -172,6 +172,22 @@ button, input, select { transition: background .2s ease, border-color .2s ease, 
 .retry-button { display: grid; place-items: center; border: 0; background: transparent; color: var(--user-accent); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; transition: transform .2s ease, background .2s ease }
 .retry-button:hover { background: var(--user-icon-bg); color: #fff; transform: rotate(-45deg) }
 
+/* Paginador del historial de descargas */
+.history-pager { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--user-border); margin-top: 12px; padding-top: 13px }
+/* Sin transición a propósito: al cambiar de página la ventana de números se
+   desplaza, y animar el borde mientras los botones se mueven de sitio produce
+   un destello raro. El cambio de estado tiene que ser instantáneo. */
+.pager-btn { min-width: 30px; height: 30px; padding: 0 8px; display: grid; place-items: center; border: 1px solid var(--user-border); background: var(--user-surface-light); color: var(--user-text-dim); border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; transition: none }
+/* El hover NO puede parecerse al seleccionado: al cambiar de página la fila se
+   corre un hueco y el botón de al lado queda debajo del ratón, así que se verían
+   dos botones resaltados igual. El seleccionado va relleno; el hover, solo un
+   fondo suave. */
+.pager-btn:hover:not(:disabled):not(.active) { background: var(--user-icon-bg); color: var(--user-accent) }
+.pager-btn.active { background: var(--user-gradient); color: var(--user-bg-base); border-color: transparent; cursor: default }
+.pager-btn:disabled { opacity: .4; cursor: default }
+.pager-btn:focus-visible { outline: 2px solid var(--user-accent); outline-offset: 2px }
+.pager-info { margin-left: auto; font-size: 11px; color: var(--user-text-dim) }
+
 .toast { position: fixed; right: 28px; top: 24px; z-index: 10001; padding: 12px 18px; border-radius: 12px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; animation: toastIn .25s ease-out; box-shadow: 0 12px 36px rgba(0,0,0,0.4), 0 0 25px var(--user-glow); backdrop-filter: blur(8px) }
 .toast.success { background: var(--user-surface); color: var(--user-accent); border: 1px solid var(--user-border-light) }
 .toast.danger { background: #3d171d; color: #ffadad; border: 1px solid #732a36 }
@@ -230,6 +246,7 @@ footer { text-align: center; color: var(--user-text-dim); font-size: 10px; margi
   .row-side { min-width: 62px; }
   .recent-row { gap: 8px; }
   .recent-size { display: none; }
+  .pager-info { width: 100%; margin-left: 0; text-align: right; }
   .toast { right: 14px; left: 14px; top: 14px; justify-content: center; }
 }
 @media (max-width: 420px) {
