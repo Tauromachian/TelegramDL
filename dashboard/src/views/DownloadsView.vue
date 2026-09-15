@@ -107,9 +107,31 @@ const pendingDownloads = computed(() =>
 
 // --- Historial paginado -----------------------------------------------------
 // Antes solo se veían las 15 últimas. Ahora está el historial completo, pero
-// repartido en páginas de 10 para que la vista no crezca sin control.
-const TAMANO_PAGINA = 10
+// repartido en páginas para que la vista no crezca sin control.
+const TAMANOS_PAGINA = [5, 10, 15]
+const TAMANO_POR_DEFECTO = 10
+const CLAVE_TAMANO = 'tgdl_historial_por_pagina'
+
+// El tamaño elegido se recuerda en el navegador, como el color del loader. Se
+// valida contra la lista porque el valor puede venir editado a mano.
+const leerTamanoGuardado = () => {
+  try {
+    const guardado = Number(localStorage.getItem(CLAVE_TAMANO))
+    return TAMANOS_PAGINA.includes(guardado) ? guardado : TAMANO_POR_DEFECTO
+  } catch (e) {
+    return TAMANO_POR_DEFECTO
+  }
+}
+
+const tamanoPagina = ref(leerTamanoGuardado())
 const paginaHistorial = ref(1)
+
+// Al cambiar el tamaño, la página en la que estabas ya no significa lo mismo:
+// se vuelve al principio.
+watch(tamanoPagina, tamano => {
+  paginaHistorial.value = 1
+  try { localStorage.setItem(CLAVE_TAMANO, tamano) } catch (e) {}
+})
 
 const historyDownloads = computed(() =>
   orderedDownloads.value
@@ -117,7 +139,7 @@ const historyDownloads = computed(() =>
 )
 
 const totalPaginas = computed(() =>
-  Math.max(1, Math.ceil(historyDownloads.value.length / TAMANO_PAGINA))
+  Math.max(1, Math.ceil(historyDownloads.value.length / tamanoPagina.value))
 )
 
 // Al borrar elementos la última página puede desaparecer: si estábamos en ella,
@@ -127,8 +149,8 @@ watch(totalPaginas, total => {
 })
 
 const recentDownloads = computed(() => {
-  const inicio = (paginaHistorial.value - 1) * TAMANO_PAGINA
-  return historyDownloads.value.slice(inicio, inicio + TAMANO_PAGINA)
+  const inicio = (paginaHistorial.value - 1) * tamanoPagina.value
+  return historyDownloads.value.slice(inicio, inicio + tamanoPagina.value)
 })
 
 // Como mucho 5 botones de página alrededor de la actual, para que el paginador
@@ -389,40 +411,61 @@ const allActivePaused = computed(() => {
         </button>
       </div>
 
-      <!-- Paginador del historial -->
-      <div v-if="totalPaginas > 1" class="history-pager">
-        <button
-          class="pager-btn"
-          type="button"
-          title="Página anterior"
-          aria-label="Página anterior"
-          :disabled="paginaHistorial === 1"
-          @click="irAPagina(paginaHistorial - 1)"
-        >
-          <ArrowLeft :size="14" />
-        </button>
-        <button
-          v-for="pagina in paginasVisibles"
-          :key="pagina"
-          class="pager-btn"
-          :class="{ active: pagina === paginaHistorial }"
-          type="button"
-          :aria-current="pagina === paginaHistorial ? 'page' : undefined"
-          @click="irAPagina(pagina)"
-        >
-          {{ pagina }}
-        </button>
-        <button
-          class="pager-btn"
-          type="button"
-          title="Página siguiente"
-          aria-label="Página siguiente"
-          :disabled="paginaHistorial === totalPaginas"
-          @click="irAPagina(paginaHistorial + 1)"
-        >
-          <ArrowRight :size="14" />
-        </button>
-        <span class="pager-info">Página {{ paginaHistorial }} de {{ totalPaginas }}</span>
+      <!-- Paginador del historial. La barra aparece en cuanto hay historial,
+           aunque quepa en una sola página: si no, al elegir 15 elementos con 12
+           en la lista desaparecería junto con el selector y no habría forma de
+           volver a bajarlo. Lo que se oculta con una sola página son los
+           botones de página, que ahí no pintan nada. -->
+      <div v-if="historyDownloads.length" class="history-pager">
+        <template v-if="totalPaginas > 1">
+          <button
+            class="pager-btn"
+            type="button"
+            title="Página anterior"
+            aria-label="Página anterior"
+            :disabled="paginaHistorial === 1"
+            @click="irAPagina(paginaHistorial - 1)"
+          >
+            <ArrowLeft :size="14" />
+          </button>
+          <button
+            v-for="pagina in paginasVisibles"
+            :key="pagina"
+            class="pager-btn"
+            :class="{ active: pagina === paginaHistorial }"
+            type="button"
+            :aria-current="pagina === paginaHistorial ? 'page' : undefined"
+            @click="irAPagina(pagina)"
+          >
+            {{ pagina }}
+          </button>
+          <button
+            class="pager-btn"
+            type="button"
+            title="Página siguiente"
+            aria-label="Página siguiente"
+            :disabled="paginaHistorial === totalPaginas"
+            @click="irAPagina(paginaHistorial + 1)"
+          >
+            <ArrowRight :size="14" />
+          </button>
+        </template>
+
+        <div class="pager-side">
+          <span v-if="totalPaginas > 1" class="pager-info">
+            Página {{ paginaHistorial }} de {{ totalPaginas }}
+          </span>
+          <select
+            v-model="tamanoPagina"
+            class="pager-select"
+            title="Descargas por página"
+            aria-label="Descargas por página"
+          >
+            <option v-for="tamano in TAMANOS_PAGINA" :key="tamano" :value="tamano">
+              {{ tamano }} por página
+            </option>
+          </select>
+        </div>
       </div>
     </section>
   </div>

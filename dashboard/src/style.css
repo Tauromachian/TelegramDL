@@ -186,7 +186,21 @@ button, input, select { transition: background .2s ease, border-color .2s ease, 
 .pager-btn.active { background: var(--user-gradient); color: var(--user-bg-base); border-color: transparent; cursor: default }
 .pager-btn:disabled { opacity: .4; cursor: default }
 .pager-btn:focus-visible { outline: 2px solid var(--user-accent); outline-offset: 2px }
-.pager-info { margin-left: auto; font-size: 11px; color: var(--user-text-dim) }
+.pager-side { display: flex; align-items: center; gap: 8px; margin-left: auto }
+.pager-info { font-size: 11px; color: var(--user-text-dim) }
+/* La flecha se dibuja con dos degradados en currentColor para que siga al
+   texto en cada tema, igual que el selector de unidades de velocidad. */
+.pager-select {
+  height: 30px; padding: 0 26px 0 10px; border: 1px solid var(--user-border); border-radius: 8px;
+  background-color: var(--user-surface-light); color: var(--user-text-dim);
+  font-size: 11px; font-weight: 600; font-family: inherit; cursor: pointer; appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 14px) 55%, calc(100% - 10px) 55%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+.pager-select:hover { color: var(--user-accent); border-color: var(--user-primary) }
+.pager-select:focus-visible { outline: 2px solid var(--user-accent); outline-offset: 2px }
 
 .toast { position: fixed; right: 28px; top: 24px; z-index: 10001; padding: 12px 18px; border-radius: 12px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; animation: toastIn .25s ease-out; box-shadow: 0 12px 36px rgba(0,0,0,0.4), 0 0 25px var(--user-glow); backdrop-filter: blur(8px) }
 .toast.success { background: var(--user-surface); color: var(--user-accent); border: 1px solid var(--user-border-light) }
@@ -246,7 +260,7 @@ footer { text-align: center; color: var(--user-text-dim); font-size: 10px; margi
   .row-side { min-width: 62px; }
   .recent-row { gap: 8px; }
   .recent-size { display: none; }
-  .pager-info { width: 100%; margin-left: 0; text-align: right; }
+  .pager-side { width: 100%; margin-left: 0; justify-content: flex-end; }
   .toast { right: 14px; left: 14px; top: 14px; justify-content: center; }
 }
 @media (max-width: 420px) {
