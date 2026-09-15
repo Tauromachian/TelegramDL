@@ -320,11 +320,6 @@ const onImportFile = async (event) => {
                  al color de la cuenta, y "Restablecer color de la cuenta"
                  vuelve a dejar el de Telegram. -->
             <span class="grupo-color-titulo">Colores temáticos</span>
-            <small class="temas-nota">
-              Paletas propias del panel, con fondo y detalles animados. No vienen de tu cuenta
-              de Telegram: al elegir una sustituye al color de la cuenta hasta que vuelvas a
-              uno de los de arriba.
-            </small>
             <div class="temas-lista">
               <button
                 v-for="id in temasEspeciales"
@@ -386,7 +381,7 @@ const onImportFile = async (event) => {
                   v-for="id in temasEspeciales"
                   :key="'loader-tema-' + id"
                   type="button"
-                  class="color-dot"
+                  class="color-dot tema-dot"
                   :class="{ active: settings.loader_color_id === id }"
                   :style="{ background: themeMap[id]?.gradient }"
                   :title="themeMap[id]?.name || ('Tema ' + id)"

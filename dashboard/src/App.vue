@@ -1351,7 +1351,13 @@ onUnmounted(() => {
 /* Estilos para Ajustes y Selector de Color */
 .content-grid-single { display: grid; grid-template-columns: 1fr; gap: 18px; animation: riseIn .55s ease both; }
 .settings-panel-full { padding: 30px; }
-.settings-sections-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; margin-bottom: 20px; align-items: start; }
+/* La segunda fila es flexible (1fr) a propósito: así el grupo de colores, que
+   ocupa dos filas, no infla la altura de la primera. Sin esto su altura se
+   reparte entre las dos filas y "Acceso remoto", que cae en la fila 2, arranca
+   mucho más abajo de donde termina el grupo de al lado, dejando un hueco.
+   (Regla de CSS Grid: un elemento que abarca una pista flexible no aporta al
+   tamaño intrínseco de las demás pistas que abarca.) */
+.settings-sections-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); grid-template-rows: max-content 1fr; gap: 40px; margin-bottom: 20px; align-items: start; }
 .settings-group { display: flex; flex-direction: column; gap: 15px; }
 .settings-actions { display: flex; gap: 12px; margin-top: 22px; }
 .settings-actions .clear-history-button, .settings-actions .save-button { width: 100%; margin-top: 0; flex: 1; }
@@ -1361,7 +1367,10 @@ onUnmounted(() => {
    que el ultimo grupo (Acceso remoto) suba al hueco de la fila 2 en vez de
    quedar colgado debajo. Solo se nota donde no caben las 4 columnas. */
 .color-group { padding-top: 5px; grid-row: span 2; }
-.color-selector-container { display: flex; flex-direction: column; gap: 12px; margin: 10px 0 20px; }
+/* El grupo de colores lleva sus propios subtítulos, así que el título del
+   bloque no necesita el hueco de abajo que usan los demás ajustes. */
+.color-group .setting-label { margin-bottom: 0; }
+.color-selector-container { display: flex; flex-direction: column; gap: 12px; margin: 0; }
 .color-row { display: flex; gap: 12px; flex-wrap: wrap; }
 .color-dot {
   width: 28px;
@@ -1385,13 +1394,28 @@ onUnmounted(() => {
 }
 .gradient-dot { position: relative; }
 
+/* Punto de un tema del panel (ids 16+) en la fila del loader. Lleva el mismo
+   aro interior que la muestra de los botones de tema, que es lo que hace que
+   el degradado se lea como una moneda y no como una mancha. Va después de
+   .color-dot.active para poder sumar el aro al resalte del seleccionado. */
+.tema-dot { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
+.tema-dot.active {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .12),
+    0 0 0 3px var(--user-bg-base),
+    0 0 0 5px var(--user-primary),
+    0 0 15px var(--user-glow);
+}
+
 /* Separa un bloque entero de ajustes del anterior (el color del loader del
    color de acento). */
-.seccion-separada { margin-top: 30px; border-top: 1px solid var(--user-border); padding-top: 20px; }
+.seccion-separada { margin-top: 24px; border-top: 1px solid var(--user-border); padding-top: 18px; }
 
 /* Título de cada grupo de colores dentro de un bloque: "Telegram" para los
    0-15 y "Colores temáticos" para los propios del panel. Es una etiqueta de
-   procedencia, más discreta que el título del bloque. */
+   procedencia, más discreta que el título del bloque. El margen de abajo es
+   negativo para recortar parte del gap de 15px del grupo: el subtítulo tiene
+   que quedar pegado a SUS colores, no a mitad de camino entre los dos bloques. */
 .grupo-color-titulo {
   display: block;
   font-size: 11px;
@@ -1399,15 +1423,9 @@ onUnmounted(() => {
   letter-spacing: .05em;
   text-transform: uppercase;
   color: var(--user-text-dim);
-  margin: 16px 0 -2px;
+  margin: 4px 0 -9px;
 }
-
-/* Colores temáticos (ids 16+). Se presentan con el nombre a la vista y no como
-   un punto más: son pocos, no vienen de Telegram y el nombre es lo que los
-   distingue. En el loader sí van como punto suelto, porque de un tema el
-   loader solo aprovecha el color. */
-.temas-nota { font-size: 11px; color: var(--user-text-dim); line-height: 1.5; margin-top: 6px; }
-.temas-lista { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 20px; }
+.temas-lista { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; }
 .tema-chip {
   display: flex;
   align-items: center;

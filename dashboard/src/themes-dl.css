@@ -1386,7 +1386,17 @@ html.tema-claro .speed-row select {
 
 /* El aro interior de las muestras de color de Ajustes es blanco: sobre un
    relleno claro no se ve y el círculo queda sin borde. */
-html.tema-claro .tema-muestra { box-shadow: inset 0 0 0 1px var(--claro-aro) }
+html.tema-claro .tema-muestra,
+html.tema-claro .tema-dot { box-shadow: inset 0 0 0 1px var(--claro-aro) }
+/* Repetido con el resalte porque este selector le gana en especificidad al
+   .tema-dot.active del panel y si no lo incluye borraría el aro del elegido. */
+html.tema-claro .tema-dot.active {
+  box-shadow:
+    inset 0 0 0 1px var(--claro-aro),
+    0 0 0 3px var(--user-bg-base),
+    0 0 0 5px var(--user-primary),
+    0 0 15px var(--user-glow);
+}
 
 /* --- Enlaces -------------------------------------------------------------- */
 html.tema-claro .inline-link,
