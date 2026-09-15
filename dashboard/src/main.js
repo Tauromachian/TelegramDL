@@ -4,7 +4,7 @@ import './style.css'
 // Decorado de los temas especiales (color 16 en adelante). Va todo dentro de
 // una clase que solo se pone en el <html> cuando uno de esos temas está
 // activo, así que con los colores de Telegram no hay ni una regla aplicada.
-import './temas-especiales.css'
+import './themes-dl.css'
 import { isWailsRuntime } from './composables/useAuthToken'
 
 // Dentro de la app de escritorio el panel debe comportarse como una ventana

@@ -74,7 +74,7 @@ const themeMap = {
   // --- Temas especiales del panel ---
   // Del 16 en adelante ya no son colores de Telegram Premium sino paletas
   // propias, y además de las variables de color encienden una capa decorativa
-  // (ver temas-especiales.css) a través de la clase que pone applyTheme en el
+  // (ver themes-dl.css) a través de la clase que pone applyTheme en el
   // <html>. El backend guarda el id tal cual, sin validar rango, así que
   // añadir temas aquí no necesita ningún cambio en Go.
   16: { name: 'Twilight Comet', especial: true, primary: '#d1618f', secondary: '#f5b96b', accent: '#b79af5', bgBase: '#0d0a1e', bgTop: '#3a2568', surface: '#160f2d', surfaceLight: '#1d1539', border: '#2f2258', borderLight: '#41307a', iconBg: '#2f2163', glow: 'rgba(192, 81, 140, 0.20)', textDim: '#9086bb', gradient: 'linear-gradient(135deg, #5b45b0 0%, #c0518c 52%, #f0803c 100%)' },
@@ -103,7 +103,7 @@ const clasesTemaEspecial = {
 }
 
 // Los temas de fondo claro llevan además la clase `tema-claro`, que enciende
-// un bloque común de temas-especiales.css. El panel tiene más de cien colores
+// un bloque común de themes-dl.css. El panel tiene más de cien colores
 // de texto fijos escritos para fondo oscuro y hay que pisarlos una sola vez,
 // no una por cada tema claro que se añada.
 const temasClaros = new Set([19])

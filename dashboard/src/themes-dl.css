@@ -652,6 +652,16 @@
 
 /* --- Estados y alertas ---------------------------------------------------- */
 
+/* El interruptor encendido. El panel pinta el botón de blanco sobre la pista
+   del color de acento, y aquí la pista es amarillo neón: blanco sobre amarillo
+   claro no se distingue y el interruptor parece una pastilla lisa. El botón
+   pasa al negro del fondo, que además es el recorte que este tema usa en los
+   botones. */
+.tema-edge-runner .switch input:checked + span:after {
+  background: var(--user-bg-base);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+}
+
 .tema-edge-runner .status-dot,
 .tema-edge-runner .live-dot {
   background: var(--user-primary);
@@ -1010,6 +1020,15 @@
 }
 
 /* --- Estados y detalles --------------------------------------------------- */
+
+/* El interruptor encendido. Aquí la pista es la niebla clara de la paleta, y
+   el botón blanco del panel encima de ella desaparece. El botón pasa al verde
+   hondo del follaje: es el mismo contraste que hay entre el texto y el fondo
+   en el resto del tema. */
+.tema-rainy-garden .switch input:checked + span:after {
+  background: var(--rg-musgo-hondo);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+}
 
 .tema-rainy-garden .status-dot,
 .tema-rainy-garden .live-dot {
