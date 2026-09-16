@@ -2405,13 +2405,13 @@ html.tema-darling-red .sidebar-nav button:hover {
 html.tema-darling-red .sidebar-nav button.selected {
   background: color-mix(in srgb, var(--dr-carmesi), transparent 42%) !important;
   color: var(--dr-hueso);
-  box-shadow: inset 3px 0 var(--dr-cian), 0 6px 18px rgba(0, 0, 0, .4);
+  box-shadow: inset 3px 0 var(--dr-cian);
 }
 html.tema-darling-red .sidebar-nav button.selected span { color: var(--dr-cian) }
 
 @media (max-width: 900px) {
   html.tema-darling-red .sidebar-nav button.selected {
-    box-shadow: inset 0 -3px var(--dr-cian), 0 6px 18px rgba(0, 0, 0, .4);
+    box-shadow: inset 0 -3px var(--dr-cian);
   }
 }
 
