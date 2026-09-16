@@ -2325,6 +2325,9 @@ html.tema-darling-red {
   /* El cian puro en un titulo de 30px deslumbra; el de la referencia es mas
      apagado. */
   --dr-cian-suave: #45c5d6;
+  /* El celeste palido de los remates del HUD: en la referencia las lineas no
+     son cian puro, tiran a azul acero. */
+  --dr-hud: #9fd9e6;
   --dr-hueso: #f5f5f5;
   /* Las tarjetas: carmesi que se apaga hacia la derecha. Apagado a proposito
      respecto a la referencia, que a pantalla completa cansaba. */
@@ -2428,49 +2431,65 @@ html.tema-darling-red .sidebar-status {
 
 html.tema-darling-red .topbar h1 { color: var(--dr-cian-suave) }
 
-/* La luna, en la franja libre entre el titulo y la velocidad. SVG dibujado
-   dentro del propio CSS (codificado como URL, no en base64, para poder
-   retocarlo desde aqui); el recorte es una mascara de dos circulos, que es lo
-   que permite que el filo claro siga tambien el borde interior.
-   Se retira por debajo de 1100px: ahi la franja se queda sin hueco. */
-@media (min-width: 1100px) {
-  html.tema-darling-red .topbar {
-    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cdefs%3E%3ClinearGradient%20id='dlg'%20x1='0'%20y1='1'%20x2='1'%20y2='0'%3E%3Cstop%20offset='0'%20stop-color='%238e0f24'/%3E%3Cstop%20offset='1'%20stop-color='%23ef4b42'/%3E%3C/linearGradient%3E%3Cmask%20id='dlm'%3E%3Crect%20width='100'%20height='100'%20fill='%23000'/%3E%3Ccircle%20cx='48'%20cy='50'%20r='45'%20fill='%23fff'/%3E%3Ccircle%20cx='73'%20cy='37'%20r='41'%20fill='%23000'/%3E%3C/mask%3E%3C/defs%3E%3Cg%20mask='url%28%23dlm%29'%3E%3Ccircle%20cx='48'%20cy='50'%20r='45'%20fill='url%28%23dlg%29'/%3E%3Ccircle%20cx='48'%20cy='50'%20r='45'%20fill='none'%20stroke='%23f7dede'%20stroke-width='5'/%3E%3Ccircle%20cx='73'%20cy='37'%20r='41'%20fill='none'%20stroke='%23f7dede'%20stroke-width='5'/%3E%3C/g%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 210px center;
-    background-size: 46px 46px;
-  }
-}
-
 /* --- Las placas ----------------------------------------------------------- */
 /* Aqui esta el cambio gordo respecto al resto de temas: el relleno de las
    tarjetas es carmesi, no gris oscuro. Sigue siendo oscuro en luminancia
    (0,047, como un gris #3a3a3a), asi que todo el texto claro fijo del panel
    se lee igual y no hace falta el bloque de temas claros. */
 
+html.tema-darling-red .stat-card {
+  background-image: var(--dr-placa);
+  border-color: color-mix(in srgb, var(--dr-rosa), transparent 72%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--dr-rosa-suave), transparent 84%), var(--dr-sombra);
+}
+
 html.tema-darling-red .panel,
-html.tema-darling-red .stat-card,
 html.tema-darling-red .logs-hero,
 html.tema-darling-red .listener-hero {
-  background-image: var(--dr-placa);
+  background-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M1%2024%20V15%20A14%2014%200%200%201%2015%201%20H24'%20fill='none'%20stroke='%2300e5ff'%20stroke-width='2'%20stroke-linecap='square'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M0%2023%20H9%20A14%2014%200%200%200%2023%209%20V0'%20fill='none'%20stroke='%23f48fb1'%20stroke-width='2'%20stroke-linecap='square'/%3E%3C/svg%3E"),
+    var(--dr-placa);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-size: 22px 22px, 22px 22px, auto;
+  background-position: left top, right bottom, center;
   border-color: color-mix(in srgb, var(--dr-rosa), transparent 72%);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--dr-rosa-suave), transparent 84%), var(--dr-sombra);
 }
 
 html.tema-darling-red .hero-card {
   background-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20320%2060'%3E%3Cpath%20d='M0%2010%20H72%20L86%2024%20H206%20L218%2036%20H320'%20fill='none'%20stroke='%239fd9e6'%20stroke-width='2'%20stroke-linejoin='miter'%20opacity='.8'/%3E%3Cg%20stroke='%2300e5ff'%20stroke-width='2.4'%20stroke-linecap='round'%20opacity='.9'%3E%3Cpath%20d='M238%2034%20l9%20-11'/%3E%3Cpath%20d='M251%2034%20l9%20-11'/%3E%3Cpath%20d='M264%2034%20l9%20-11'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M1%2024%20V15%20A14%2014%200%200%201%2015%201%20H24'%20fill='none'%20stroke='%2300e5ff'%20stroke-width='2'%20stroke-linecap='square'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M0%2023%20H9%20A14%2014%200%200%200%2023%209%20V0'%20fill='none'%20stroke='%23f48fb1'%20stroke-width='2'%20stroke-linecap='square'/%3E%3C/svg%3E"),
     radial-gradient(52% 120% at 88% -20%, color-mix(in srgb, var(--dr-carmesi), transparent 70%) 0%, transparent 70%),
     var(--dr-placa);
+  background-repeat: no-repeat;
+  background-size: 320px 60px, 26px 26px, 26px 26px, auto, auto;
+  background-position: right 0 top 0, left top, right bottom, center, center;
   border-color: color-mix(in srgb, var(--dr-rosa), transparent 66%);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--dr-rosa-suave), transparent 78%), var(--dr-sombra);
 }
 
 html.tema-darling-red .toast { box-shadow: var(--dr-sombra) }
 
-/* Escuadras, como en la referencia. En la tarjeta grande se aprovecha el
-   `:after` que style.css usaba para el halo (ya no hace falta: el halo va
-   ahora en el propio degradado del fondo). El radio es el de cada caja para
-   que la escuadra se pegue a la curva en vez de cruzarla. */
+/* --- Los remates del HUD -------------------------------------------------- */
+/* Son los detalles celestes de la referencia. Van en tres piezas:
+
+   - Las ESCUADRAS de las esquinas, ahora como capas de fondo en SVG (antes
+     eran los pseudoelementos). Se cambiaron de sitio porque solo hay dos
+     pseudos por caja y las pinzas los necesitan; como capa de fondo ademas se
+     colocan en la esquina sin tener que calcular nada.
+   - Las PINZAS laterales, la linea vertical con los extremos en diagonal que
+     en la foto va pegada a los bordes izquierdo y derecho de las tarjetas
+     grandes. Cada una son tres degradados: dos cuadrados de 13px con una
+     diagonal a 45 grados (la banda sale perpendicular al eje del degradado,
+     por eso el de arriba va a 45deg y el de abajo a 135deg) y una barra de
+     2px entre ellos.
+   - El REMATE escalonado con las tres marcas, arriba a la derecha de la
+     tarjeta grande. Mide 320px fijos, asi que se retira en movil: en una
+     tarjeta estrecha se veria cortado por la mitad. */
+
 html.tema-darling-red .panel { position: relative }
 
 html.tema-darling-red .hero-card::before,
@@ -2479,40 +2498,60 @@ html.tema-darling-red .panel::before,
 html.tema-darling-red .panel::after {
   content: '';
   position: absolute;
-  width: 18px;
-  height: 18px;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  width: 13px;
+  height: min(58%, 132px);
   pointer-events: none;
+  background-repeat: no-repeat;
   /* El `:after` de la tarjeta grande era el halo redondo de style.css: hay que
-     apagarle tambien el radio, o los tres lados que no se redondean aqui se
-     quedan al 50% y la escuadra sale como una media luna. */
-  background: none;
-  filter: none;
-  opacity: 1;
+     apagarle el radio, el desenfoque y el tamano que traia de alli. */
+  border: 0;
   border-radius: 0;
+  filter: none;
+  opacity: .9;
 }
 
 html.tema-darling-red .hero-card::before,
 html.tema-darling-red .panel::before {
-  top: 0;
-  left: 0;
+  left: 7px;
   right: auto;
-  border-top: 2px solid var(--dr-cian);
-  border-left: 2px solid var(--dr-cian);
-}
-html.tema-darling-red .hero-card:after,
-html.tema-darling-red .panel::after {
-  bottom: 0;
-  right: 0;
-  top: auto;
-  left: auto;
-  border-bottom: 2px solid color-mix(in srgb, var(--dr-rosa), transparent 20%);
-  border-right: 2px solid color-mix(in srgb, var(--dr-rosa), transparent 20%);
+  background-image:
+    linear-gradient(45deg,  transparent calc(50% - 1px), var(--dr-hud) calc(50% - 1px), var(--dr-hud) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(var(--dr-hud), var(--dr-hud)),
+    linear-gradient(135deg, transparent calc(50% - 1px), var(--dr-hud) calc(50% - 1px), var(--dr-hud) calc(50% + 1px), transparent calc(50% + 1px));
+  background-size: 13px 13px, 2px calc(100% - 26px), 13px 13px;
+  background-position: left top, right 0 top 13px, left bottom;
 }
 
-html.tema-darling-red .hero-card::before { border-top-left-radius: 18px }
-html.tema-darling-red .hero-card:after  { border-bottom-right-radius: 18px; width: 18px; height: 18px }
-html.tema-darling-red .panel::before    { border-top-left-radius: 15px }
-html.tema-darling-red .panel::after     { border-bottom-right-radius: 15px }
+html.tema-darling-red .hero-card:after,
+html.tema-darling-red .panel::after {
+  right: 7px;
+  left: auto;
+  background-image:
+    linear-gradient(135deg, transparent calc(50% - 1px), var(--dr-hud) calc(50% - 1px), var(--dr-hud) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(var(--dr-hud), var(--dr-hud)),
+    linear-gradient(45deg,  transparent calc(50% - 1px), var(--dr-hud) calc(50% - 1px), var(--dr-hud) calc(50% + 1px), transparent calc(50% + 1px));
+  background-size: 13px 13px, 2px calc(100% - 26px), 13px 13px;
+  background-position: left top, left 0 top 13px, left bottom;
+}
+
+@media (max-width: 900px) {
+  html.tema-darling-red .hero-card {
+    background-image:
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M1%2024%20V15%20A14%2014%200%200%201%2015%201%20H24'%20fill='none'%20stroke='%2300e5ff'%20stroke-width='2'%20stroke-linecap='square'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M0%2023%20H9%20A14%2014%200%200%200%2023%209%20V0'%20fill='none'%20stroke='%23f48fb1'%20stroke-width='2'%20stroke-linecap='square'/%3E%3C/svg%3E"),
+      radial-gradient(52% 120% at 88% -20%, color-mix(in srgb, var(--dr-carmesi), transparent 70%) 0%, transparent 70%),
+      var(--dr-placa);
+    background-size: 22px 22px, 22px 22px, auto, auto;
+    background-position: left top, right bottom, center, center;
+  }
+  html.tema-darling-red .hero-card::before,
+  html.tema-darling-red .hero-card:after,
+  html.tema-darling-red .panel::before,
+  html.tema-darling-red .panel::after { display: none }
+}
 
 /* --- Botones de accion ---------------------------------------------------- */
 /* Fondo blanco hueso con la letra en carmesi. Es lo que pedia la paleta
