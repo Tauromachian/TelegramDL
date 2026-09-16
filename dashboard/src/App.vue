@@ -81,7 +81,8 @@ const themeMap = {
   17: { name: 'Edge Runner UI', especial: true, secondary: '#00e5ff', primary: '#e0ff00', accent: '#00e5ff', bgBase: '#0a0a0c', bgTop: '#14161d', surface: '#16181e', surfaceLight: '#1e2029', border: '#272a33', borderLight: '#3a3e4a', iconBg: '#1f2230', glow: 'rgba(224, 255, 0, 0.18)', textDim: '#a0a5b5', gradient: 'linear-gradient(120deg, #e0ff00 0%, #a8f53c 42%, #00e5ff 100%)' },
   18: { name: 'Rainy Garden', especial: true, secondary: '#8fa4b5', primary: '#e6ecef', accent: '#8fa4b5', bgBase: '#0f1c11', bgTop: '#2d5a27', surface: '#1a3318', surfaceLight: '#224021', border: '#3a5361', borderLight: '#5c768d', iconBg: '#26402c', glow: 'rgba(230, 236, 239, 0.16)', textDim: '#93a79b', gradient: 'linear-gradient(120deg, #e6ecef 0%, #b9c9d4 46%, #8fa4b5 100%)' },
   19: { name: 'Silent Cherry', especial: true, secondary: '#a0e7e5', primary: '#f48fb1', accent: '#2a6f69', bgBase: '#e3dbea', bgTop: '#f0cfdc', surface: '#f4eef6', surfaceLight: '#ece2ee', border: '#d6c9d7', borderLight: '#bfb0c2', iconBg: '#f0d9e3', glow: 'rgba(244, 143, 177, 0.25)', textDim: '#6b6270', gradient: 'linear-gradient(120deg, #ffb7c5 0%, #f48fb1 52%, #a0e7e5 100%)' },
-  20: { name: 'osX', especial: true, secondary: '#64d2ff', primary: '#0a84ff', accent: '#64d2ff', bgBase: '#09090b', bgTop: '#10131a', surface: '#1c1c1e', surfaceLight: '#2c2c2e', border: '#2c2c2e', borderLight: '#3a3a3c', iconBg: '#26262a', glow: 'rgba(10, 132, 255, 0.28)', textDim: '#98989f', gradient: 'linear-gradient(180deg, #3e9bff 0%, #0a84ff 100%)' }
+  20: { name: 'osX', especial: true, secondary: '#64d2ff', primary: '#0a84ff', accent: '#64d2ff', bgBase: '#09090b', bgTop: '#10131a', surface: '#1c1c1e', surfaceLight: '#2c2c2e', border: '#2c2c2e', borderLight: '#3a3a3c', iconBg: '#26262a', glow: 'rgba(10, 132, 255, 0.28)', textDim: '#98989f', gradient: 'linear-gradient(180deg, #3e9bff 0%, #0a84ff 100%)' },
+  21: { name: 'Herbal Apothecary', especial: true, secondary: '#2b586c', primary: '#7fb069', accent: '#8fc0d4', bgBase: '#141f18', bgTop: '#25402f', surface: '#1a261d', surfaceLight: '#223026', border: '#2c4550', borderLight: '#3d6272', iconBg: '#22392b', glow: 'rgba(127, 176, 105, 0.20)', textDim: '#8fa596', gradient: 'linear-gradient(120deg, #4a7c59 0%, #7fb069 58%, #99c2a2 100%)' }
 }
 
 const applyLoaderTheme = (colorId) => {
@@ -99,7 +100,8 @@ const clasesTemaEspecial = {
   17: 'tema-edge-runner',
   18: 'tema-rainy-garden',
   19: 'tema-silent-cherry',
-  20: 'tema-osx'
+  20: 'tema-osx',
+  21: 'tema-herbal-apothecary'
 }
 
 // Los temas de fondo claro llevan además la clase `tema-claro`, que enciende

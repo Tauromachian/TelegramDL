@@ -1327,7 +1327,8 @@ html.tema-claro .pager-btn.active {
    de ahí el !important: sin él ganaría el del componente. El color va por
    variable para que cada tema ponga su propio negro. */
 html.tema-edge-runner .auth-button.primary,
-html.tema-rainy-garden .auth-button.primary {
+html.tema-rainy-garden .auth-button.primary,
+html.tema-herbal-apothecary .auth-button.primary {
   color: var(--user-bg-base) !important;
 }
 
@@ -1994,4 +1995,303 @@ html.tema-osx ::-webkit-scrollbar-thumb:hover {
 html.tema-osx .boot-screen,
 html.tema-osx .update-required-overlay {
   background-image: radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 54%);
+}
+
+
+/* -----------------------------------------------------------------------------
+   Herbal Apothecary (color 21)   ·   tema oscuro
+   La botica : verde jade de su traje, azul cerúleo del hanfu, brote de
+   menta para lo que está vivo y encendido, y el bermellón del veneno guardado
+   para lo que va mal. Fondo de verde noche, papel de arroz y hierbas puestas a
+   secar en la esquina.
+
+   Una sola capa animada —las motas de polvo en la luz del candil—, que es lo
+   que pide un tema de botica: quieto, de anaquel.
+   -------------------------------------------------------------------------- */
+html.tema-herbal-apothecary {
+  --ha-jade: #4a7c59;
+  --ha-ceruleo: #2b586c;
+  --ha-ceruleo-claro: #8fc0d4;
+  --ha-brote: #7fb069;
+  --ha-brote-suave: #99c2a2;
+  /* El bermellón no está en el themeMap porque no es un color de interfaz sino
+     de aviso: sale en errores, en lo destructivo y en poco más. Como texto
+     sobre el verde noche el #c0392b de la paleta se queda en 2,6:1, así que
+     hay una versión aclarada para las letras y la original para los rellenos. */
+  --ha-veneno: #c0392b;
+  --ha-veneno-claro: #e57b6b;
+  --ha-candil: #d9a441;
+  --ha-sombra: 0 12px 32px rgba(0, 0, 0, .42);
+}
+
+/* --- La botica ------------------------------------------------------------ */
+
+html.tema-herbal-apothecary body {
+  background-image:
+    /* Hierbas colgadas a secar, atadas con cordel. SVG dibujado dentro del
+       propio CSS (codificado como URL, no en base64, para poder retocarlo
+       desde aquí). Lleva su opacidad dentro del SVG y va retirado hacia fuera
+       por arriba y por la derecha: en esa esquina vive el reloj de la barra
+       superior y las hierbas no pueden pisarlo. */
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20240%20200'%3E%3Cg%20opacity='.38'%3E%3Cg%20fill='none'%20stroke='%235c8a68'%20stroke-width='2.2'%20stroke-linecap='round'%3E%3Cpath%20d='M44%20-6%20C30%2044%2064%2092%2054%20152'/%3E%3Cpath%20d='M116%20-6%20C128%2038%2096%2074%20102%20116'/%3E%3Cpath%20d='M186%20-6%20C176%2050%20206%20104%20196%20176'/%3E%3C/g%3E%3Cg%20fill='%2357876a'%3E%3Cellipse%20cx='45.7'%20cy='27.4'%20rx='4.6'%20ry='11.0'%20transform='rotate(142%2045.7%2027.4)'/%3E%3Cellipse%20cx='35.5'%20cy='27.4'%20rx='4.6'%20ry='11.0'%20transform='rotate(218%2035.5%2027.4)'/%3E%3Cellipse%20cx='49.1'%20cy='54.4'%20rx='4.2'%20ry='10.0'%20transform='rotate(132%2049.1%2054.4)'/%3E%3Cellipse%20cx='40.0'%20cy='56.0'%20rx='4.2'%20ry='10.0'%20transform='rotate(208%2040.0%2056.0)'/%3E%3Cellipse%20cx='54.7'%20cy='83.0'%20rx='3.8'%20ry='9.1'%20transform='rotate(130%2054.7%2083.0)'/%3E%3Cellipse%20cx='46.5'%20cy='84.7'%20rx='3.8'%20ry='9.1'%20transform='rotate(206%2046.5%2084.7)'/%3E%3Cellipse%20cx='59.0'%20cy='113.4'%20rx='3.4'%20ry='8.1'%20transform='rotate(136%2059.0%20113.4)'/%3E%3Cellipse%20cx='51.5'%20cy='114.2'%20rx='3.4'%20ry='8.1'%20transform='rotate(212%2051.5%20114.2)'/%3E%3Cellipse%20cx='58.3'%20cy='145.8'%20rx='3.0'%20ry='7.2'%20transform='rotate(147%2058.3%20145.8)'/%3E%3Cellipse%20cx='51.7'%20cy='145.3'%20rx='3.0'%20ry='7.2'%20transform='rotate(223%2051.7%20145.3)'/%3E%3Cellipse%20cx='123.6'%20cy='23.7'%20rx='4.6'%20ry='11.0'%20transform='rotate(144%20123.6%2023.7)'/%3E%3Cellipse%20cx='113.4'%20cy='23.4'%20rx='4.6'%20ry='11.0'%20transform='rotate(220%20113.4%2023.4)'/%3E%3Cellipse%20cx='118.6'%20cy='47.1'%20rx='4.2'%20ry='10.0'%20transform='rotate(155%20118.6%2047.1)'/%3E%3Cellipse%20cx='109.5'%20cy='45.0'%20rx='4.2'%20ry='10.0'%20transform='rotate(231%20109.5%2045.0)'/%3E%3Cellipse%20cx='111.7'%20cy='69.2'%20rx='3.8'%20ry='9.1'%20transform='rotate(158%20111.7%2069.2)'/%3E%3Cellipse%20cx='103.6'%20cy='66.8'%20rx='3.8'%20ry='9.1'%20transform='rotate(234%20103.6%2066.8)'/%3E%3Cellipse%20cx='106.1'%20cy='90.8'%20rx='3.4'%20ry='8.1'%20transform='rotate(153%20106.1%2090.8)'/%3E%3Cellipse%20cx='98.7'%20cy='89.4'%20rx='3.4'%20ry='8.1'%20transform='rotate(229%2098.7%2089.4)'/%3E%3Cellipse%20cx='104.8'%20cy='112.6'%20rx='3.0'%20ry='7.2'%20transform='rotate(140%20104.8%20112.6)'/%3E%3Cellipse%20cx='98.2'%20cy='112.9'%20rx='3.0'%20ry='7.2'%20transform='rotate(216%2098.2%20112.9)'/%3E%3Cellipse%20cx='189.3'%20cy='30.5'%20rx='4.6'%20ry='11.0'%20transform='rotate(140%20189.3%2030.5)'/%3E%3Cellipse%20cx='179.2'%20cy='30.8'%20rx='4.6'%20ry='11.0'%20transform='rotate(216%20179.2%2030.8)'/%3E%3Cellipse%20cx='192.7'%20cy='61.5'%20rx='4.2'%20ry='10.0'%20transform='rotate(133%20192.7%2061.5)'/%3E%3Cellipse%20cx='183.6'%20cy='62.9'%20rx='4.2'%20ry='10.0'%20transform='rotate(209%20183.6%2062.9)'/%3E%3Cellipse%20cx='197.8'%20cy='94.3'%20rx='3.8'%20ry='9.1'%20transform='rotate(133%20197.8%2094.3)'/%3E%3Cellipse%20cx='189.5'%20cy='95.7'%20rx='3.8'%20ry='9.1'%20transform='rotate(209%20189.5%2095.7)'/%3E%3Cellipse%20cx='201.4'%20cy='129.6'%20rx='3.4'%20ry='8.1'%20transform='rotate(138%20201.4%20129.6)'/%3E%3Cellipse%20cx='193.9'%20cy='130.1'%20rx='3.4'%20ry='8.1'%20transform='rotate(214%20193.9%20130.1)'/%3E%3Cellipse%20cx='200.3'%20cy='167.7'%20rx='3.0'%20ry='7.2'%20transform='rotate(146%20200.3%20167.7)'/%3E%3Cellipse%20cx='193.8'%20cy='167.2'%20rx='3.0'%20ry='7.2'%20transform='rotate(222%20193.8%20167.2)'/%3E%3C/g%3E%3Cg%20stroke='%238a6f4a'%20stroke-width='2'%20fill='none'%3E%3Cpath%20d='M37%2016%20C44%2012%2052%2014%2057%2019'/%3E%3Cpath%20d='M110%2014%20C117%2010%20126%2012%20131%2017'/%3E%3Cpath%20d='M179%2018%20C186%2014%20195%2016%20200%2021'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"),
+    /* La luz del candil, abajo a la izquierda; la luna entrando por arriba. */
+    radial-gradient(48% 38% at 4% 100%, color-mix(in srgb, var(--ha-candil), transparent 88%) 0%, transparent 66%),
+    radial-gradient(52% 40% at 88% -6%, color-mix(in srgb, var(--ha-ceruleo), transparent 72%) 0%, transparent 64%),
+    radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 52%);
+  background-repeat: no-repeat;
+  background-size: 300px auto, auto, auto, auto;
+  background-position: right -64px top -56px, center, center, center;
+  background-attachment: fixed;
+}
+
+/* Papel de arroz: dos tramas cruzadas a muy baja opacidad. Es lo que le quita
+   al fondo el aspecto de color plano sin costar nada: son dos degradados
+   repetidos, estáticos, por detrás de todo. */
+html.tema-herbal-apothecary body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(232, 239, 233, .022) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg,  rgba(232, 239, 233, .018) 0 1px, transparent 1px 5px);
+}
+
+/* Motas de polvo subiendo en la luz del candil. Mismo mecanismo que la lluvia
+   y los pétalos de los otros temas: un mosaico que se repite y se mueve entero
+   con transform un recorrido igual a su alto, así que el bucle no salta. Suben
+   en vez de caer, que es lo que hace el polvo en una habitación cerrada con
+   una llama encendida. */
+html.tema-herbal-apothecary body::after {
+  content: '';
+  position: fixed;
+  inset: -15%;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1.6px 1.6px at 16% 18%, color-mix(in srgb, var(--ha-candil), transparent 45%), transparent 70%),
+    radial-gradient(1.2px 1.2px at 44% 62%, color-mix(in srgb, var(--ha-brote-suave), transparent 55%), transparent 70%),
+    radial-gradient(1.8px 1.8px at 72% 30%, color-mix(in srgb, var(--ha-candil), transparent 55%), transparent 70%),
+    radial-gradient(1.3px 1.3px at 88% 78%, color-mix(in srgb, var(--ha-brote-suave), transparent 60%), transparent 70%),
+    radial-gradient(1.4px 1.4px at 28% 88%, color-mix(in srgb, var(--ha-candil), transparent 62%), transparent 70%);
+  background-size: 340px 420px;
+  opacity: .5;
+  animation: haMotas 26s linear infinite;
+}
+
+@keyframes haMotas {
+  from { transform: translateY(0) }
+  to   { transform: translateY(-420px) }
+}
+
+html.tema-herbal-apothecary .app-shell { position: relative; z-index: 1 }
+
+@media (prefers-reduced-motion: reduce) {
+  html.tema-herbal-apothecary body::after { animation: none }
+  html.tema-herbal-apothecary .progress-fill::before,
+  html.tema-herbal-apothecary .disk-bar .fill::before { animation: none }
+}
+
+/* --- Anaqueles ------------------------------------------------------------ */
+/* Los paneles son los cajones del boticario: madera verde en penumbra, borde
+   cerúleo y un filo de jade arriba, que es donde da la luz. */
+
+html.tema-herbal-apothecary .sidebar {
+  background: color-mix(in srgb, var(--user-bg-base), transparent 14%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-right: 1px solid color-mix(in srgb, var(--ha-jade), transparent 68%);
+}
+
+html.tema-herbal-apothecary .panel,
+html.tema-herbal-apothecary .stat-card,
+html.tema-herbal-apothecary .hero-card,
+html.tema-herbal-apothecary .logs-hero,
+html.tema-herbal-apothecary .listener-hero {
+  background-color: color-mix(in srgb, var(--user-surface), transparent 10%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: color-mix(in srgb, var(--ha-ceruleo), transparent 42%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ha-jade), transparent 62%), var(--ha-sombra);
+}
+
+/* La tarjeta grande es la mesa de trabajo bajo el candil. */
+html.tema-herbal-apothecary .hero-card {
+  background-image: linear-gradient(118deg,
+    color-mix(in srgb, var(--user-surface-light), transparent 6%) 0%,
+    color-mix(in srgb, var(--user-surface), transparent 8%) 58%,
+    color-mix(in srgb, var(--ha-candil), var(--user-surface) 88%) 100%);
+}
+
+html.tema-herbal-apothecary .hero-card:after {
+  background: radial-gradient(circle, var(--ha-candil) 0%, transparent 66%);
+  opacity: .16;
+  filter: blur(22px);
+}
+
+html.tema-herbal-apothecary .toast { box-shadow: var(--ha-sombra) }
+
+/* --- Navegación ----------------------------------------------------------- */
+/* La pestaña activa va en cerúleo, que es el color del manto: el verde queda
+   para lo que está vivo (botones, estado, progreso). */
+
+html.tema-herbal-apothecary .sidebar-nav button:hover {
+  background: color-mix(in srgb, var(--ha-jade), transparent 88%);
+  color: var(--ha-brote-suave);
+}
+
+html.tema-herbal-apothecary .sidebar-nav button.selected {
+  background: color-mix(in srgb, var(--ha-ceruleo), transparent 55%) !important;
+  color: #e8efe9;
+  box-shadow: inset 3px 0 var(--ha-brote), 0 6px 18px rgba(0, 0, 0, .3);
+}
+html.tema-herbal-apothecary .sidebar-nav button.selected span { color: var(--ha-brote) }
+
+@media (max-width: 900px) {
+  html.tema-herbal-apothecary .sidebar-nav button.selected {
+    box-shadow: inset 0 -3px var(--ha-brote), 0 6px 18px rgba(0, 0, 0, .3);
+  }
+}
+
+/* --- Frascos y pociones --------------------------------------------------- */
+/* La barra de progreso es el líquido subiendo en el frasco: el degradado del
+   tema con unas bandas suaves en diagonal encima. Misma técnica que los demás:
+   capa propia movida con transform y recorrido fijo, para que el avance se vea
+   igual con la barra corta que con la barra llena. Patrón a 110° con periodo
+   de 13px sobre su eje: en horizontal repite cada 13 / sen(110°) = 13,83px, y
+   el recorrido, 27,67px, son dos periodos justos. */
+
+html.tema-herbal-apothecary .progress-fill,
+html.tema-herbal-apothecary .disk-bar .fill,
+html.tema-herbal-apothecary .update-progress-fill {
+  background-image: var(--user-gradient);
+  box-shadow: inset 0 1px 0 rgba(232, 239, 233, .3), 0 0 12px var(--user-glow);
+}
+
+html.tema-herbal-apothecary .progress-track {
+  background: color-mix(in srgb, var(--user-bg-base), transparent 25%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ha-ceruleo), transparent 62%);
+}
+
+html.tema-herbal-apothecary .progress-fill,
+html.tema-herbal-apothecary .disk-bar .fill {
+  position: relative;
+  overflow: hidden;
+}
+
+html.tema-herbal-apothecary .progress-fill::before,
+html.tema-herbal-apothecary .disk-bar .fill::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: -30px;
+  background-image:
+    repeating-linear-gradient(110deg,
+      rgba(232, 239, 233, .22) 0 4px,
+      rgba(20, 31, 24, .12) 4px 13px);
+  animation: haLicor 2s linear infinite;
+}
+
+@keyframes haLicor {
+  from { transform: translateX(0) }
+  to   { transform: translateX(-27.67px) }
+}
+
+html.tema-herbal-apothecary .update-progress-fill {
+  background-image:
+    repeating-linear-gradient(110deg,
+      rgba(232, 239, 233, .22) 0 4px,
+      rgba(20, 31, 24, .12) 4px 13px),
+    var(--user-gradient);
+}
+
+/* --- Estados -------------------------------------------------------------- */
+
+html.tema-herbal-apothecary .status-dot,
+html.tema-herbal-apothecary .live-dot {
+  background: var(--ha-brote);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ha-brote), transparent 45%);
+}
+html.tema-herbal-apothecary .status-dot.disconnected {
+  background: var(--ha-veneno);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ha-veneno), transparent 45%);
+}
+html.tema-herbal-apothecary .sidebar-status.is-disconnected {
+  color: var(--ha-veneno-claro);
+  background: color-mix(in srgb, var(--ha-veneno), transparent 92%);
+  border-color: color-mix(in srgb, var(--ha-veneno), transparent 82%);
+}
+
+html.tema-herbal-apothecary .badge,
+html.tema-herbal-apothecary .save-state {
+  background: color-mix(in srgb, var(--ha-brote), transparent 88%);
+  color: var(--ha-brote-suave);
+  border-color: color-mix(in srgb, var(--ha-brote), transparent 74%);
+}
+
+html.tema-herbal-apothecary .count-pill {
+  background: color-mix(in srgb, var(--ha-ceruleo), transparent 58%);
+  color: var(--ha-ceruleo-claro);
+}
+
+html.tema-herbal-apothecary .sidebar-user-badge .user-icon { color: var(--ha-brote) }
+
+/* Lo destructivo y lo roto, en bermellón. */
+html.tema-herbal-apothecary .row-side button,
+html.tema-herbal-apothecary .delete-button,
+html.tema-herbal-apothecary .sidebar-user-badge .logout-btn { color: var(--ha-veneno-claro) }
+html.tema-herbal-apothecary .row-side button:hover,
+html.tema-herbal-apothecary .delete-button:hover,
+html.tema-herbal-apothecary .sidebar-user-badge .logout-btn:hover {
+  color: #ffd5cc;
+  background: color-mix(in srgb, var(--ha-veneno), transparent 80%);
+}
+html.tema-herbal-apothecary .row-side .pause-action { color: var(--ha-candil) }
+html.tema-herbal-apothecary .row-side .resume-action { color: var(--ha-brote) }
+
+html.tema-herbal-apothecary .toast.danger {
+  background: color-mix(in srgb, var(--ha-veneno), var(--user-surface) 82%);
+  color: #ffd5cc;
+  border: 1px solid color-mix(in srgb, var(--ha-veneno), transparent 58%);
+}
+
+html.tema-herbal-apothecary .inline-link,
+html.tema-herbal-apothecary .inline-link:visited { color: var(--ha-ceruleo-claro) }
+html.tema-herbal-apothecary .inline-link:hover { color: var(--ha-brote-suave) }
+html.tema-herbal-apothecary .inline-link:focus-visible { outline-color: var(--ha-ceruleo-claro) }
+
+/* --- Detalles ------------------------------------------------------------- */
+
+html.tema-herbal-apothecary .stat-icon.blue  { background: color-mix(in srgb, var(--ha-jade), transparent 72%);    color: var(--ha-brote) }
+html.tema-herbal-apothecary .stat-icon.amber { background: color-mix(in srgb, var(--ha-candil), transparent 84%);  color: var(--ha-candil) }
+html.tema-herbal-apothecary .stat-icon.green { background: color-mix(in srgb, var(--ha-ceruleo), transparent 62%); color: var(--ha-ceruleo-claro) }
+html.tema-herbal-apothecary .stat-icon.gray  { background: color-mix(in srgb, var(--user-text-dim), transparent 88%); color: var(--user-text-dim) }
+
+/* El botón del interruptor, otra vez el mismo caso: el relleno encendido es un
+   verde claro y el blanco fijo del panel encima no destaca. Va al verde noche
+   del fondo, que es además el color del texto de los botones de este tema. */
+html.tema-herbal-apothecary .switch input:checked + span:after {
+  background: var(--user-bg-base);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+}
+
+html.tema-herbal-apothecary ::-webkit-scrollbar { width: 9px; height: 9px }
+html.tema-herbal-apothecary ::-webkit-scrollbar-track { background: transparent }
+html.tema-herbal-apothecary ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ha-jade), transparent 35%);
+  border-radius: 9px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+html.tema-herbal-apothecary ::-webkit-scrollbar-thumb:hover {
+  background: var(--ha-brote);
+  background-clip: content-box;
+}
+
+html.tema-herbal-apothecary .boot-screen,
+html.tema-herbal-apothecary .update-required-overlay {
+  background-image: radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 52%);
 }
