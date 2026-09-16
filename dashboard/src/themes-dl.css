@@ -1438,20 +1438,20 @@ html.tema-silent-cherry {
      valen para rellenos, pero como texto sobre marfil no llegan al contraste
      mínimo para leerse. */
   --claro-tinta: #463a57;
-  --claro-tinta-suave: #8a7f8c;
-  --claro-ok: #2f8f7f;
+  --claro-tinta-suave: #6b6270;
+  --claro-ok: #25756a;
   --claro-ok-fondo: color-mix(in srgb, var(--sc-agua), transparent 72%);
   --claro-ok-borde: color-mix(in srgb, var(--sc-menta), transparent 60%);
-  --claro-alerta: #c8506b;
-  --claro-alerta-fondo: #fdeaef;
-  --claro-ambar: #b5822a;
-  --claro-ambar-fondo: #fdf3e3;
+  --claro-alerta: #b03a56;
+  --claro-alerta-fondo: #fbe0e8;
+  --claro-ambar: #8f6414;
+  --claro-ambar-fondo: #f9ecd8;
   --claro-info-fondo: color-mix(in srgb, var(--sc-sakura), transparent 80%);
-  --claro-debug-fondo: #f1eef5;
+  --claro-debug-fondo: #ddd5e6;
   --claro-pista: color-mix(in srgb, var(--sc-sakura), transparent 62%);
   --claro-aro: rgba(70, 58, 87, .14);
-  --claro-enlace: #c8506b;
-  --claro-enlace-hover: #a83b56;
+  --claro-enlace: #b03a56;
+  --claro-enlace-hover: #8e2a44;
   /* Los botones llevan el degradado pastel: encima, el blanco se pierde. */
   --claro-boton-texto: #463a57;
 }
@@ -1569,7 +1569,7 @@ html.tema-silent-cherry .app-shell { position: relative; z-index: 1 }
    fondo claro es lo que evita el efecto "recorte sucio". */
 
 html.tema-silent-cherry .sidebar {
-  background: color-mix(in srgb, #ffffff, transparent 22%);
+  background: color-mix(in srgb, var(--user-surface), transparent 20%);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-right: 1px solid var(--user-border);
@@ -1580,7 +1580,7 @@ html.tema-silent-cherry .stat-card,
 html.tema-silent-cherry .hero-card,
 html.tema-silent-cherry .logs-hero,
 html.tema-silent-cherry .listener-hero {
-  background-color: color-mix(in srgb, #ffffff, transparent 14%);
+  background-color: color-mix(in srgb, var(--user-surface), transparent 12%);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-color: var(--user-border);
@@ -1594,8 +1594,8 @@ html.tema-silent-cherry .stat-card:hover {
 html.tema-silent-cherry .hero-card {
   background-image: linear-gradient(118deg,
     color-mix(in srgb, var(--user-surface-light), transparent 10%) 0%,
-    color-mix(in srgb, #ffffff, transparent 12%) 55%,
-    color-mix(in srgb, var(--sc-agua), #ffffff 82%) 100%);
+    color-mix(in srgb, var(--user-surface), transparent 10%) 55%,
+    color-mix(in srgb, var(--sc-agua), var(--user-surface) 80%) 100%);
   box-shadow: 0 16px 40px var(--sc-sombra);
 }
 
@@ -1610,10 +1610,10 @@ html.tema-silent-cherry .toast { box-shadow: 0 12px 34px var(--sc-sombra) }
 /* --- Acentos -------------------------------------------------------------- */
 
 /* Los cuatro iconos de cifras, en pastel: cerezo, lavanda, agua y gris suave. */
-html.tema-silent-cherry .stat-icon.blue  { background: color-mix(in srgb, var(--sc-sakura), transparent 62%); color: #c2607f }
-html.tema-silent-cherry .stat-icon.amber { background: #ece6f7; color: #7a6aa8 }
+html.tema-silent-cherry .stat-icon.blue  { background: color-mix(in srgb, var(--sc-sakura), transparent 55%); color: #a94a67 }
+html.tema-silent-cherry .stat-icon.amber { background: #ded4f0; color: #5f4f8f }
 html.tema-silent-cherry .stat-icon.green { background: color-mix(in srgb, var(--sc-agua), transparent 58%); color: var(--claro-ok) }
-html.tema-silent-cherry .stat-icon.gray  { background: #efecf2; color: var(--claro-tinta-suave) }
+html.tema-silent-cherry .stat-icon.gray  { background: #ded7e2; color: var(--claro-tinta-suave) }
 
 /* La pestaña activa, en verde agua: es el único sitio donde el menta manda, y
    deja el rosa para los botones de acción. */
