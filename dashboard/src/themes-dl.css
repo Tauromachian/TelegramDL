@@ -2299,13 +2299,17 @@ html.tema-herbal-apothecary .update-required-overlay {
 
 /* =============================================================================
    Darling Red (color 22)   ·   tema oscuro
-   La cabina del Strelitzia: gris noche por dentro, carmesi en todo lo que es
-   del piloto (bordes, botones, lo que manda) y el rosa del pelo para lo
-   secundario. El cian es la maquina: conexion, progreso y los detalles del HUD.
-   El blanco hueso queda para el texto que tiene que leerse si o si.
+   La cabina del Strelitzia. A diferencia del resto de temas aqui las tarjetas
+   NO son gris oscuro: van en carmesi, que es lo que pidio Frank a partir de su
+   referencia. El rosa queda para lo secundario, el cian es la maquina (titulo,
+   conexion, progreso, aros de los iconos) y el blanco hueso es el fondo de los
+   botones de accion, como decia su paleta.
 
-   Una sola capa animada (las chispas del HUD) mas una rejilla estatica, que es
-   lo que cuesta poco y da el aire de cabina.
+   La barra lateral va en vino, mas oscura y mas morada que las tarjetas: es la
+   unica forma de que se distinga de ellas sin dejarla en gris.
+
+   Nada de tramas de lineas en el fondo (Frank las quito expresamente de la
+   referencia). Queda una sola capa animada: las chispas del HUD.
    -------------------------------------------------------------------------- */
 html.tema-darling-red {
   --dr-carmesi: #d32f2f;
@@ -2318,7 +2322,18 @@ html.tema-darling-red {
   --dr-rosa-suave: #f8bbd0;
   --dr-cian: #00e5ff;
   --dr-cian-vivo: #18ffff;
+  /* El cian puro en un titulo de 30px deslumbra; el de la referencia es mas
+     apagado. */
+  --dr-cian-suave: #45c5d6;
   --dr-hueso: #f5f5f5;
+  /* Las tarjetas: carmesi que se apaga hacia la derecha. Apagado a proposito
+     respecto a la referencia, que a pantalla completa cansaba. */
+  --dr-placa: linear-gradient(100deg, #5f1523 0%, #481019 52%, #3a0c15 100%);
+  /* La barra lateral es el MISMO carmesi, un par de pasos mas oscuro: se
+     distingue por valor, no por tono. Antes iba en vino morado y se veia como
+     otro tema pegado al lado. */
+  --dr-vino-alto: #4a1119;
+  --dr-vino-bajo: #330c13;
   --dr-sombra: 0 14px 34px rgba(0, 0, 0, .5);
 }
 
@@ -2326,33 +2341,17 @@ html.tema-darling-red {
 
 html.tema-darling-red body {
   background-image:
-    /* Luz cian del pistilo por abajo a la izquierda; el carmesi entrando por
-       arriba, que es de donde viene la luz en toda la interfaz. */
-    radial-gradient(44% 34% at 2% 98%, color-mix(in srgb, var(--dr-cian), transparent 88%) 0%, transparent 64%),
-    radial-gradient(56% 42% at 84% -8%, color-mix(in srgb, var(--dr-carmesi), transparent 74%) 0%, transparent 62%),
+    radial-gradient(44% 34% at 2% 98%, color-mix(in srgb, var(--dr-cian), transparent 90%) 0%, transparent 64%),
+    radial-gradient(64% 46% at 78% -10%, color-mix(in srgb, var(--dr-carmesi), transparent 74%) 0%, transparent 66%),
     radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 52%);
   background-repeat: no-repeat;
   background-attachment: fixed;
 }
 
-/* Rejilla de cabina y linea de barrido: tres tramas repetidas a muy baja
-   opacidad. Son estaticas y van detras de todo, asi que no cuestan nada; es lo
-   que le quita al fondo el aspecto de color plano. */
-html.tema-darling-red body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    repeating-linear-gradient(90deg, rgba(0, 229, 255, .030) 0 1px, transparent 1px 46px),
-    repeating-linear-gradient(0deg,  rgba(0, 229, 255, .024) 0 1px, transparent 1px 46px),
-    repeating-linear-gradient(0deg,  rgba(244, 143, 177, .016) 0 1px, transparent 1px 3px);
-}
-
 /* Chispas del HUD subiendo. Mismo mecanismo que la lluvia, los petalos y las
    motas de los otros temas: un mosaico que se repite y se mueve entero con
-   transform un recorrido igual a su alto, asi que el bucle no salta. */
+   transform un recorrido igual a su alto, asi que el bucle no salta. Es la
+   unica capa animada del fondo. */
 html.tema-darling-red body::after {
   content: '';
   position: fixed;
@@ -2366,7 +2365,7 @@ html.tema-darling-red body::after {
     radial-gradient(1.3px 1.3px at 86% 74%, color-mix(in srgb, var(--dr-rosa-suave), transparent 58%), transparent 70%),
     radial-gradient(1.5px 1.5px at 26% 90%, color-mix(in srgb, var(--dr-carmesi-claro), transparent 60%), transparent 70%);
   background-size: 360px 440px;
-  opacity: .55;
+  opacity: .5;
   animation: drChispas 24s linear infinite;
 }
 
@@ -2383,91 +2382,176 @@ html.tema-darling-red .app-shell { position: relative; z-index: 1 }
   html.tema-darling-red .disk-bar .fill::before { animation: none }
 }
 
-/* --- Paneles -------------------------------------------------------------- */
-/* Las tarjetas son las placas de la cabina: gris noche con el borde carmesi,
-   que es lo que pide la paleta, y un filo rosa arriba donde da la luz. */
+/* --- La barra lateral ----------------------------------------------------- */
+/* En vino, no en gris: mas oscura y mas morada que las tarjetas para que se
+   note que es otra zona. El filo carmesi de la derecha es lo que la separa del
+   contenido. */
 
 html.tema-darling-red .sidebar {
-  background: color-mix(in srgb, var(--user-bg-base), transparent 12%);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-right: 1px solid color-mix(in srgb, var(--dr-carmesi), transparent 64%);
+  background-image: linear-gradient(180deg, var(--dr-vino-alto) 0%, var(--dr-vino-bajo) 100%);
+  border-right: 1px solid color-mix(in srgb, var(--dr-carmesi), transparent 42%);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, .38);
 }
-
-/* Los cuernos, como emblema de la cabina. SVG dibujado dentro del propio CSS
-   (codificado como URL, no en base64, para poder retocarlo desde aqui); lleva
-   su opacidad dentro del SVG. Va en la barra lateral y no en el fondo del
-   panel a proposito: el fondo lo tapan las tarjetas casi entero y el dibujo
-   solo asomaria a trozos por los huecos, que queda peor que no ponerlo. En el
-   hueco de la barra, entre el menu y el contador del dia, siempre hay sitio.
-   Solo en escritorio: por debajo de 900px la barra lateral pasa a ser una
-   franja superior y ahi no cabe. */
-@media (min-width: 901px) {
-  html.tema-darling-red .sidebar {
-    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20220%20210'%3E%3Cg%20opacity='.36'%3E%3Cpath%20fill='%23d32f2f'%20stroke='%2300e5ff'%20stroke-width='1.8'%20d='M100%20206%20C90%20156%2064%20106%2026%2060%20C16%2047%204%2054%2011%2070%20C36%20124%2060%20162%2074%20208%20Z'/%3E%3Cpath%20fill='%23d32f2f'%20stroke='%2300e5ff'%20stroke-width='1.8'%20d='M120%20206%20C130%20156%20156%20106%20194%2060%20C204%2047%20216%2054%20209%2070%20C184%20124%20160%20162%20146%20208%20Z'/%3E%3C/g%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: center 58%;
-    background-size: 138px auto;
-  }
-}
-
-html.tema-darling-red .panel,
-html.tema-darling-red .stat-card,
-html.tema-darling-red .hero-card,
-html.tema-darling-red .logs-hero,
-html.tema-darling-red .listener-hero {
-  background-color: color-mix(in srgb, var(--user-surface), transparent 8%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-color: color-mix(in srgb, var(--dr-carmesi), transparent 52%);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--dr-rosa), transparent 80%), var(--dr-sombra);
-}
-
-html.tema-darling-red .hero-card {
-  background-image: linear-gradient(118deg,
-    color-mix(in srgb, var(--user-surface-light), transparent 6%) 0%,
-    color-mix(in srgb, var(--user-surface), transparent 8%) 56%,
-    color-mix(in srgb, var(--dr-carmesi), var(--user-surface) 86%) 100%);
-}
-
-html.tema-darling-red .hero-card:after {
-  background: radial-gradient(circle, var(--dr-carmesi) 0%, transparent 66%);
-  opacity: .20;
-  filter: blur(22px);
-}
-
-html.tema-darling-red .toast { box-shadow: var(--dr-sombra) }
-
-/* --- Navegacion ----------------------------------------------------------- */
-/* La pestana activa va en carmesi con el filo cian: el rojo es del piloto y el
-   cian es la maquina marcando donde estas. */
 
 html.tema-darling-red .sidebar-nav button:hover {
-  background: color-mix(in srgb, var(--dr-carmesi), transparent 88%);
+  background: color-mix(in srgb, var(--dr-carmesi), transparent 76%);
   color: var(--dr-rosa-suave);
+  transform: translateX(3px);
 }
 
 html.tema-darling-red .sidebar-nav button.selected {
-  background: color-mix(in srgb, var(--dr-carmesi-hondo), transparent 46%) !important;
+  background: color-mix(in srgb, var(--dr-carmesi), transparent 42%) !important;
   color: var(--dr-hueso);
-  box-shadow: inset 3px 0 var(--dr-cian), 0 6px 18px rgba(0, 0, 0, .38);
+  box-shadow: inset 3px 0 var(--dr-cian), 0 6px 18px rgba(0, 0, 0, .4);
 }
 html.tema-darling-red .sidebar-nav button.selected span { color: var(--dr-cian) }
 
 @media (max-width: 900px) {
   html.tema-darling-red .sidebar-nav button.selected {
-    box-shadow: inset 0 -3px var(--dr-cian), 0 6px 18px rgba(0, 0, 0, .38);
+    box-shadow: inset 0 -3px var(--dr-cian), 0 6px 18px rgba(0, 0, 0, .4);
   }
 }
 
+/* Las dos cajas de la barra usan --user-bg-base y --user-surface-light, que
+   sobre el vino se ven como parches de otro tema. Van a vino translucido. */
+html.tema-darling-red .sidebar-user-badge {
+  background: rgba(0, 0, 0, .26);
+  border-color: color-mix(in srgb, var(--dr-carmesi), transparent 58%);
+}
+html.tema-darling-red .sidebar-status {
+  background: rgba(0, 0, 0, .26);
+  color: var(--dr-rosa-suave);
+}
+
+/* --- La barra superior ---------------------------------------------------- */
+/* El titulo en cian: en la referencia es lo que marca de que va el tema. */
+
+html.tema-darling-red .topbar h1 { color: var(--dr-cian-suave) }
+
+/* La luna, en la franja libre entre el titulo y la velocidad. SVG dibujado
+   dentro del propio CSS (codificado como URL, no en base64, para poder
+   retocarlo desde aqui); el recorte es una mascara de dos circulos, que es lo
+   que permite que el filo claro siga tambien el borde interior.
+   Se retira por debajo de 1100px: ahi la franja se queda sin hueco. */
+@media (min-width: 1100px) {
+  html.tema-darling-red .topbar {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cdefs%3E%3ClinearGradient%20id='dlg'%20x1='0'%20y1='1'%20x2='1'%20y2='0'%3E%3Cstop%20offset='0'%20stop-color='%238e0f24'/%3E%3Cstop%20offset='1'%20stop-color='%23ef4b42'/%3E%3C/linearGradient%3E%3Cmask%20id='dlm'%3E%3Crect%20width='100'%20height='100'%20fill='%23000'/%3E%3Ccircle%20cx='48'%20cy='50'%20r='45'%20fill='%23fff'/%3E%3Ccircle%20cx='73'%20cy='37'%20r='41'%20fill='%23000'/%3E%3C/mask%3E%3C/defs%3E%3Cg%20mask='url%28%23dlm%29'%3E%3Ccircle%20cx='48'%20cy='50'%20r='45'%20fill='url%28%23dlg%29'/%3E%3Ccircle%20cx='48'%20cy='50'%20r='45'%20fill='none'%20stroke='%23f7dede'%20stroke-width='5'/%3E%3Ccircle%20cx='73'%20cy='37'%20r='41'%20fill='none'%20stroke='%23f7dede'%20stroke-width='5'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 210px center;
+    background-size: 46px 46px;
+  }
+}
+
+/* --- Las placas ----------------------------------------------------------- */
+/* Aqui esta el cambio gordo respecto al resto de temas: el relleno de las
+   tarjetas es carmesi, no gris oscuro. Sigue siendo oscuro en luminancia
+   (0,047, como un gris #3a3a3a), asi que todo el texto claro fijo del panel
+   se lee igual y no hace falta el bloque de temas claros. */
+
+html.tema-darling-red .panel,
+html.tema-darling-red .stat-card,
+html.tema-darling-red .logs-hero,
+html.tema-darling-red .listener-hero {
+  background-image: var(--dr-placa);
+  border-color: color-mix(in srgb, var(--dr-rosa), transparent 72%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--dr-rosa-suave), transparent 84%), var(--dr-sombra);
+}
+
+html.tema-darling-red .hero-card {
+  background-image:
+    radial-gradient(52% 120% at 88% -20%, color-mix(in srgb, var(--dr-carmesi), transparent 70%) 0%, transparent 70%),
+    var(--dr-placa);
+  border-color: color-mix(in srgb, var(--dr-rosa), transparent 66%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--dr-rosa-suave), transparent 78%), var(--dr-sombra);
+}
+
+html.tema-darling-red .toast { box-shadow: var(--dr-sombra) }
+
+/* Escuadras, como en la referencia. En la tarjeta grande se aprovecha el
+   `:after` que style.css usaba para el halo (ya no hace falta: el halo va
+   ahora en el propio degradado del fondo). El radio es el de cada caja para
+   que la escuadra se pegue a la curva en vez de cruzarla. */
+html.tema-darling-red .panel { position: relative }
+
+html.tema-darling-red .hero-card::before,
+html.tema-darling-red .hero-card:after,
+html.tema-darling-red .panel::before,
+html.tema-darling-red .panel::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  /* El `:after` de la tarjeta grande era el halo redondo de style.css: hay que
+     apagarle tambien el radio, o los tres lados que no se redondean aqui se
+     quedan al 50% y la escuadra sale como una media luna. */
+  background: none;
+  filter: none;
+  opacity: 1;
+  border-radius: 0;
+}
+
+html.tema-darling-red .hero-card::before,
+html.tema-darling-red .panel::before {
+  top: 0;
+  left: 0;
+  right: auto;
+  border-top: 2px solid var(--dr-cian);
+  border-left: 2px solid var(--dr-cian);
+}
+html.tema-darling-red .hero-card:after,
+html.tema-darling-red .panel::after {
+  bottom: 0;
+  right: 0;
+  top: auto;
+  left: auto;
+  border-bottom: 2px solid color-mix(in srgb, var(--dr-rosa), transparent 20%);
+  border-right: 2px solid color-mix(in srgb, var(--dr-rosa), transparent 20%);
+}
+
+html.tema-darling-red .hero-card::before { border-top-left-radius: 18px }
+html.tema-darling-red .hero-card:after  { border-bottom-right-radius: 18px; width: 18px; height: 18px }
+html.tema-darling-red .panel::before    { border-top-left-radius: 15px }
+html.tema-darling-red .panel::after     { border-bottom-right-radius: 15px }
+
+/* --- Botones de accion ---------------------------------------------------- */
+/* Fondo blanco hueso con la letra en carmesi. Es lo que pedia la paleta
+   ("blanco: fondos de boton activo") y lo que hace la referencia; ademas
+   resuelve solo el problema de siempre, porque sobre el hueso la letra oscura
+   que ya traia el panel (`var(--user-bg-base)`) se lee de sobra. */
+html.tema-darling-red .primary-button,
+html.tema-darling-red .save-button,
+html.tema-darling-red .auth-button.primary,
+html.tema-darling-red .update-btn,
+html.tema-darling-red .pager-btn.active {
+  background: linear-gradient(135deg, #ffffff 0%, #f2d9dc 100%);
+  color: #3a0710 !important;
+  border-color: transparent;
+}
+html.tema-darling-red .primary-button:hover:not(:disabled),
+html.tema-darling-red .save-button:hover:not(:disabled) {
+  box-shadow: 0 9px 24px color-mix(in srgb, var(--dr-carmesi), transparent 55%);
+}
+
+/* --- Campos --------------------------------------------------------------- */
+/* Usan --user-bg-base, que aqui es casi negro y al lado del carmesi de la
+   tarjeta parece un agujero. Van a un carmesi mas hondo que la placa. */
+html.tema-darling-red .download-form input,
+html.tema-darling-red .speed-row input,
+html.tema-darling-red .speed-row select,
+html.tema-darling-red .token-row input {
+  background: rgba(30, 3, 12, .62);
+  border-color: color-mix(in srgb, var(--dr-carmesi), transparent 52%);
+}
+
 /* --- Indicadores del HUD -------------------------------------------------- */
-/* Aqui la barra NO usa el degradado del tema: la paleta manda el cian para el
+/* La barra NO usa el degradado del tema: la paleta manda el cian para el
    progreso y la conexion, que es lo de la maquina, y el carmesi se queda en
-   los botones. Encima va el barrido, con la misma tecnica de los demas temas:
-   capa propia movida con transform y recorrido fijo, para que el avance se vea
-   igual con la barra corta que con la barra llena. Patron a 105 grados con
-   periodo de 12px sobre su eje: en horizontal repite cada 12 / sen(105) =
-   12,42px, y el recorrido, 24,85px, son dos periodos justos. */
+   placas y botones. Encima va el barrido, con la misma tecnica de los demas
+   temas: capa propia movida con transform y recorrido fijo, para que el avance
+   se vea igual con la barra corta que con la barra llena. Patron a 105 grados
+   con periodo de 12px sobre su eje: en horizontal repite cada
+   12 / sen(105) = 12,42px, y el recorrido, 24,85px, son dos periodos justos. */
 
 html.tema-darling-red .progress-fill,
 html.tema-darling-red .disk-bar .fill,
@@ -2476,9 +2560,10 @@ html.tema-darling-red .update-progress-fill {
   box-shadow: inset 0 1px 0 rgba(245, 245, 245, .32), 0 0 12px color-mix(in srgb, var(--dr-cian), transparent 55%);
 }
 
-html.tema-darling-red .progress-track {
-  background: color-mix(in srgb, var(--user-bg-base), transparent 22%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dr-cian), transparent 76%);
+html.tema-darling-red .progress-track,
+html.tema-darling-red .disk-bar {
+  background: rgba(0, 0, 0, .38);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dr-cian), transparent 78%);
 }
 
 html.tema-darling-red .progress-fill,
@@ -2515,6 +2600,32 @@ html.tema-darling-red .update-progress-fill {
     linear-gradient(120deg, #0097a7 0%, var(--dr-cian) 52%, var(--dr-cian-vivo) 100%);
 }
 
+/* --- Iconos --------------------------------------------------------------- */
+/* Todos con aro cian, como en la referencia. El interior va casi negro para
+   que el aro despegue del carmesi de la placa; el simbolo cambia de color
+   segun el estado, que es lo unico que queda de la codificacion original. */
+
+html.tema-darling-red .stat-icon {
+  background: rgba(20, 2, 9, .72);
+  border: 1.5px solid color-mix(in srgb, var(--dr-cian), transparent 30%);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--dr-cian), transparent 72%),
+              inset 0 0 8px color-mix(in srgb, var(--dr-cian), transparent 88%);
+}
+html.tema-darling-red .stat-icon.blue  { color: var(--dr-cian) }
+html.tema-darling-red .stat-icon.amber { color: var(--dr-rosa) }
+html.tema-darling-red .stat-icon.green { color: var(--dr-cian-vivo) }
+html.tema-darling-red .stat-icon.gray  { color: var(--dr-hueso) }
+
+/* Los iconos de fichero traen el carmesi del tema sobre un fondo tambien
+   carmesi: 2,9:1. Van al rosa. */
+html.tema-darling-red .file-symbol,
+html.tema-darling-red .recent-icon {
+  background: rgba(20, 2, 9, .6);
+  color: var(--dr-rosa);
+}
+
+html.tema-darling-red .sidebar-user-badge .user-icon { color: var(--dr-rosa) }
+
 /* --- Estados -------------------------------------------------------------- */
 
 html.tema-darling-red .status-dot,
@@ -2523,46 +2634,45 @@ html.tema-darling-red .live-dot {
   box-shadow: 0 0 10px color-mix(in srgb, var(--dr-cian), transparent 40%);
 }
 html.tema-darling-red .status-dot.disconnected {
-  background: var(--dr-carmesi);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--dr-carmesi), transparent 40%);
+  background: var(--dr-carmesi-claro);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--dr-carmesi-claro), transparent 40%);
 }
 html.tema-darling-red .sidebar-status.is-disconnected {
   color: var(--dr-carmesi-claro);
-  background: color-mix(in srgb, var(--dr-carmesi), transparent 92%);
-  border-color: color-mix(in srgb, var(--dr-carmesi), transparent 80%);
+  background: rgba(0, 0, 0, .3);
+  border-color: color-mix(in srgb, var(--dr-carmesi-claro), transparent 70%);
 }
 
 html.tema-darling-red .badge,
 html.tema-darling-red .save-state {
-  background: color-mix(in srgb, var(--dr-rosa), transparent 88%);
+  background: rgba(20, 2, 9, .5);
   color: var(--dr-rosa-suave);
-  border-color: color-mix(in srgb, var(--dr-rosa), transparent 74%);
+  border-color: color-mix(in srgb, var(--dr-rosa), transparent 66%);
 }
 
 html.tema-darling-red .count-pill {
-  background: color-mix(in srgb, var(--dr-cian), transparent 88%);
+  background: rgba(20, 2, 9, .5);
   color: var(--dr-cian);
 }
 
-html.tema-darling-red .sidebar-user-badge .user-icon { color: var(--dr-rosa) }
-
-/* Lo destructivo y lo roto, en carmesi aclarado para que se lea. */
+/* Lo destructivo y lo roto: sobre el carmesi de la placa el rojo ya no
+   distingue nada, asi que va en rosa claro y se enciende al hueso. */
 html.tema-darling-red .row-side button,
 html.tema-darling-red .delete-button,
-html.tema-darling-red .sidebar-user-badge .logout-btn { color: var(--dr-carmesi-claro) }
+html.tema-darling-red .sidebar-user-badge .logout-btn { color: var(--dr-rosa-suave) }
 html.tema-darling-red .row-side button:hover,
 html.tema-darling-red .delete-button:hover,
 html.tema-darling-red .sidebar-user-badge .logout-btn:hover {
-  color: #ffd9d5;
-  background: color-mix(in srgb, var(--dr-carmesi), transparent 80%);
+  color: #ffffff;
+  background: rgba(0, 0, 0, .3);
 }
 html.tema-darling-red .row-side .pause-action { color: var(--dr-rosa) }
 html.tema-darling-red .row-side .resume-action { color: var(--dr-cian) }
 
 html.tema-darling-red .toast.danger {
-  background: color-mix(in srgb, var(--dr-carmesi), var(--user-surface) 80%);
-  color: #ffd9d5;
-  border: 1px solid color-mix(in srgb, var(--dr-carmesi), transparent 56%);
+  background: linear-gradient(100deg, #6e141f 0%, #4c101a 100%);
+  color: #ffe6e3;
+  border: 1px solid color-mix(in srgb, var(--dr-carmesi-claro), transparent 60%);
 }
 
 html.tema-darling-red .inline-link,
@@ -2570,24 +2680,21 @@ html.tema-darling-red .inline-link:visited { color: var(--dr-cian) }
 html.tema-darling-red .inline-link:hover { color: var(--dr-rosa-suave) }
 html.tema-darling-red .inline-link:focus-visible { outline-color: var(--dr-cian) }
 
-/* --- Detalles ------------------------------------------------------------- */
-
-html.tema-darling-red .stat-icon.blue  { background: color-mix(in srgb, var(--dr-cian), transparent 86%);       color: var(--dr-cian) }
-html.tema-darling-red .stat-icon.amber { background: color-mix(in srgb, var(--dr-rosa), transparent 86%);       color: var(--dr-rosa) }
-html.tema-darling-red .stat-icon.green { background: color-mix(in srgb, var(--dr-carmesi), transparent 76%);    color: var(--dr-carmesi-claro) }
-html.tema-darling-red .stat-icon.gray  { background: color-mix(in srgb, var(--user-text-dim), transparent 88%); color: var(--user-text-dim) }
+/* --- Controles ------------------------------------------------------------ */
 
 /* El deslizante. Chromium elige el color de la parte no rellena de la pista a
-   partir del `accent-color`, y con el carmesi la pinta BLANCA: sobre el gris
-   noche es una mancha (con el azul de osX o el verde de Herbal la pinta gris
-   oscuro y por eso alli no pasa). En vez de repintar la pista a mano, que
-   obliga a renunciar al relleno de color en Chromium, el deslizante pasa al
-   cian, que es justo lo que la paleta pide para progreso e indicadores. */
+   partir del `accent-color`, y con el carmesi la pinta BLANCA: una mancha
+   (con el azul de osX o el verde de Herbal la pinta gris oscuro y por eso alli
+   no pasa). En vez de repintar la pista a mano, que obliga a renunciar al
+   relleno de color en Chromium, el deslizante pasa al cian, que es justo lo
+   que la paleta pide para progreso e indicadores. */
 html.tema-darling-red .range-input { accent-color: var(--dr-cian) }
 
 /* El interruptor encendido se pinta sobre el carmesi, que es oscuro: aqui el
-   boton blanco fijo del panel si se ve y no hay que cambiarlo (a diferencia de
-   Edge Runner o Rainy Garden). Solo se le sube la sombra para que despegue. */
+   boton blanco fijo del panel si se ve. Solo se le sube la sombra y la pista
+   apagada baja a negro, que sobre la placa carmesi no se distinguia. */
+html.tema-darling-red .switch span { background: rgba(0, 0, 0, .45) }
+html.tema-darling-red .switch input:checked + span { background: var(--dr-carmesi) }
 html.tema-darling-red .switch input:checked + span:after {
   box-shadow: 0 1px 4px rgba(0, 0, 0, .55);
 }
