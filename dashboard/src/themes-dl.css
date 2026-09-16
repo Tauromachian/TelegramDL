@@ -2506,7 +2506,11 @@ html.tema-darling-red .panel::after {
   pointer-events: none;
   background-repeat: no-repeat;
   /* El `:after` de la tarjeta grande era el halo redondo de style.css: hay que
-     apagarle el radio, el desenfoque y el tamano que traia de alli. */
+     apagarle el radio, el desenfoque y el tamano que traia de alli. Y sobre
+     todo el COLOR DE FONDO: alli va como `background: var(--user-glow)`, que
+     es un color, no una imagen, asi que cambiarle el `background-image` no lo
+     quita y queda un rectangulo rojizo detras de la pinza. */
+  background-color: transparent;
   border: 0;
   border-radius: 0;
   filter: none;
@@ -2515,7 +2519,7 @@ html.tema-darling-red .panel::after {
 
 html.tema-darling-red .hero-card::before,
 html.tema-darling-red .panel::before {
-  left: 7px;
+  left: 0;
   right: auto;
   background-image:
     linear-gradient(45deg,  transparent calc(50% - 1px), var(--dr-hud) calc(50% - 1px), var(--dr-hud) calc(50% + 1px), transparent calc(50% + 1px)),
@@ -2527,7 +2531,7 @@ html.tema-darling-red .panel::before {
 
 html.tema-darling-red .hero-card:after,
 html.tema-darling-red .panel::after {
-  right: 7px;
+  right: 0;
   left: auto;
   background-image:
     linear-gradient(135deg, transparent calc(50% - 1px), var(--dr-hud) calc(50% - 1px), var(--dr-hud) calc(50% + 1px), transparent calc(50% + 1px)),
