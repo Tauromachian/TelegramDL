@@ -40,30 +40,13 @@ const emit = defineEmits([
   'regenerate-token'
 ])
 
-// Secciones plegables. Arranca abierta solo la de descargas, que es la que se
-// toca a diario; el resto se despliegan a mano. Lo que el usuario deja abierto
-// se recuerda en localStorage para no tener que volver a abrirlo cada vez.
-const CLAVE_SECCIONES = 'tgdown-ajustes-secciones'
-const abiertos = ref({ descargas: true, temas: false, remoto: false, datos: false })
-
-try {
-  const guardado = JSON.parse(localStorage.getItem(CLAVE_SECCIONES) || 'null')
-  if (guardado && typeof guardado === 'object') {
-    for (const clave of Object.keys(abiertos.value)) {
-      if (typeof guardado[clave] === 'boolean') abiertos.value[clave] = guardado[clave]
-    }
-  }
-} catch (e) {
-  // Si el almacenamiento no está disponible se queda el reparto por defecto.
-}
+// Secciones plegables, en acordeón: solo puede haber una abierta a la vez y al
+// entrar en Ajustes están todas cerradas, así la vista arranca siempre igual y
+// se ve de un vistazo lo que hay. null = ninguna abierta.
+const seccionAbierta = ref(null)
 
 const alternar = (clave) => {
-  abiertos.value[clave] = !abiertos.value[clave]
-  try {
-    localStorage.setItem(CLAVE_SECCIONES, JSON.stringify(abiertos.value))
-  } catch (e) {
-    // Guardar el estado es un extra: si falla, la sección se abre igual.
-  }
+  seccionAbierta.value = seccionAbierta.value === clave ? null : clave
 }
 
 const showToken = ref(false)
@@ -245,11 +228,11 @@ const onImportFile = async (event) => {
 
         <div class="ajustes-acordeon">
           <!-- 1. Descargas -->
-          <section class="ajuste-bloque" :class="{ abierto: abiertos.descargas }">
+          <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'descargas' }">
             <button
               type="button"
               class="ajuste-cabecera"
-              :aria-expanded="abiertos.descargas"
+              :aria-expanded="seccionAbierta === 'descargas'"
               @click="alternar('descargas')"
             >
               <span class="ajuste-icono"><ArrowDownToLine :size="15" /></span>
@@ -260,7 +243,7 @@ const onImportFile = async (event) => {
               <ChevronRight class="ajuste-flecha" :size="16" />
             </button>
 
-            <div v-show="abiertos.descargas" class="ajuste-cuerpo">
+            <div v-show="seccionAbierta === 'descargas'" class="ajuste-cuerpo">
               <div class="ajuste-columnas">
                 <!-- Concurrencia y Workers -->
                 <div class="settings-group">
@@ -329,11 +312,11 @@ const onImportFile = async (event) => {
           </section>
 
           <!-- 2. Temas -->
-          <section class="ajuste-bloque" :class="{ abierto: abiertos.temas }">
+          <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'temas' }">
             <button
               type="button"
               class="ajuste-cabecera"
-              :aria-expanded="abiertos.temas"
+              :aria-expanded="seccionAbierta === 'temas'"
               @click="alternar('temas')"
             >
               <span class="ajuste-icono"><Palette :size="15" /></span>
@@ -344,7 +327,7 @@ const onImportFile = async (event) => {
               <ChevronRight class="ajuste-flecha" :size="16" />
             </button>
 
-            <div v-show="abiertos.temas" class="ajuste-cuerpo">
+            <div v-show="seccionAbierta === 'temas'" class="ajuste-cuerpo">
               <div class="ajuste-columnas">
                 <!-- Paleta de Color y Tema -->
                 <div class="settings-group color-group">
@@ -470,11 +453,11 @@ const onImportFile = async (event) => {
           </section>
 
           <!-- 3. Acceso remoto -->
-          <section class="ajuste-bloque" :class="{ abierto: abiertos.remoto }">
+          <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'remoto' }">
             <button
               type="button"
               class="ajuste-cabecera"
-              :aria-expanded="abiertos.remoto"
+              :aria-expanded="seccionAbierta === 'remoto'"
               @click="alternar('remoto')"
             >
               <span class="ajuste-icono"><KeyRound :size="15" /></span>
@@ -485,7 +468,7 @@ const onImportFile = async (event) => {
               <ChevronRight class="ajuste-flecha" :size="16" />
             </button>
 
-            <div v-show="abiertos.remoto" class="ajuste-cuerpo">
+            <div v-show="seccionAbierta === 'remoto'" class="ajuste-cuerpo">
               <div class="settings-group">
                 <small>
                   Con este token puedes controlar TelegramDL desde otro dispositivo (celular, otra PC).
@@ -518,11 +501,11 @@ const onImportFile = async (event) => {
           </section>
 
           <!-- 4. Datos: escucha e historial -->
-          <section class="ajuste-bloque" :class="{ abierto: abiertos.datos }">
+          <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'datos' }">
             <button
               type="button"
               class="ajuste-cabecera"
-              :aria-expanded="abiertos.datos"
+              :aria-expanded="seccionAbierta === 'datos'"
               @click="alternar('datos')"
             >
               <span class="ajuste-icono"><HardDrive :size="15" /></span>
@@ -533,7 +516,7 @@ const onImportFile = async (event) => {
               <ChevronRight class="ajuste-flecha" :size="16" />
             </button>
 
-            <div v-show="abiertos.datos" class="ajuste-cuerpo">
+            <div v-show="seccionAbierta === 'datos'" class="ajuste-cuerpo">
               <div class="settings-group">
                 <div class="settings-actions acciones-datos">
                   <button type="button" class="reset-button-alt" :disabled="exporting" @click="exportListener">
