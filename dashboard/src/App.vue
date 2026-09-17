@@ -200,7 +200,8 @@ const settings = reactive({
   speed_limit: { value: 0, unit: 'MB' },
   color_id: 5,
   loader_color_id: 5,
-  download_folder: ''
+  download_folder: '',
+  organize_by_chat: true
 })
 
 const resetColor = () => {

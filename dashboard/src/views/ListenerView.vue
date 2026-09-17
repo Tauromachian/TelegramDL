@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, reactive, watch } from 'vue'
-import { Download, FileText, Image, Inbox, MessageCircle, Music, Plus, Radio, Trash2, Video } from '../icons'
+import { Download, FileText, Folder, Image, Inbox, MessageCircle, Music, Plus, Radio, Trash2, Video } from '../icons'
 import ConfirmModal from '../components/ConfirmModal.vue'
 import { useAuthToken } from '../composables/useAuthToken'
 
@@ -64,6 +64,16 @@ const chatLabel = chat => {
 }
 
 const chatMeta = chat => (chat && chat.topic_id ? `${chat.id} · tema ${chat.topic_id}` : String(chat ? chat.id : ''))
+
+// Carpeta de descarga asignada a este chat. El backend la fija con el primer
+// archivo que llega, así que hasta entonces no hay nada que enseñar.
+const chatFolder = chat => {
+  if (!chat || props.settings.organize_by_chat === false) return ''
+  const base = (chat.folder || '').trim()
+  if (!base) return ''
+  const tema = (chat.topic_folder || '').trim()
+  return chat.topic_id && tema ? `${base} / ${tema}` : base
+}
 
 // Acepta un ID numérico o un enlace privado https://t.me/c/<grupo>/<tema>[/<mensaje>].
 const parseChatInput = raw => {
@@ -401,6 +411,7 @@ onUnmounted(() => {
             <div class="chat-details">
               <strong>{{ chatLabel(chat) }}</strong>
               <small>{{ chatMeta(chat) }}</small>
+              <small v-if="chatFolder(chat)" class="chat-carpeta"><Folder :size="10" /> {{ chatFolder(chat) }}</small>
             </div>
             <label class="auto-toggle switch" :class="{ disabled: saving }">
               <input type="checkbox" v-model="chat.auto_download" :disabled="saving" @change="save">
@@ -506,7 +517,7 @@ onUnmounted(() => {
 .topic-picker-actions .save-button{width:auto;margin:0;padding:0 15px}
 .ghost-button{border:1px solid var(--user-border-light);background:transparent;color:var(--user-text-dim);border-radius:9px;padding:0 15px;font:inherit;font-size:12px;cursor:pointer}
 .ghost-button:hover{color:#dbe7f5;border-color:var(--user-primary)}
-.chat-details{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.chat-details strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-details small{color:var(--user-text-dim);font-size:10px}.auto-toggle{display:flex;align-items:center;gap:7px;color:var(--user-text-dim);cursor:pointer;white-space:nowrap}.auto-toggle span{flex:none}.auto-toggle b{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--user-text-dim);transition:color .2s}.auto-toggle input:checked+span+b{color:var(--user-accent)}.auto-toggle.disabled{cursor:default;opacity:.6}
+.chat-details{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.chat-details strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-details small{color:var(--user-text-dim);font-size:10px}.chat-carpeta{display:flex;align-items:center;gap:4px;color:var(--user-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-carpeta svg{flex:none}.auto-toggle{display:flex;align-items:center;gap:7px;color:var(--user-text-dim);cursor:pointer;white-space:nowrap}.auto-toggle span{flex:none}.auto-toggle b{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--user-text-dim);transition:color .2s}.auto-toggle input:checked+span+b{color:var(--user-accent)}.auto-toggle.disabled{cursor:default;opacity:.6}
 .file-symbol{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;border:1px solid var(--user-border);flex-shrink:0;transition:all .2s ease}
 .media-badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-right:6px;border:1px solid transparent;vertical-align:middle}
 .media-photo{color:#38bdf8;background:rgba(56,189,248,.12);border-color:rgba(56,189,248,.3)}

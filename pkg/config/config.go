@@ -59,6 +59,26 @@ type ListenerChat struct {
 	FAudios      bool   `json:"f_audios"`
 	FDocs        bool   `json:"f_docs"`
 	FStickers    bool   `json:"f_stickers"`
+
+	// Folder es la subcarpeta de descargas de este chat, relativa a la carpeta
+	// de descargas. Se calcula la primera vez que llega un archivo y se guarda:
+	// así, si el canal se renombra, sus archivos siguen cayendo todos juntos.
+	// TopicFolder es lo mismo para el tema, y cuelga de Folder.
+	Folder      string `json:"folder,omitempty"`
+	TopicFolder string `json:"topic_folder,omitempty"`
+}
+
+// CarpetaRelativa es la ruta, relativa a la carpeta de descargas, donde van los
+// archivos de esta entrada. Vacía significa que todavía no se le asignó una.
+func (c ListenerChat) CarpetaRelativa() string {
+	base := strings.TrimSpace(c.Folder)
+	if base == "" {
+		return ""
+	}
+	if tema := strings.TrimSpace(c.TopicFolder); c.HasTopic() && tema != "" {
+		return filepath.Join(base, tema)
+	}
+	return base
 }
 
 // ListenerChatKey construye el identificador único de una entrada de escucha.
@@ -128,16 +148,19 @@ func TopicPointer(topicID int64) *int64 {
 }
 
 type Config struct {
-	MaxConcurrentDownloads int            `json:"max_concurrent_downloads"`
-	ParallelChunks         bool           `json:"parallel_chunks"`
-	ChunkWorkers           int            `json:"chunk_workers"`
-	DownloadFolder         string         `json:"download_folder"`
-	ColorID                *int           `json:"color_id"`
-	LoaderColorID          *int           `json:"loader_color_id"`
-	SpeedLimit             SpeedLimit     `json:"speed_limit"`
-	ListenerEnabled        bool           `json:"listener_enabled"`
-	ListenerChats          []ListenerChat `json:"listener_chats"`
-	ListenerChatIDs        []int64        `json:"listener_chat_ids"`
+	MaxConcurrentDownloads int    `json:"max_concurrent_downloads"`
+	ParallelChunks         bool   `json:"parallel_chunks"`
+	ChunkWorkers           int    `json:"chunk_workers"`
+	DownloadFolder         string `json:"download_folder"`
+	// OrganizeByChat reparte lo que baja la escucha en una subcarpeta por chat.
+	// Apagado, todo cae en la carpeta de descargas, como antes.
+	OrganizeByChat  bool           `json:"organize_by_chat"`
+	ColorID         *int           `json:"color_id"`
+	LoaderColorID   *int           `json:"loader_color_id"`
+	SpeedLimit      SpeedLimit     `json:"speed_limit"`
+	ListenerEnabled bool           `json:"listener_enabled"`
+	ListenerChats   []ListenerChat `json:"listener_chats"`
+	ListenerChatIDs []int64        `json:"listener_chat_ids"`
 }
 
 var (
@@ -396,6 +419,7 @@ func DefaultConfig() Config {
 		ParallelChunks:         true,
 		ChunkWorkers:           4,
 		DownloadFolder:         GetDefaultDownloadFolder(),
+		OrganizeByChat:         true,
 		ColorID:                nil,
 		LoaderColorID:          nil,
 		SpeedLimit: SpeedLimit{
@@ -536,9 +560,12 @@ func NormalizeConfig(raw Config) Config {
 		}
 		if !chat.HasTopic() {
 			chat.TopicName = ""
+			chat.TopicFolder = ""
 		}
 		chat.TopicName = strings.TrimSpace(chat.TopicName)
 		chat.Name = strings.TrimSpace(chat.Name)
+		chat.Folder = strings.TrimSpace(chat.Folder)
+		chat.TopicFolder = strings.TrimSpace(chat.TopicFolder)
 
 		if pos, dup := seenKeys[chat.Key()]; dup {
 			uniqueChats[pos] = chat
@@ -564,6 +591,37 @@ func NormalizeConfig(raw Config) Config {
 	raw.ListenerChatIDs = chatIDs
 
 	return raw
+}
+
+// PreservarCarpetas devuelve las entradas nuevas con la carpeta que ya tenían
+// las viejas. El panel manda la lista de chats sin el campo «folder» (la vista
+// de Ajustes reconstruye cada chat campo a campo al importar la escucha), y sin
+// esto un guardado desde allí borraría el reparto en carpetas y los archivos
+// del mismo chat acabarían en dos sitios distintos.
+func PreservarCarpetas(previas, nuevas []ListenerChat) []ListenerChat {
+	if len(previas) == 0 || len(nuevas) == 0 {
+		return nuevas
+	}
+
+	porClave := make(map[string]ListenerChat, len(previas))
+	for _, vieja := range previas {
+		porClave[vieja.Key()] = vieja
+	}
+
+	for i := range nuevas {
+		vieja, ok := porClave[nuevas[i].Key()]
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(nuevas[i].Folder) == "" {
+			nuevas[i].Folder = vieja.Folder
+		}
+		if strings.TrimSpace(nuevas[i].TopicFolder) == "" {
+			nuevas[i].TopicFolder = vieja.TopicFolder
+		}
+	}
+
+	return nuevas
 }
 
 func FormatBytes(size float64) string {

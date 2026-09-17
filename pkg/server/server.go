@@ -1373,6 +1373,11 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	if v, ok := raw["chunk_workers"]; ok && v != nil {
 		cfg.ChunkWorkers = int(config.ParseInt64(v))
 	}
+	if v, ok := raw["organize_by_chat"]; ok && v != nil {
+		if b, ok := v.(bool); ok {
+			cfg.OrganizeByChat = b
+		}
+	}
 	if v, ok := raw["download_folder"]; ok && v != nil {
 		if sVal, ok := v.(string); ok && strings.TrimSpace(sVal) != "" {
 			// Se descarta en silencio una carpeta prohibida en vez de aplicarla:
@@ -1423,7 +1428,11 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		if chatBytes, err := json.Marshal(v); err == nil {
 			var parsedChats []config.ListenerChat
 			if json.Unmarshal(chatBytes, &parsedChats) == nil {
-				cfg.ListenerChats = parsedChats
+				// La carpeta asignada a cada chat no viaja en lo que manda el
+				// panel, así que se conserva la que ya había: si no, guardar
+				// desde Ajustes dejaría los archivos del mismo chat repartidos
+				// entre la carpeta vieja y una nueva.
+				cfg.ListenerChats = config.PreservarCarpetas(cfg.ListenerChats, parsedChats)
 			}
 		}
 	}
@@ -1542,7 +1551,10 @@ func (s *Server) handleListenerSettings(w http.ResponseWriter, r *http.Request) 
 		if chatBytes, err := json.Marshal(rawChats); err == nil {
 			var parsedChats []config.ListenerChat
 			if err := json.Unmarshal(chatBytes, &parsedChats); err == nil {
-				cfg.ListenerChats = parsedChats
+				// Igual que en /api/settings: la carpeta ya asignada se conserva
+				// aunque quien llame no la mande (la importación de escucha
+				// reconstruye cada chat campo a campo).
+				cfg.ListenerChats = config.PreservarCarpetas(cfg.ListenerChats, parsedChats)
 			}
 		}
 	} else {

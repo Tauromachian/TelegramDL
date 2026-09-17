@@ -1,0 +1,325 @@
+package downloader
+
+import (
+	"fmt"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"unicode"
+)
+
+// Nombres de carpeta para organizar las descargas de la escucha.
+//
+// La idea: cada chat vigilado baja sus archivos a una subcarpeta con su
+// nombre. El título lo elige quien administra el canal, así que puede traer
+// cualquier cosa —emojis, marcas que invierten el texto, letras decorativas—.
+// Lo que aquí se hace es quedarse con la parte legible del título y, si no
+// queda nada legible, usar el ID del chat.
+//
+// El criterio es amplio a propósito: cirílico, chino, griego o árabe se
+// conservan, porque NTFS, APFS y ext4 los guardan sin problema. Lo que se tira
+// es la decoración: emojis, pictogramas, símbolos sueltos y los caracteres de
+// control de dirección (RLO/LRO), que son los que hacen que el Explorador
+// enseñe el nombre al revés.
+
+const (
+	// maxCarpetaRunas es más corto que el de los archivos (200 bytes) porque
+	// delante va la carpeta de descargas y detrás el nombre del archivo, y
+	// Windows sigue teniendo el tope de 260 caracteres en muchas de sus APIs.
+	maxCarpetaRunas = 60
+
+	// minAlfanumericos es lo mínimo que tiene que quedar tras la limpieza para
+	// considerar que el título dice algo. Un título de una sola letra no
+	// identifica nada, y casi siempre es el resto de un nombre hecho de
+	// símbolos.
+	minAlfanumericos = 2
+)
+
+// NombreCarpetaChat devuelve el nombre de carpeta de un chat: su título si se
+// puede escribir y leer en cualquier sistema, y «chat_<id>» si no.
+func NombreCarpetaChat(titulo string, id int64) string {
+	if nombre := nombreLegible(titulo); nombre != "" {
+		return nombre
+	}
+	return CarpetaPorID(id)
+}
+
+// CarpetaPorID es el nombre de respaldo. El ID va en positivo: los canales lo
+// tienen negativo y un nombre que empieza por «-» se lo comen como una opción
+// más de una herramienta de consola.
+func CarpetaPorID(id int64) string {
+	if id < 0 {
+		id = -id
+	}
+	return "chat_" + strconv.FormatInt(id, 10)
+}
+
+// NombreCarpetaTema es lo mismo para el tema de un grupo, con «tema_<id>» de
+// respaldo mientras Telegram no nos haya dado su título.
+func NombreCarpetaTema(titulo string, topicID int64) string {
+	if nombre := nombreLegible(titulo); nombre != "" {
+		return nombre
+	}
+	if topicID < 0 {
+		topicID = -topicID
+	}
+	return "tema_" + strconv.FormatInt(topicID, 10)
+}
+
+// NombreCarpetaConID añade el ID al nombre. Se usa cuando dos chats distintos
+// resuelven al mismo nombre de carpeta: el segundo lleva su ID detrás para que
+// no compartan destino.
+func NombreCarpetaConID(nombre string, id int64) string {
+	if id < 0 {
+		id = -id
+	}
+	sufijo := " (" + strconv.FormatInt(id, 10) + ")"
+	base := strings.TrimSpace(nombre)
+	if base == "" {
+		return CarpetaPorID(id)
+	}
+	// El recorte va antes de pegar el sufijo: si no, un nombre ya en el límite
+	// dejaría el ID fuera, que es justo lo que distingue a las dos carpetas.
+	base = recortarRunas(base, maxCarpetaRunas-len([]rune(sufijo)))
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return CarpetaPorID(id)
+	}
+	return SanitizeFileName(base + sufijo)
+}
+
+// RutaRelativaSegura valida la ruta relativa que viaja con una descarga antes
+// de pegarla a la carpeta de destino. Aunque la genera el propio programa, sale
+// de un nombre que elige un tercero en Telegram, así que se trata como entrada
+// no confiable: nada de rutas absolutas, nada de «..» y como mucho dos niveles
+// (grupo y tema).
+func RutaRelativaSegura(sub string) string {
+	sub = strings.TrimSpace(sub)
+	if sub == "" {
+		return ""
+	}
+
+	// El separador se normaliza porque la ruta pudo guardarse en la base de
+	// datos en otro sistema (una configuración copiada de Windows a Linux).
+	sub = strings.ReplaceAll(sub, "\\", "/")
+
+	// Una ruta absoluta no es una subcarpeta de nada: se rechaza entera en vez
+	// de recortarla, que es la forma de no convertir «/etc/passwd» en algo que
+	// parezca válido.
+	if strings.HasPrefix(sub, "/") {
+		return ""
+	}
+	if len(sub) > 1 && sub[1] == ':' {
+		return ""
+	}
+
+	partes := make([]string, 0, 2)
+	for _, parte := range strings.Split(sub, "/") {
+		parte = strings.TrimSpace(parte)
+		if parte == "" || parte == "." {
+			continue
+		}
+		// Un «..» no se salta: significa que la ruta viene mal, y lo seguro es
+		// quedarse sin subcarpeta y bajar a la raíz de descargas.
+		if parte == ".." {
+			return ""
+		}
+		parte = SanitizeFileName(parte)
+		if parte == "" {
+			continue
+		}
+		partes = append(partes, parte)
+		if len(partes) == 2 {
+			break
+		}
+	}
+
+	if len(partes) == 0 {
+		return ""
+	}
+	return filepath.Join(partes...)
+}
+
+// nombreLegible devuelve el título ya limpio y apto para el disco, o cadena
+// vacía si de ese título no queda nada que sirva.
+func nombreLegible(titulo string) string {
+	limpio := colapsarEspacios(quitarDecoracion(titulo))
+	if contarAlfanumericos(limpio) < minAlfanumericos {
+		return ""
+	}
+
+	limpio = strings.TrimSpace(recortarRunas(limpio, maxCarpetaRunas))
+	if limpio == "" {
+		return ""
+	}
+
+	// SanitizeFileName es la misma limpieza que se aplica a los archivos:
+	// caracteres que no admite la ruta, nombres reservados de Windows y nada
+	// de punto o espacio al final.
+	seguro := SanitizeFileName(limpio)
+
+	// «archivo» es el comodín que devuelve SanitizeFileName cuando no queda
+	// nada; como nombre de carpeta de un chat no dice nada, mejor el ID.
+	if seguro == "archivo" && !strings.EqualFold(limpio, "archivo") {
+		return ""
+	}
+	if contarAlfanumericos(seguro) < minAlfanumericos {
+		return ""
+	}
+	return seguro
+}
+
+// quitarDecoracion se queda con la parte del título que es texto de verdad.
+func quitarDecoracion(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+
+	combinantes := 0
+	for _, r := range s {
+		// Las letras «decorativas» matemáticas (𝓒𝓪𝓷𝓪𝓵, 𝗖𝗮𝗻𝗮𝗹) se convierten a su
+		// letra normal en vez de tirarse: son títulos perfectamente legibles
+		// escritos con un alfabeto raro, y así no acaban en el ID.
+		if letra, ok := letraMatematica(r); ok {
+			b.WriteRune(letra)
+			combinantes = 0
+			continue
+		}
+
+		switch {
+		case r == '\n' || r == '\r' || r == '\t':
+			b.WriteRune(' ')
+			combinantes = 0
+
+		case unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r):
+			// Marcas combinantes: una por letra base. Más de una es el truco
+			// del «Zalgo», texto sepultado bajo cientos de tildes.
+			if combinantes < 1 {
+				b.WriteRune(r)
+				combinantes++
+			}
+
+		case esDecorativo(r):
+			// Se sustituye por un espacio para no pegar dos palabras que solo
+			// estaban separadas por el emoji de en medio.
+			b.WriteRune(' ')
+			combinantes = 0
+
+		default:
+			b.WriteRune(r)
+			combinantes = 0
+		}
+	}
+
+	return b.String()
+}
+
+// esDecorativo distingue lo que no es texto: emojis, pictogramas, símbolos
+// sueltos y los caracteres de control e invisibles.
+func esDecorativo(r rune) bool {
+	switch {
+	case r < 0x20 || r == 0x7f:
+		return true
+	// Cf incluye las marcas de dirección (RLO, LRO, PDF) y los anchos cero.
+	// Son las peligrosas de verdad: no se ven, pero le dan la vuelta al nombre
+	// en el Explorador.
+	case unicode.Is(unicode.Cc, r), unicode.Is(unicode.Cf, r),
+		unicode.Is(unicode.Cs, r), unicode.Is(unicode.Co, r):
+		return true
+	// So son los pictogramas y dingbats; Sk los modificadores (tonos de piel,
+	// acentos sueltos con forma de símbolo).
+	case unicode.Is(unicode.So, r), unicode.Is(unicode.Sk, r):
+		return true
+	case r >= 0xFE00 && r <= 0xFE0F: // selectores de variación
+		return true
+	case r >= 0x1F000 && r <= 0x1FAFF: // emoji y pictogramas
+		return true
+	case r >= 0xE0000 && r <= 0xE007F: // etiquetas invisibles
+		return true
+	}
+	return false
+}
+
+// alfabetosMatematicos son los bloques de letras y números decorativos del
+// plano 1, cada uno con la letra por la que empieza. Los huecos del bloque
+// (la «h» cursiva vive fuera, en ℎ) no hacen falta: esos caracteres ya son
+// letras normales y pasan el filtro por su cuenta.
+var alfabetosMatematicos = []struct {
+	inicio rune
+	base   rune
+	largo  rune
+}{
+	{0x1D400, 'A', 26}, {0x1D41A, 'a', 26}, // negrita
+	{0x1D434, 'A', 26}, {0x1D44E, 'a', 26}, // cursiva
+	{0x1D468, 'A', 26}, {0x1D482, 'a', 26}, // negrita cursiva
+	{0x1D49C, 'A', 26}, {0x1D4B6, 'a', 26}, // caligráfica
+	{0x1D4D0, 'A', 26}, {0x1D4EA, 'a', 26}, // caligráfica negrita
+	{0x1D504, 'A', 26}, {0x1D51E, 'a', 26}, // gótica
+	{0x1D538, 'A', 26}, {0x1D552, 'a', 26}, // hueca
+	{0x1D56C, 'A', 26}, {0x1D586, 'a', 26}, // gótica negrita
+	{0x1D5A0, 'A', 26}, {0x1D5BA, 'a', 26}, // palo seco
+	{0x1D5D4, 'A', 26}, {0x1D5EE, 'a', 26}, // palo seco negrita
+	{0x1D608, 'A', 26}, {0x1D622, 'a', 26}, // palo seco cursiva
+	{0x1D63C, 'A', 26}, {0x1D656, 'a', 26}, // palo seco negrita cursiva
+	{0x1D670, 'A', 26}, {0x1D68A, 'a', 26}, // monoespaciada
+	{0x1D7CE, '0', 10}, {0x1D7D8, '0', 10}, // cifras negrita y huecas
+	{0x1D7E2, '0', 10}, {0x1D7EC, '0', 10}, // cifras palo seco
+	{0x1D7F6, '0', 10}, // cifras monoespaciadas
+}
+
+// letraMatematica traduce una letra decorativa a su equivalente normal.
+func letraMatematica(r rune) (rune, bool) {
+	if r < 0x1D400 || r > 0x1D7FF {
+		return 0, false
+	}
+	for _, bloque := range alfabetosMatematicos {
+		if r >= bloque.inicio && r < bloque.inicio+bloque.largo {
+			return bloque.base + (r - bloque.inicio), true
+		}
+	}
+	return 0, false
+}
+
+// colapsarEspacios deja un solo espacio entre palabras y quita los de los
+// extremos. Después de quitar la decoración suelen quedar huecos dobles.
+func colapsarEspacios(s string) string {
+	campos := strings.FieldsFunc(s, unicode.IsSpace)
+	return strings.Join(campos, " ")
+}
+
+// contarAlfanumericos cuenta las runas que son letra o número de algún sistema
+// de escritura real. Es la prueba de «esto dice algo».
+func contarAlfanumericos(s string) int {
+	total := 0
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			total++
+		}
+	}
+	return total
+}
+
+// recortarRunas corta a lo sumo limite runas, sin partir ningún carácter.
+func recortarRunas(s string, limite int) string {
+	if limite <= 0 {
+		return ""
+	}
+	runas := []rune(s)
+	if len(runas) <= limite {
+		return s
+	}
+	return string(runas[:limite])
+}
+
+// TextoCarpetaChat es el contenido del archivito que se deja dentro de la
+// carpeta cuando el nombre no dice de qué chat es. Sirve para reconocerla
+// desde el Explorador sin abrir el programa.
+func TextoCarpetaChat(titulo string, id int64, tema string) string {
+	var b strings.Builder
+	b.WriteString("Carpeta creada por TelegramDL\r\n")
+	b.WriteString(fmt.Sprintf("Chat: %s\r\n", strings.TrimSpace(titulo)))
+	b.WriteString(fmt.Sprintf("ID: %d\r\n", id))
+	if tema = strings.TrimSpace(tema); tema != "" {
+		b.WriteString(fmt.Sprintf("Tema: %s\r\n", tema))
+	}
+	return b.String()
+}

@@ -306,6 +306,17 @@ const onImportFile = async (event) => {
                   </div>
 
                   <FolderPicker v-model="settings.download_folder" />
+
+                  <div class="setting-line">
+                    <div>
+                      <strong>Carpeta por chat (escucha)</strong>
+                      <small>Lo que baje de un chat vigilado va a una subcarpeta con su nombre; si el nombre no se puede escribir en disco, se usa su ID.</small>
+                    </div>
+                    <label class="switch">
+                      <input v-model="settings.organize_by_chat" type="checkbox" />
+                      <span></span>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>

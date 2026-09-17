@@ -99,6 +99,10 @@ func logConfigChanges(before, after config.Config) {
 		changes = append(changes, fmt.Sprintf("Carpeta de descargas: %s → %s",
 			before.DownloadFolder, after.DownloadFolder))
 	}
+	if before.OrganizeByChat != after.OrganizeByChat {
+		changes = append(changes, fmt.Sprintf("Carpeta por chat en la escucha: %s → %s",
+			onOff(before.OrganizeByChat), onOff(after.OrganizeByChat)))
+	}
 	if before.SpeedLimit != after.SpeedLimit {
 		changes = append(changes, fmt.Sprintf("Límite de velocidad: %s → %s",
 			describeSpeedLimit(before.SpeedLimit), describeSpeedLimit(after.SpeedLimit)))

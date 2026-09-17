@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -140,7 +141,16 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 		return errors.New("cliente de Telegram no listo")
 	}
 
-	_ = os.MkdirAll(downloadFolder, 0755)
+	// Destino final: la carpeta de descargas y, si el archivo viene de un chat
+	// vigilado y el reparto por chat está encendido, su subcarpeta. La ruta se
+	// valida antes de pegarla: la genera el programa, pero sale de un nombre
+	// que elige un tercero en Telegram.
+	destino := downloadFolder
+	if sub := RutaRelativaSegura(datos.SubFolder); sub != "" {
+		destino = filepath.Join(downloadFolder, sub)
+	}
+
+	_ = os.MkdirAll(destino, 0755)
 
 	e.mu.Lock()
 	cachedMsg := e.messageCache[itemID]
@@ -182,7 +192,7 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	e.mu.Unlock()
 
 	finalPath, finalName, alreadyExists := e.reservations.ReservePath(
-		downloadFolder, currentFileName, datos.MessageID, mediaInfo.FileSize, allowDuplicate,
+		destino, currentFileName, datos.MessageID, mediaInfo.FileSize, allowDuplicate,
 	)
 	defer e.reservations.ReleasePath(finalPath)
 

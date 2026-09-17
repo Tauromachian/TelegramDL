@@ -18,18 +18,22 @@ import (
 )
 
 type DownloadItem struct {
-	ID           string  `json:"id"`
-	JobID        string  `json:"job_id"`
-	MessageID    int64   `json:"message_id"`
-	ChatID       int64   `json:"chat_id"`
-	FileName     string  `json:"file_name"`
-	Status       string  `json:"status"`
-	Progress     float64 `json:"progress"`
-	TotalStr     string  `json:"total_str"`
-	CurrentStr   string  `json:"current_str"`
-	Speed        string  `json:"speed"`
-	Kind         string  `json:"kind"`
-	FilePath     string  `json:"file_path"`
+	ID         string  `json:"id"`
+	JobID      string  `json:"job_id"`
+	MessageID  int64   `json:"message_id"`
+	ChatID     int64   `json:"chat_id"`
+	FileName   string  `json:"file_name"`
+	Status     string  `json:"status"`
+	Progress   float64 `json:"progress"`
+	TotalStr   string  `json:"total_str"`
+	CurrentStr string  `json:"current_str"`
+	Speed      string  `json:"speed"`
+	Kind       string  `json:"kind"`
+	FilePath   string  `json:"file_path"`
+	// SubFolder es la subcarpeta, relativa a la carpeta de descargas, donde va
+	// este archivo. La pone la escucha con el nombre del chat; vacía significa
+	// que el archivo cae en la raíz, como las descargas por enlace.
+	SubFolder    string  `json:"sub_folder,omitempty"`
 	Source       string  `json:"source"`
 	Error        string  `json:"error"`
 	UpdatedAt    float64 `json:"updated_at"`
@@ -117,6 +121,7 @@ func (s *Storage) initSchema() error {
 		speed TEXT NOT NULL DEFAULT '0 B/s',
 		kind TEXT,
 		file_path TEXT,
+		sub_folder TEXT,
 		source TEXT,
 		error TEXT,
 		updated_at REAL NOT NULL,
@@ -143,8 +148,14 @@ func (s *Storage) initSchema() error {
 	_, _ = s.db.Exec("ALTER TABLE downloads ADD COLUMN total_bytes INTEGER NOT NULL DEFAULT 0")
 	_, _ = s.db.Exec("ALTER TABLE downloads ADD COLUMN current_bytes INTEGER NOT NULL DEFAULT 0")
 	_, _ = s.db.Exec("ALTER TABLE downloads ADD COLUMN error TEXT")
+	_, _ = s.db.Exec("ALTER TABLE downloads ADD COLUMN sub_folder TEXT")
 	for _, col := range []string{"f_photos", "f_videos", "f_audios", "f_docs", "f_stickers"} {
 		_, _ = s.db.Exec(fmt.Sprintf("ALTER TABLE listener_chats ADD COLUMN %s INTEGER NOT NULL DEFAULT 1", col))
+	}
+	// Carpeta asignada a cada chat vigilado. Las bases de datos que vienen de
+	// una versión anterior no tienen estas columnas.
+	for _, col := range []string{"folder", "topic_folder"} {
+		_, _ = s.db.Exec(fmt.Sprintf("ALTER TABLE listener_chats ADD COLUMN %s TEXT NOT NULL DEFAULT ''", col))
 	}
 
 	if err := s.migrateListenerTopics(); err != nil {
@@ -164,6 +175,8 @@ const listenerChatsSchema = `
 		topic_id INTEGER NOT NULL DEFAULT 0,
 		topic_name TEXT NOT NULL DEFAULT '',
 		name TEXT NOT NULL,
+		folder TEXT NOT NULL DEFAULT '',
+		topic_folder TEXT NOT NULL DEFAULT '',
 		auto_download INTEGER NOT NULL DEFAULT 0,
 		f_photos INTEGER NOT NULL DEFAULT 1,
 		f_videos INTEGER NOT NULL DEFAULT 1,
@@ -496,6 +509,9 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 	if val, ok := kv["listener_enabled"]; ok {
 		cfg.ListenerEnabled = val == "1" || val == "true"
 	}
+	if val, ok := kv["organize_by_chat"]; ok {
+		cfg.OrganizeByChat = val == "1" || val == "true"
+	}
 	if val, ok := kv["download_folder"]; ok && val != "" {
 		cfg.DownloadFolder = val
 	}
@@ -519,20 +535,22 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 	}
 
 	// Cargar listener_chats
-	chatRows, err := s.db.Query("SELECT chat_id, topic_id, topic_name, name, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers FROM listener_chats ORDER BY chat_id, topic_id")
+	chatRows, err := s.db.Query("SELECT chat_id, topic_id, topic_name, name, folder, topic_folder, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers FROM listener_chats ORDER BY chat_id, topic_id")
 	if err == nil {
 		defer chatRows.Close()
 		chats := make([]config.ListenerChat, 0)
 		for chatRows.Next() {
 			var c config.ListenerChat
 			var topicID int64
-			var topicName string
+			var topicName, folder, topicFolder string
 			var auto, photos, videos, audios, docs, stickers int
-			if err := chatRows.Scan(&c.ID, &topicID, &topicName, &c.Name, &auto, &photos, &videos, &audios, &docs, &stickers); err == nil {
+			if err := chatRows.Scan(&c.ID, &topicID, &topicName, &c.Name, &folder, &topicFolder, &auto, &photos, &videos, &audios, &docs, &stickers); err == nil {
 				c.TopicID = config.TopicPointer(topicID)
 				if c.HasTopic() {
 					c.TopicName = topicName
+					c.TopicFolder = topicFolder
 				}
+				c.Folder = folder
 				c.AutoDownload = auto != 0
 				c.FPhotos = photos != 0
 				c.FVideos = videos != 0
@@ -609,6 +627,7 @@ func (s *Storage) SaveConfig(cfg config.Config) error {
 		"chunk_workers":            strconv.Itoa(cfg.ChunkWorkers),
 		"download_folder":          cfg.DownloadFolder,
 		"listener_enabled":         strconv.FormatBool(cfg.ListenerEnabled),
+		"organize_by_chat":         strconv.FormatBool(cfg.OrganizeByChat),
 		"speed_value":              fmt.Sprintf("%f", cfg.SpeedLimit.Value),
 		"speed_unit":               cfg.SpeedLimit.Unit,
 	}
@@ -664,9 +683,9 @@ func (s *Storage) SaveConfig(cfg config.Config) error {
 		}
 
 		_, err := tx.Exec(`
-			INSERT OR REPLACE INTO listener_chats(chat_id, topic_id, topic_name, name, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers)
-			VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, c.ID, c.Topic(), c.TopicName, name, auto, fPhotos, fVideos, fAudios, fDocs, fStickers)
+			INSERT OR REPLACE INTO listener_chats(chat_id, topic_id, topic_name, name, folder, topic_folder, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers)
+			VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, c.ID, c.Topic(), c.TopicName, name, c.Folder, c.TopicFolder, auto, fPhotos, fVideos, fAudios, fDocs, fStickers)
 		if err != nil {
 			return err
 		}
@@ -721,7 +740,7 @@ func (s *Storage) LoadDownloads(legacyPath string) (map[string]DownloadItem, err
 		}
 	}
 
-	rows, err := s.db.Query("SELECT id, job_id, message_id, chat_id, file_name, status, progress, total_str, current_str, speed, kind, file_path, source, error, updated_at, created_at, total_bytes, current_bytes FROM downloads ORDER BY updated_at DESC")
+	rows, err := s.db.Query("SELECT id, job_id, message_id, chat_id, file_name, status, progress, total_str, current_str, speed, kind, file_path, sub_folder, source, error, updated_at, created_at, total_bytes, current_bytes FROM downloads ORDER BY updated_at DESC")
 	if err != nil {
 		return items, err
 	}
@@ -729,13 +748,13 @@ func (s *Storage) LoadDownloads(legacyPath string) (map[string]DownloadItem, err
 
 	for rows.Next() {
 		var item DownloadItem
-		var jobID, kind, filePath, source, errStr sql.NullString
+		var jobID, kind, filePath, subFolder, source, errStr sql.NullString
 		var msgID, chatID, totalB, currB sql.NullInt64
 
 		err := rows.Scan(
 			&item.ID, &jobID, &msgID, &chatID, &item.FileName,
 			&item.Status, &item.Progress, &item.TotalStr, &item.CurrentStr,
-			&item.Speed, &kind, &filePath, &source, &errStr, &item.UpdatedAt,
+			&item.Speed, &kind, &filePath, &subFolder, &source, &errStr, &item.UpdatedAt,
 			&item.CreatedAt, &totalB, &currB,
 		)
 		if err == nil {
@@ -747,6 +766,9 @@ func (s *Storage) LoadDownloads(legacyPath string) (map[string]DownloadItem, err
 			}
 			if filePath.Valid {
 				item.FilePath = filePath.String
+			}
+			if subFolder.Valid {
+				item.SubFolder = subFolder.String
 			}
 			if source.Valid {
 				item.Source = source.String
@@ -789,8 +811,8 @@ func (s *Storage) SaveDownload(item DownloadItem) error {
 		INSERT INTO downloads(
 			id, job_id, message_id, chat_id, file_name,
 			status, progress, total_str, current_str, speed,
-			kind, file_path, source, error, updated_at, created_at, total_bytes, current_bytes
-		) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			kind, file_path, sub_folder, source, error, updated_at, created_at, total_bytes, current_bytes
+		) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			file_name=excluded.file_name,
 			status=excluded.status,
@@ -800,6 +822,7 @@ func (s *Storage) SaveDownload(item DownloadItem) error {
 			speed=excluded.speed,
 			updated_at=excluded.updated_at,
 			file_path=excluded.file_path,
+			sub_folder=excluded.sub_folder,
 			kind=excluded.kind,
 			error=excluded.error,
 			total_bytes=excluded.total_bytes,
@@ -807,7 +830,7 @@ func (s *Storage) SaveDownload(item DownloadItem) error {
 	`,
 		item.ID, item.JobID, item.MessageID, item.ChatID, item.FileName,
 		item.Status, item.Progress, item.TotalStr, item.CurrentStr, item.Speed,
-		item.Kind, item.FilePath, item.Source, item.Error, item.UpdatedAt, item.CreatedAt,
+		item.Kind, item.FilePath, item.SubFolder, item.Source, item.Error, item.UpdatedAt, item.CreatedAt,
 		item.TotalBytes, item.CurrentBytes,
 	)
 
