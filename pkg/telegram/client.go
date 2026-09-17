@@ -51,10 +51,14 @@ type AuthStatus struct {
 }
 
 type ClientManager struct {
-	apiID                int
-	apiHash              string
-	client               *telegram.Client
-	rawClient            *tg.Client
+	apiID     int
+	apiHash   string
+	client    *telegram.Client
+	rawClient *tg.Client
+	// Grupo de conexiones dedicado a bajar archivos. Ver ConexionesDescarga.
+	downloadPool         telegram.CloseInvoker
+	downloadClient       *tg.Client
+	downloadPoolAviso    bool
 	sessionPath          string
 	cancelRun            context.CancelFunc
 	runWg                sync.WaitGroup
@@ -77,6 +81,103 @@ type ClientManager struct {
 // límite se descarta una entrada existente (orden no determinista, pero
 // barato) para dejar sitio a la nueva.
 const maxAccessHashEntries = 20000
+
+// ConexionesDescarga es cuántas conexiones MTProto se abren, además de la
+// principal, solo para pedir bloques de archivo.
+//
+// Es el arreglo de fondo del problema de «los workers no suman»: MTProto
+// multiplexa muchas peticiones por una conexión, pero Telegram le pone un techo
+// de velocidad a cada una. Con una sola conexión daba igual poner 2 workers que
+// 8: el techo era el mismo y lo único que se conseguía era provocar FLOOD_WAIT.
+// Los clientes oficiales abren varias conexiones por centro de datos justo por
+// esto.
+//
+// Ocho es lo que usan los clientes oficiales y deja margen de sobra: con
+// bloques de 512 KB y 100 ms de ida y vuelta el techo teórico queda muy por
+// encima de cualquier conexión doméstica. Subirlo más no acelera y sí acerca el
+// límite de Telegram.
+const ConexionesDescarga = 8
+
+// abrirPoolDescargas levanta el grupo de conexiones de descarga. Se llama con
+// el cliente ya conectado, porque el grupo se crea contra el centro de datos de
+// la sesión. Si falla, no pasa nada: las descargas siguen saliendo por la
+// conexión principal, como antes.
+func (cm *ClientManager) abrirPoolDescargas() {
+	cm.mu.RLock()
+	client := cm.client
+	yaAbierto := cm.downloadPool != nil
+	cm.mu.RUnlock()
+
+	if client == nil || yaAbierto {
+		return
+	}
+
+	pool, err := client.Pool(int64(ConexionesDescarga))
+	if err != nil {
+		// El aviso sale una sola vez: DownloadClient reintenta abrirlo en cada
+		// descarga y no tiene sentido llenar el registro con lo mismo.
+		cm.mu.Lock()
+		avisar := !cm.downloadPoolAviso
+		cm.downloadPoolAviso = true
+		cm.mu.Unlock()
+		if avisar {
+			log.Printf("[TG CLIENT] No se pudo abrir el grupo de conexiones de descarga (se usará la principal): %v", err)
+		}
+		return
+	}
+
+	cm.mu.Lock()
+	cm.downloadPool = pool
+	cm.downloadClient = tg.NewClient(pool)
+	cm.downloadPoolAviso = false
+	cm.mu.Unlock()
+
+	log.Printf("[TG CLIENT] Grupo de %d conexiones para descargas abierto.", ConexionesDescarga)
+}
+
+// cerrarPoolDescargas cierra el grupo al caerse la conexión. Es idempotente.
+func (cm *ClientManager) cerrarPoolDescargas() {
+	cm.mu.Lock()
+	pool := cm.downloadPool
+	cm.downloadPool = nil
+	cm.downloadClient = nil
+	cm.mu.Unlock()
+
+	if pool != nil {
+		if err := pool.Close(); err != nil {
+			log.Printf("[TG CLIENT] Error cerrando el grupo de conexiones de descarga: %v", err)
+		}
+	}
+}
+
+// DownloadClient es el cliente por el que salen las peticiones de bloques de
+// archivo. Devuelve el grupo de conexiones cuando está disponible y la conexión
+// principal en caso contrario, así que quien lo llame no tiene que comprobar
+// nada.
+//
+// Separarlo de RawClient tiene un segundo efecto que importa: las consultas de
+// metadatos (nombre y tamaño del archivo) siguen yendo por la conexión
+// principal y dejan de competir con los bloques.
+func (cm *ClientManager) DownloadClient() *tg.Client {
+	cm.mu.RLock()
+	dl := cm.downloadClient
+	cm.mu.RUnlock()
+	if dl != nil {
+		return dl
+	}
+
+	// El grupo se abre al conectar, pero si en ese momento todavía no había
+	// sesión iniciada pudo fallar. Aquí se reintenta, así que la primera
+	// descarga después de iniciar sesión ya lo levanta.
+	cm.abrirPoolDescargas()
+
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	if cm.downloadClient != nil {
+		return cm.downloadClient
+	}
+	return cm.rawClient
+}
 
 func boundedHashSet(m map[int64]int64, id int64, hash int64) {
 	if _, exists := m[id]; !exists && len(m) >= maxAccessHashEntries {
@@ -619,6 +720,12 @@ func (cm *ClientManager) InitClient(apiIDStr, apiHash string) error {
 
 			log.Printf("[TG CLIENT] Conexión MTProto establecida exitosamente.")
 
+			// Los bloques de archivo salen por su propio grupo de conexiones.
+			// Se abre aquí, con la sesión ya conectada, y se cierra al salir de
+			// Run, que es cuando se cae la conexión o se cierra el programa.
+			cm.abrirPoolDescargas()
+			defer cm.cerrarPoolDescargas()
+
 			// Bucle de espera de autenticación para iniciar el manejador de actualizaciones (gaps)
 			for {
 				self, err := client.Self(runCtx)
@@ -664,6 +771,9 @@ func (cm *ClientManager) stopRunning() {
 	cm.mu.Lock()
 	cm.client = nil
 	cm.rawClient = nil
+	cm.downloadPool = nil
+	cm.downloadClient = nil
+	cm.downloadPoolAviso = false
 	cm.readyChan = nil
 	cm.mu.Unlock()
 }

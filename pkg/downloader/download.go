@@ -21,6 +21,7 @@ import (
 	"tgdown/pkg/config"
 	"tgdown/pkg/logbus"
 	"tgdown/pkg/storage"
+	"tgdown/pkg/telegram"
 )
 
 func (e *Engine) resolveItemMetadata(itemID string) {
@@ -321,6 +322,27 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	if parallelChunks && chunkWorkers > 1 {
 		threads = chunkWorkers
 	}
+	// Más workers que conexiones no aporta: las peticiones de sobra se quedan
+	// haciendo cola dentro del cliente igual, y cada una que espera es una
+	// candidata a que Telegram nos frene.
+	if threads > telegram.ConexionesDescarga {
+		threads = telegram.ConexionesDescarga
+	}
+
+	// Los bloques salen por el grupo de conexiones de descarga; los metadatos
+	// (el mensaje, el nombre, el tamaño) siguen yendo por la conexión principal
+	// y así dejan de competir con ellos. El envoltorio es el que limita cuántas
+	// peticiones van en vuelo y el que aguanta las pausas de Telegram, para los
+	// dos caminos de descarga por igual.
+	clienteDatos := e.clientMgr.DownloadClient()
+	if clienteDatos == nil {
+		clienteDatos = rawClient
+	}
+	cliente := envolverCliente(clienteDatos)
+
+	logbus.Debug(logbus.CatDownloads,
+		fmt.Sprintf("Descargando %s con %d workers sobre %d conexiones", finalName, threads, telegram.ConexionesDescarga),
+		fmt.Sprintf("Bloques de %d KB · %d ya descargados", downloadPartSize/1024, len(resumeChunks)))
 
 	writer := &progressWriterAt{
 		file:   tempFile,
@@ -330,10 +352,10 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	}
 
 	if len(resumeChunks) > 0 {
-		err = downloadMissingParts(ctx, rawClient, mediaInfo.Location, writer, mediaInfo.FileSize, threads, resumeChunks)
+		err = downloadMissingParts(ctx, cliente, mediaInfo.Location, writer, mediaInfo.FileSize, threads, resumeChunks)
 	} else {
 		dl := tdDownloader.NewDownloader().WithPartSize(int(downloadPartSize))
-		builder := dl.Download(rawClient, mediaInfo.Location).WithThreads(threads)
+		builder := dl.Download(cliente, mediaInfo.Location).WithThreads(threads)
 		_, err = builder.Parallel(ctx, writer)
 	}
 
