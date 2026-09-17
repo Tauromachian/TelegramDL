@@ -1,6 +1,9 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Settings2, Zap, Trash2, Save, Copy, Eye, EyeOff, RefreshCw, Download, Upload } from '../icons'
+import {
+  Settings2, Zap, Trash2, Save, Copy, Eye, EyeOff, RefreshCw, Download, Upload,
+  ChevronRight, ArrowDownToLine, Image as Palette, KeyRound, HardDrive
+} from '../icons'
 import FolderPicker from '../components/FolderPicker.vue'
 import { useAuthToken } from '../composables/useAuthToken'
 
@@ -36,6 +39,32 @@ const emit = defineEmits([
   'reset-loader-color',
   'regenerate-token'
 ])
+
+// Secciones plegables. Arranca abierta solo la de descargas, que es la que se
+// toca a diario; el resto se despliegan a mano. Lo que el usuario deja abierto
+// se recuerda en localStorage para no tener que volver a abrirlo cada vez.
+const CLAVE_SECCIONES = 'tgdown-ajustes-secciones'
+const abiertos = ref({ descargas: true, temas: false, remoto: false, datos: false })
+
+try {
+  const guardado = JSON.parse(localStorage.getItem(CLAVE_SECCIONES) || 'null')
+  if (guardado && typeof guardado === 'object') {
+    for (const clave of Object.keys(abiertos.value)) {
+      if (typeof guardado[clave] === 'boolean') abiertos.value[clave] = guardado[clave]
+    }
+  }
+} catch (e) {
+  // Si el almacenamiento no está disponible se queda el reparto por defecto.
+}
+
+const alternar = (clave) => {
+  abiertos.value[clave] = !abiertos.value[clave]
+  try {
+    localStorage.setItem(CLAVE_SECCIONES, JSON.stringify(abiertos.value))
+  } catch (e) {
+    // Guardar el estado es un extra: si falla, la sección se abre igual.
+  }
+}
 
 const showToken = ref(false)
 const copyLabel = ref('Copiar')
@@ -214,254 +243,339 @@ const onImportFile = async (event) => {
           <span class="save-state">{{ saving ? 'Guardando…' : 'Auto-guardado' }}</span>
         </div>
 
-        <div class="settings-sections-grid">
-          <!-- Concurrencia y Workers -->
-          <div class="settings-group">
-            <label class="setting-label">
-              Descargas simultáneas <output>{{ settings.max_concurrent_downloads }}</output>
-            </label>
-            <input
-              v-model.number="settings.max_concurrent_downloads"
-              type="range"
-              min="1"
-              max="32"
-              class="range-input"
-            />
-            <div class="range-hints"><span>1</span><span>32</span></div>
-
-            <div class="setting-line">
-              <div>
-                <strong>Partes simultáneas</strong>
-                <small>Acelera cada archivo usando varios bloques.</small>
-              </div>
-              <label class="switch">
-                <input v-model="settings.parallel_chunks" type="checkbox" />
-                <span></span>
-              </label>
-            </div>
-
-            <label class="setting-label compact">
-              Workers por archivo <output>{{ settings.chunk_workers }}</output>
-            </label>
-            <input
-              v-model.number="settings.chunk_workers"
-              :disabled="!settings.parallel_chunks"
-              type="range"
-              min="1"
-              max="8"
-              class="range-input"
-            />
-            <div class="range-hints"><span>1</span><span>8</span></div>
-          </div>
-
-          <!-- Velocidad y Directorio -->
-          <div class="settings-group">
-            <div class="speed-setting">
-              <label class="setting-label compact">Límite global de velocidad</label>
-              <div class="speed-row">
-                <input
-                  v-model.number="settings.speed_limit.value"
-                  type="number"
-                  min="0"
-                  step="0.5"
-                />
-                <select v-model="settings.speed_limit.unit">
-                  <option>KB</option>
-                  <option>MB</option>
-                  <option>GB</option>
-                </select>
-                <span>/s</span>
-              </div>
-              <small>Usa 0 para quitar el límite.</small>
-            </div>
-
-            <FolderPicker v-model="settings.download_folder" />
-          </div>
-
-          <!-- Paleta de Color y Tema -->
-          <div class="settings-group color-group">
-            <span class="setting-label">Color de Acento y Tema</span>
-
-            <!-- Los 0-15 vienen de Telegram Premium; del 16 en adelante son las
-                 paletas propias del panel. Van separados con su propio título
-                 para que se vea de dónde sale cada grupo. -->
-            <span class="grupo-color-titulo">Telegram</span>
-            <div class="color-selector-container">
-              <div class="color-row">
-                <button
-                  v-for="id in [0, 1, 2, 3, 4, 5, 6, 7]"
-                  :key="id"
-                  type="button"
-                  class="color-dot"
-                  :class="{ active: settings.color_id === id }"
-                  :style="{ background: themeMap[id]?.gradient || '#38a7ff' }"
-                  :title="'Color ' + id"
-                  @click="settings.color_id = id"
-                ></button>
-              </div>
-              <div class="color-row">
-                <button
-                  v-for="id in [8, 9, 10, 11, 12, 13, 14, 15]"
-                  :key="id"
-                  type="button"
-                  class="color-dot gradient-dot"
-                  :class="{ active: settings.color_id === id }"
-                  :style="{
-                    background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
-                  }"
-                  :title="'Degradado ' + id"
-                  @click="settings.color_id = id"
-                ></button>
-              </div>
-            </div>
-
-            <!-- Colores temáticos: paletas propias del panel. Se guardan en el
-                 mismo ajuste (color_id) que los de arriba: elegir uno sustituye
-                 al color de la cuenta, y "Restablecer color de la cuenta"
-                 vuelve a dejar el de Telegram. -->
-            <span class="grupo-color-titulo">Colores temáticos</span>
-            <div class="temas-lista">
-              <button
-                v-for="id in temasEspeciales"
-                :key="'tema-' + id"
-                type="button"
-                class="tema-chip"
-                :class="{ active: settings.color_id === id }"
-                :title="themeMap[id]?.name || ('Tema ' + id)"
-                @click="settings.color_id = id"
-              >
-                <span class="tema-muestra" :style="{ background: themeMap[id]?.gradient }"></span>
-                <span class="tema-nombre">{{ themeMap[id]?.name || ('Tema ' + id) }}</span>
-              </button>
-            </div>
-
-            <button type="button" class="reset-button-alt" @click="emit('reset-color')">
-              <Zap :size="14" /> Restablecer color de la cuenta
+        <div class="ajustes-acordeon">
+          <!-- 1. Descargas -->
+          <section class="ajuste-bloque" :class="{ abierto: abiertos.descargas }">
+            <button
+              type="button"
+              class="ajuste-cabecera"
+              :aria-expanded="abiertos.descargas"
+              @click="alternar('descargas')"
+            >
+              <span class="ajuste-icono"><ArrowDownToLine :size="15" /></span>
+              <span class="ajuste-titulo">
+                <strong>Configuración de descarga</strong>
+                <small>Simultáneas, partes, límite de velocidad y carpeta</small>
+              </span>
+              <ChevronRight class="ajuste-flecha" :size="16" />
             </button>
 
-            <!-- Color del Loader -->
-            <span class="setting-label compact seccion-separada">Color de Loader</span>
-            <span class="grupo-color-titulo">Telegram</span>
-            <div class="color-selector-container">
-              <div class="color-row">
-                <button
-                  v-for="id in [0, 1, 2, 3, 4, 5, 6, 7]"
-                  :key="'loader-' + id"
-                  type="button"
-                  class="color-dot"
-                  :class="{ active: settings.loader_color_id === id }"
-                  :style="{ background: themeMap[id]?.gradient || '#38a7ff' }"
-                  :title="'Color Loader ' + id"
-                  @click="settings.loader_color_id = id"
-                ></button>
-              </div>
-              <div class="color-row">
-                <button
-                  v-for="id in [8, 9, 10, 11, 12, 13, 14, 15]"
-                  :key="'loader-grad-' + id"
-                  type="button"
-                  class="color-dot gradient-dot"
-                  :class="{ active: settings.loader_color_id === id }"
-                  :style="{
-                    background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
-                  }"
-                  :title="'Degradado Loader ' + id"
-                  @click="settings.loader_color_id = id"
-                ></button>
+            <div v-show="abiertos.descargas" class="ajuste-cuerpo">
+              <div class="ajuste-columnas">
+                <!-- Concurrencia y Workers -->
+                <div class="settings-group">
+                  <label class="setting-label">
+                    Descargas simultáneas <output>{{ settings.max_concurrent_downloads }}</output>
+                  </label>
+                  <input
+                    v-model.number="settings.max_concurrent_downloads"
+                    type="range"
+                    min="1"
+                    max="32"
+                    class="range-input"
+                  />
+                  <div class="range-hints"><span>1</span><span>32</span></div>
+
+                  <div class="setting-line">
+                    <div>
+                      <strong>Partes simultáneas</strong>
+                      <small>Acelera cada archivo usando varios bloques.</small>
+                    </div>
+                    <label class="switch">
+                      <input v-model="settings.parallel_chunks" type="checkbox" />
+                      <span></span>
+                    </label>
+                  </div>
+
+                  <label class="setting-label compact">
+                    Workers por archivo <output>{{ settings.chunk_workers }}</output>
+                  </label>
+                  <input
+                    v-model.number="settings.chunk_workers"
+                    :disabled="!settings.parallel_chunks"
+                    type="range"
+                    min="1"
+                    max="8"
+                    class="range-input"
+                  />
+                  <div class="range-hints"><span>1</span><span>8</span></div>
+                </div>
+
+                <!-- Velocidad y Directorio -->
+                <div class="settings-group">
+                  <div class="speed-setting">
+                    <label class="setting-label compact">Límite global de velocidad</label>
+                    <div class="speed-row">
+                      <input
+                        v-model.number="settings.speed_limit.value"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                      />
+                      <select v-model="settings.speed_limit.unit">
+                        <option>KB</option>
+                        <option>MB</option>
+                        <option>GB</option>
+                      </select>
+                      <span>/s</span>
+                    </div>
+                    <small>Usa 0 para quitar el límite.</small>
+                  </div>
+
+                  <FolderPicker v-model="settings.download_folder" />
+                </div>
               </div>
             </div>
+          </section>
 
-            <!-- Aquí solo va el círculo con el degradado del tema, sin nombre:
-                 del tema especial el loader únicamente toma el color, no el
-                 decorado, así que no hay nada más que enseñar. -->
-            <span class="grupo-color-titulo">Temáticos</span>
-            <div class="color-selector-container">
-              <div class="color-row">
-                <button
-                  v-for="id in temasEspeciales"
-                  :key="'loader-tema-' + id"
-                  type="button"
-                  class="color-dot tema-dot"
-                  :class="{ active: settings.loader_color_id === id }"
-                  :style="{ background: themeMap[id]?.gradient }"
-                  :title="themeMap[id]?.name || ('Tema ' + id)"
-                  @click="settings.loader_color_id = id"
-                ></button>
-              </div>
-            </div>
-
-            <button type="button" class="reset-button-alt" @click="emit('reset-loader-color')">
-              <Zap :size="14" /> Restablecer color del loader
+          <!-- 2. Temas -->
+          <section class="ajuste-bloque" :class="{ abierto: abiertos.temas }">
+            <button
+              type="button"
+              class="ajuste-cabecera"
+              :aria-expanded="abiertos.temas"
+              @click="alternar('temas')"
+            >
+              <span class="ajuste-icono"><Palette :size="15" /></span>
+              <span class="ajuste-titulo">
+                <strong>Temas y color</strong>
+                <small>Color de acento, temas del panel y color del loader</small>
+              </span>
+              <ChevronRight class="ajuste-flecha" :size="16" />
             </button>
-          </div>
 
-          <!-- Acceso remoto -->
-          <div class="settings-group">
-            <span class="setting-label">Acceso remoto</span>
-            <small>
-              Con este token puedes controlar TelegramDL desde otro dispositivo (celular, otra PC).
-              No abras este puerto directamente a internet: combínalo con una VPN como
-              <a class="inline-link" href="https://tailscale.com" target="_blank" rel="noopener">Tailscale</a>
-              o un túnel como Cloudflare Tunnel, y pega el token en la pantalla de login remoto.
-            </small>
+            <div v-show="abiertos.temas" class="ajuste-cuerpo">
+              <div class="ajuste-columnas">
+                <!-- Paleta de Color y Tema -->
+                <div class="settings-group color-group">
+                  <span class="setting-label">Color de Acento y Tema</span>
 
-            <div class="token-row">
-              <input
-                :value="showToken ? apiToken : maskedToken"
-                type="text"
-                readonly
-              />
+                  <!-- Los 0-15 vienen de Telegram Premium; del 16 en adelante son las
+                       paletas propias del panel. Van separados con su propio título
+                       para que se vea de dónde sale cada grupo. -->
+                  <span class="grupo-color-titulo">Telegram</span>
+                  <div class="color-selector-container">
+                    <div class="color-row">
+                      <button
+                        v-for="id in [0, 1, 2, 3, 4, 5, 6, 7]"
+                        :key="id"
+                        type="button"
+                        class="color-dot"
+                        :class="{ active: settings.color_id === id }"
+                        :style="{ background: themeMap[id]?.gradient || '#38a7ff' }"
+                        :title="'Color ' + id"
+                        @click="settings.color_id = id"
+                      ></button>
+                    </div>
+                    <div class="color-row">
+                      <button
+                        v-for="id in [8, 9, 10, 11, 12, 13, 14, 15]"
+                        :key="id"
+                        type="button"
+                        class="color-dot gradient-dot"
+                        :class="{ active: settings.color_id === id }"
+                        :style="{
+                          background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
+                        }"
+                        :title="'Degradado ' + id"
+                        @click="settings.color_id = id"
+                      ></button>
+                    </div>
+                  </div>
+
+                  <!-- Colores temáticos: paletas propias del panel. Se guardan en el
+                       mismo ajuste (color_id) que los de arriba: elegir uno sustituye
+                       al color de la cuenta, y "Restablecer color de la cuenta"
+                       vuelve a dejar el de Telegram. -->
+                  <span class="grupo-color-titulo">Colores temáticos</span>
+                  <div class="temas-lista">
+                    <button
+                      v-for="id in temasEspeciales"
+                      :key="'tema-' + id"
+                      type="button"
+                      class="tema-chip"
+                      :class="{ active: settings.color_id === id }"
+                      :title="themeMap[id]?.name || ('Tema ' + id)"
+                      @click="settings.color_id = id"
+                    >
+                      <span class="tema-muestra" :style="{ background: themeMap[id]?.gradient }"></span>
+                      <span class="tema-nombre">{{ themeMap[id]?.name || ('Tema ' + id) }}</span>
+                    </button>
+                  </div>
+
+                  <button type="button" class="reset-button-alt" @click="emit('reset-color')">
+                    <Zap :size="14" /> Restablecer color de la cuenta
+                  </button>
+                </div>
+
+                <!-- Color del Loader -->
+                <div class="settings-group color-group">
+                  <span class="setting-label">Color de Loader</span>
+
+                  <span class="grupo-color-titulo">Telegram</span>
+                  <div class="color-selector-container">
+                    <div class="color-row">
+                      <button
+                        v-for="id in [0, 1, 2, 3, 4, 5, 6, 7]"
+                        :key="'loader-' + id"
+                        type="button"
+                        class="color-dot"
+                        :class="{ active: settings.loader_color_id === id }"
+                        :style="{ background: themeMap[id]?.gradient || '#38a7ff' }"
+                        :title="'Color Loader ' + id"
+                        @click="settings.loader_color_id = id"
+                      ></button>
+                    </div>
+                    <div class="color-row">
+                      <button
+                        v-for="id in [8, 9, 10, 11, 12, 13, 14, 15]"
+                        :key="'loader-grad-' + id"
+                        type="button"
+                        class="color-dot gradient-dot"
+                        :class="{ active: settings.loader_color_id === id }"
+                        :style="{
+                          background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
+                        }"
+                        :title="'Degradado Loader ' + id"
+                        @click="settings.loader_color_id = id"
+                      ></button>
+                    </div>
+                  </div>
+
+                  <!-- Aquí solo va el círculo con el degradado del tema, sin nombre:
+                       del tema especial el loader únicamente toma el color, no el
+                       decorado, así que no hay nada más que enseñar. -->
+                  <span class="grupo-color-titulo">Temáticos</span>
+                  <div class="color-selector-container">
+                    <div class="color-row">
+                      <button
+                        v-for="id in temasEspeciales"
+                        :key="'loader-tema-' + id"
+                        type="button"
+                        class="color-dot tema-dot"
+                        :class="{ active: settings.loader_color_id === id }"
+                        :style="{ background: themeMap[id]?.gradient }"
+                        :title="themeMap[id]?.name || ('Tema ' + id)"
+                        @click="settings.loader_color_id = id"
+                      ></button>
+                    </div>
+                  </div>
+
+                  <button type="button" class="reset-button-alt" @click="emit('reset-loader-color')">
+                    <Zap :size="14" /> Restablecer color del loader
+                  </button>
+                </div>
+              </div>
             </div>
+          </section>
 
-            <div class="settings-actions" style="margin-top: 10px; padding: 0;">
-              <button type="button" class="reset-button-alt" @click="showToken = !showToken">
-                <component :is="showToken ? EyeOff : Eye" :size="14" /> {{ showToken ? 'Ocultar' : 'Mostrar' }}
-              </button>
-              <button type="button" class="reset-button-alt" @click="copyToken">
-                <Copy :size="14" /> {{ copyLabel }}
-              </button>
-              <button type="button" class="reset-button-alt" @click="emit('regenerate-token')">
-                <RefreshCw :size="14" /> Regenerar token
-              </button>
+          <!-- 3. Acceso remoto -->
+          <section class="ajuste-bloque" :class="{ abierto: abiertos.remoto }">
+            <button
+              type="button"
+              class="ajuste-cabecera"
+              :aria-expanded="abiertos.remoto"
+              @click="alternar('remoto')"
+            >
+              <span class="ajuste-icono"><KeyRound :size="15" /></span>
+              <span class="ajuste-titulo">
+                <strong>Acceso remoto</strong>
+                <small>Token para controlar TelegramDL desde otro dispositivo</small>
+              </span>
+              <ChevronRight class="ajuste-flecha" :size="16" />
+            </button>
+
+            <div v-show="abiertos.remoto" class="ajuste-cuerpo">
+              <div class="settings-group">
+                <small>
+                  Con este token puedes controlar TelegramDL desde otro dispositivo (celular, otra PC).
+                  No abras este puerto directamente a internet: combínalo con una VPN como
+                  <a class="inline-link" href="https://tailscale.com" target="_blank" rel="noopener">Tailscale</a>
+                  o un túnel como Cloudflare Tunnel, y pega el token en la pantalla de login remoto.
+                </small>
+
+                <div class="token-row">
+                  <input
+                    :value="showToken ? apiToken : maskedToken"
+                    type="text"
+                    readonly
+                  />
+                </div>
+
+                <div class="settings-actions" style="margin-top: 0; padding: 0; flex-wrap: wrap;">
+                  <button type="button" class="reset-button-alt" @click="showToken = !showToken">
+                    <component :is="showToken ? EyeOff : Eye" :size="14" /> {{ showToken ? 'Ocultar' : 'Mostrar' }}
+                  </button>
+                  <button type="button" class="reset-button-alt" @click="copyToken">
+                    <Copy :size="14" /> {{ copyLabel }}
+                  </button>
+                  <button type="button" class="reset-button-alt" @click="emit('regenerate-token')">
+                    <RefreshCw :size="14" /> Regenerar token
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </section>
 
-        <!-- Acciones de Configuración -->
-        <div class="settings-actions" style="margin-bottom: 10px;">
-          <button type="button" class="reset-button-alt" :disabled="exporting" @click="exportListener">
-            <Download :size="14" /> {{ exporting ? 'Exportando…' : 'Exportar escucha' }}
-          </button>
-          <button type="button" class="reset-button-alt" :disabled="importing" @click="pickImportFile">
-            <Upload :size="14" /> {{ importing ? 'Importando…' : 'Importar escucha' }}
-          </button>
-          <input
-            ref="importInput"
-            type="file"
-            accept="application/json,.json"
-            style="display: none"
-            @change="onImportFile"
-          />
-        </div>
+          <!-- 4. Datos: escucha e historial -->
+          <section class="ajuste-bloque" :class="{ abierto: abiertos.datos }">
+            <button
+              type="button"
+              class="ajuste-cabecera"
+              :aria-expanded="abiertos.datos"
+              @click="alternar('datos')"
+            >
+              <span class="ajuste-icono"><HardDrive :size="15" /></span>
+              <span class="ajuste-titulo">
+                <strong>Datos y respaldo</strong>
+                <small>Exportar o importar la escucha y limpiar el historial</small>
+              </span>
+              <ChevronRight class="ajuste-flecha" :size="16" />
+            </button>
 
-        <div class="settings-actions">
-          <button
-            class="clear-history-button"
-            type="button"
-            @click="emit('clear-history')"
-          >
-            <Trash2 :size="15" /> Limpiar historial
-          </button>
-          <button
-            class="save-button"
-            type="button"
-            :disabled="saving"
-            @click="emit('save-settings')"
-          >
-            <Save :size="15" /> {{ saving ? 'Guardando…' : 'Guardar ahora' }}
-          </button>
+            <div v-show="abiertos.datos" class="ajuste-cuerpo">
+              <div class="settings-group">
+                <div class="settings-actions acciones-datos">
+                  <button type="button" class="reset-button-alt" :disabled="exporting" @click="exportListener">
+                    <Download :size="14" /> {{ exporting ? 'Exportando…' : 'Exportar escucha' }}
+                  </button>
+                  <button type="button" class="reset-button-alt" :disabled="importing" @click="pickImportFile">
+                    <Upload :size="14" /> {{ importing ? 'Importando…' : 'Importar escucha' }}
+                  </button>
+                  <button
+                    class="clear-history-button boton-historial"
+                    type="button"
+                    @click="emit('clear-history')"
+                  >
+                    <Trash2 :size="15" /> Limpiar historial
+                  </button>
+                  <input
+                    ref="importInput"
+                    type="file"
+                    accept="application/json,.json"
+                    style="display: none"
+                    @change="onImportFile"
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
       </aside>
     </div>
+
+    <!-- Los ajustes se guardan solos; este botón es para forzar el guardado en
+         el momento. Va flotando en la esquina para no ocupar sitio dentro del
+         panel ahora que las secciones se pliegan. -->
+    <button
+      class="save-button save-fab"
+      type="button"
+      :disabled="saving"
+      :title="saving ? 'Guardando…' : 'Guardar ahora'"
+      aria-label="Guardar ahora"
+      @click="emit('save-settings')"
+    >
+      <Save :size="19" />
+    </button>
   </div>
 </template>
