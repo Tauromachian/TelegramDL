@@ -4,7 +4,7 @@
 
 ---
 
-## 🔗 Formatos de Enlace Soportados
+## :material-link-variant: Formatos de Enlace Soportados
 
 TelegramDL cuenta con un analizador sintáctico inteligente (`pkg/downloader/parser.go`) capaz de procesar enlaces directos, rangos continuos y enlaces de temas en supergrupos:
 
@@ -18,7 +18,7 @@ TelegramDL cuenta con un analizador sintáctico inteligente (`pkg/downloader/par
 
 ---
 
-## ⚡ Motor de Descargas Multihilo por Fragmentos
+## :material-lightning-bolt: Motor de Descargas Multihilo por Fragmentos
 
 El motor de descarga (`pkg/downloader/engine.go`) implementa descargas segmentadas en paralelo directamente sobre el protocolo MTProto:
 
@@ -44,7 +44,7 @@ graph TD
 
 ---
 
-## 🔁 Reanudación Inteligente de Fragmentos
+## :material-cached: Reanudación Inteligente de Fragmentos
 
 A diferencia de clientes tradicionales que descargan archivos secuencialmente:
 
@@ -55,19 +55,19 @@ A diferencia de clientes tradicionales que descargan archivos secuencialmente:
 
 ---
 
-## 🎛️ Control Total de Tareas
+## :material-tune: Control Total de Tareas
 
 Desde la interfaz o a través de la API REST, puedes controlar cualquier tarea en cualquier momento:
 
-- ⏸️ **Pausar**: Detiene la transferencia de datos y libera los workers para otras descargas en cola.
-- ▶️ **Reanudar**: Vuelve a encolar la tarea y continúa exactamente desde el último fragmento completado.
-- ⏹️ **Cancelar**: Cancela el contexto de red activo y marca la tarea como cancelada.
-- 🔄 **Reintentar**: Vuelve a poner en cola una descarga que haya fallado o sido cancelada.
-- 🗑️ **Borrar**: Permite eliminar el registro de la base de datos y, opcionalmente, borrar el archivo físico del disco.
-- 🧹 **Limpiar Historial**: Limpia los registros completados, fallidos o cancelados sin tocar los archivos descargados.
+- :material-pause: **Pausar**: Detiene la transferencia de datos y libera los workers para otras descargas en cola.
+- :material-play: **Reanudar**: Vuelve a encolar la tarea y continúa exactamente desde el último fragmento completado.
+- :material-stop: **Cancelar**: Cancela el contexto de red activo y marca la tarea como cancelada.
+- :material-refresh: **Reintentar**: Vuelve a poner en cola una descarga que haya fallado o sido cancelada.
+- :material-delete: **Borrar**: Permite eliminar el registro de la base de datos y, opcionalmente, borrar el archivo físico del disco.
+- :material-broom: **Limpiar Historial**: Limpia los registros completados, fallidos o cancelados sin tocar los archivos descargados.
 
 ---
 
-## 🚦 Límite de Velocidad (Throttling)
+## :material-speedometer: Límite de Velocidad (Throttling)
 
 Puedes establecer un límite de velocidad global (en KB/s o MB/s) desde la barra inferior o desde **Ajustes**. El motor ajustará el caudal de recepción de los fragmentos en tiempo real para no saturar tu conexión doméstica o de trabajo.

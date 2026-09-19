@@ -4,7 +4,7 @@ The **Listener Mode** transforms TelegramDL into an automated, real-time backgro
 
 ---
 
-## 🎧 How the Listener Works
+## :material-headphones: How the Listener Works
 
 The listener engine (`pkg/listener/listener.go`) registers directly into the Telegram MTProto event dispatcher:
 
@@ -25,19 +25,19 @@ flowchart TD
 
 ---
 
-## 🎯 Granular Media Filters
+## :material-target: Granular Media Filters
 
 Each monitored chat or channel can be configured with distinct content filters:
 
-- 📷 **Photos**: Direct images and screenshots.
-- 🎬 **Videos**: Movies, TV shows, video clips, and animations.
-- 🎵 **Audios / Music**: Songs, voice memos, and audio tracks.
-- 📄 **Documents / Files**: Archives (`.zip`, `.rar`, `.7z`), PDFs, software installers, etc.
-- 🎭 **Stickers**: Static and animated stickers.
+- :material-image: **Photos**: Direct images and screenshots.
+- :material-video: **Videos**: Movies, TV shows, video clips, and animations.
+- :material-music: **Audios / Music**: Songs, voice memos, and audio tracks.
+- :material-file-document: **Documents / Files**: Archives (`.zip`, `.rar`, `.7z`), PDFs, software installers, etc.
+- :material-sticker-emoji: **Stickers**: Static and animated stickers.
 
 ---
 
-## ⚙️ Operating Modes
+## :material-cog: Operating Modes
 
 ### 1. Automatic Download (`AutoDownload = true`)
 Any incoming media matching your filter criteria is immediately enqueued into the active download pipeline and starts downloading with no manual interaction.
@@ -47,7 +47,7 @@ Files are staged under the **"Detected Media"** tab with status `available`. You
 
 ---
 
-## 💬 Forum Topics Support
+## :material-forum: Forum Topics Support
 
 TelegramDL natively supports forum supergroups with topics:
 
@@ -57,7 +57,7 @@ TelegramDL natively supports forum supergroups with topics:
 
 ---
 
-## ⚠️ Important Isolation Rule
+## :material-alert: Important Isolation Rule
 
 > [!NOTE]
 > **Manual link downloads are never restricted by Listener filters.**

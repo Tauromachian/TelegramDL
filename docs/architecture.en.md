@@ -4,7 +4,7 @@
 
 ---
 
-## 🏗️ Component Diagram
+## :material-sitemap: Component Diagram
 
 ```mermaid
 graph TD
@@ -41,7 +41,7 @@ graph TD
 
 ---
 
-## 📦 Package Structure (`pkg/`)
+## :material-package-variant-closed: Package Structure (`pkg/`)
 
 - **`pkg/telegram`**: Manages native MTProto client lifecycle using `gotd/td`. Handles network handshakes, authentication (SMS, Telegram app, 2FA via SRP), entity cache, `AccessHash` resolution, and download readiness gating (`WaitReady`).
 - **`pkg/downloader`**: Parallel chunk download engine. Handles 512 KB chunk slicing, scheduling up to 8 parallel workers per task, global concurrency semaphores, automatic resume, and duplicate avoidance.
@@ -53,7 +53,7 @@ graph TD
 
 ---
 
-## 🗄️ SQLite Database Schema
+## :material-database: SQLite Database Schema
 
 The database resides at `~/.tgdown/tgdown.sqlite3` and contains the following core tables:
 

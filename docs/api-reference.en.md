@@ -4,7 +4,7 @@ TelegramDL exposes a comprehensive HTTP REST API and a WebSocket feed on its con
 
 ---
 
-## 🔒 Authentication
+## :material-lock: Authentication
 
 All endpoints under `/api/*` (except theme queries and the send-token-to-telegram endpoint) require authentication via HTTP header or query parameter:
 
@@ -18,7 +18,7 @@ http://127.0.0.1:8000/api/downloads?token=<YOUR_API_TOKEN>
 
 ---
 
-## 📥 Download Endpoints
+## :material-download: Download Endpoints
 
 ### 1. List Downloads
 - **Method**: `GET`
@@ -58,7 +58,7 @@ http://127.0.0.1:8000/api/downloads?token=<YOUR_API_TOKEN>
 
 ---
 
-## 🎧 Listener Endpoints
+## :material-headphones: Listener Endpoints
 
 - **`GET /api/listener/items`**: List pending detected media items.
 - **`GET /api/listener/settings`**: Fetch monitored chat rules and active media filters.
@@ -70,7 +70,7 @@ http://127.0.0.1:8000/api/downloads?token=<YOUR_API_TOKEN>
 
 ---
 
-## ⚙️ Configuration & System
+## :material-cog: Configuration & System
 
 - **`GET /api/settings`**: Fetch current application settings.
 - **`POST /api/settings`**: Update download directory, max concurrency, etc.
@@ -83,7 +83,7 @@ http://127.0.0.1:8000/api/downloads?token=<YOUR_API_TOKEN>
 
 ---
 
-## 🔄 Real-time WebSocket
+## :material-sync: Real-time WebSocket
 
 To maintain UI reactivity without polling:
 

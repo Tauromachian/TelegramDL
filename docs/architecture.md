@@ -4,7 +4,7 @@
 
 ---
 
-## 🏗️ Diagrama de Componentes
+## :material-sitemap: Diagrama de Componentes
 
 ```mermaid
 graph TD
@@ -41,7 +41,7 @@ graph TD
 
 ---
 
-## 📦 Estructura de Paquetes (`pkg/`)
+## :material-package-variant-closed: Estructura de Paquetes (`pkg/`)
 
 - **`pkg/telegram`**: Gestiona el ciclo de vida del cliente MTProto nativo mediante `gotd/td`. Se encarga del handshake de red, autenticación (SMS, app, 2FA con SRP), resolución de `AccessHash` y sincronización segura antes de iniciar descargas (`WaitReady`).
 - **`pkg/downloader`**: Núcleo de descarga por fragmentos. Maneja la partición en bloques de 512 KB, la asignación de hasta 8 workers concurrentes por archivo, el semáforo global de concurrencia, reanudación y prevención de duplicados.
@@ -53,7 +53,7 @@ graph TD
 
 ---
 
-## 🗄️ Esquema de Base de Datos SQLite
+## :material-database: Esquema de Base de Datos SQLite
 
 La base de datos se almacena en `~/.tgdown/tgdown.sqlite3` y cuenta con las siguientes tablas principales:
 

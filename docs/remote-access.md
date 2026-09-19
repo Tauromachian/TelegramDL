@@ -4,7 +4,7 @@ TelegramDL incorpora un servidor HTTP y WebSocket interno (por defecto en el pue
 
 ---
 
-## 🔐 Seguridad: Autenticación por Token Bearer
+## :material-shield-key: Seguridad: Autenticación por Token Bearer
 
 Toda la API REST (`/api/*`) y el flujo WebSocket exigen un **Token de Acceso**. Nadie en tu red local ni en internet puede consultar tus descargas, iniciar transferencias ni acceder a tus credenciales de Telegram sin este token.
 
@@ -15,7 +15,7 @@ Toda la API REST (`/api/*`) y el flujo WebSocket exigen un **Token de Acceso**. 
 
 ---
 
-## 📱 Botón «Enviármelo a Telegram» (Saved Messages)
+## :material-cellphone: Botón «Enviármelo a Telegram» (Saved Messages)
 
 Si intentas acceder a TelegramDL desde tu smartphone fuera del ordenador y no recuerdas el token:
 
@@ -29,7 +29,7 @@ Si intentas acceder a TelegramDL desde tu smartphone fuera del ordenador y no re
 
 ---
 
-## 🏠 Acceso en Red Local (LAN / Wi-Fi)
+## :material-home: Acceso en Red Local (LAN / Wi-Fi)
 
 Por defecto, TelegramDL enlaza a `0.0.0.0`, lo que permite que cualquier dispositivo conectado a tu red Wi-Fi doméstica acceda al panel:
 
@@ -48,7 +48,7 @@ Para conectarte desde tu móvil o portátil:
 
 ---
 
-## 🌐 Acceso desde Fuera de Casa (Internet)
+## :material-web: Acceso desde Fuera de Casa (Internet)
 
 > [!CAUTION]
 > **Nunca abras el puerto 8000 en tu router (port-forwarding directo)** sin cifrado ni cortafuegos, ya que los escáneres automáticos de internet lo atacarán en minutos.

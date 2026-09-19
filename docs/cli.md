@@ -4,7 +4,7 @@ Además de la interfaz gráfica de escritorio habitual, el ejecutable de **Teleg
 
 ---
 
-## 💻 Modos de Ejecución
+## :material-laptop: Modos de Ejecución
 
 ```bash
 # Windows
@@ -25,7 +25,7 @@ TelegramDL.exe [opciones]
 
 ---
 
-## 🖥️ Modo Servidor Headless (`--server`)
+## :material-server: Modo Servidor Headless (`--server`)
 
 El modo servidor es ideal para:
 - Servidores domésticos o NAS (Synology, TrueNAS, etc.).
@@ -44,7 +44,7 @@ Al iniciarse en este modo:
 
 ---
 
-## 🔄 Actualización Automática (`--update`)
+## :material-sync: Actualización Automática (`--update`)
 
 Puedes forzar una búsqueda y actualización automática de versión directamente desde la línea de comandos:
 
@@ -60,7 +60,7 @@ El actualizador integrado (`pkg/updater/updater.go`):
 
 ---
 
-## 🔒 Bloqueo de Instancia Única
+## :material-lock: Bloqueo de Instancia Única
 
 TelegramDL implementa un mecanismo de bloqueo inteligente para evitar que dos procesos utilicen la misma base de datos SQLite o el mismo puerto de red simultáneamente:
 

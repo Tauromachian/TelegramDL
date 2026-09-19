@@ -4,7 +4,7 @@
 
 ---
 
-## 🔗 Supported Link Formats
+## :material-link-variant: Supported Link Formats
 
 TelegramDL features an intelligent URL parser (`pkg/downloader/parser.go`) that handles direct messages, continuous ranges, and forum topics:
 
@@ -18,7 +18,7 @@ TelegramDL features an intelligent URL parser (`pkg/downloader/parser.go`) that 
 
 ---
 
-## ⚡ Multi-Worker Chunk Download Engine
+## :material-lightning-bolt: Multi-Worker Chunk Download Engine
 
 The download engine (`pkg/downloader/engine.go`) performs parallel segmented downloads directly over the MTProto protocol:
 
@@ -44,7 +44,7 @@ graph TD
 
 ---
 
-## 🔁 Intelligent Chunk-based Resume
+## :material-cached: Intelligent Chunk-based Resume
 
 Unlike sequential download tools:
 
@@ -55,19 +55,19 @@ Unlike sequential download tools:
 
 ---
 
-## 🎛️ Complete Task Management
+## :material-tune: Complete Task Management
 
 From either the UI or the REST API, you can control any task at any time:
 
-- ⏸️ **Pause**: Stops network transfer and frees up workers for queued tasks.
-- ▶️ **Resume**: Re-enqueues the task, continuing from the last downloaded chunk.
-- ⏹️ **Cancel**: Aborts active network context and marks the item as cancelled.
-- 🔄 **Retry**: Re-queues any failed or cancelled downloads.
-- 🗑️ **Delete**: Removes database records and optionally purges the file from disk.
-- 🧹 **Clear History**: Purges completed, failed, or cancelled records while preserving downloaded files.
+- :material-pause: **Pause**: Stops network transfer and frees up workers for queued tasks.
+- :material-play: **Resume**: Re-enqueues the task, continuing from the last downloaded chunk.
+- :material-stop: **Cancel**: Aborts active network context and marks the item as cancelled.
+- :material-refresh: **Retry**: Re-queues any failed or cancelled downloads.
+- :material-delete: **Delete**: Removes database records and optionally purges the file from disk.
+- :material-broom: **Clear History**: Purges completed, failed, or cancelled records while preserving downloaded files.
 
 ---
 
-## 🚦 Speed Throttling
+## :material-speedometer: Speed Throttling
 
 You can set a global speed limit (in KB/s or MB/s) from the status bar or the **Settings** view. The engine adjusts chunk dispatching dynamically to prevent network congestion.

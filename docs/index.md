@@ -6,14 +6,14 @@ TelegramDL está desarrollado en **Go**, **Wails v2** y **Vue 3**, combinando un
 
 ---
 
-## 🎯 ¿Qué es y qué no es TelegramDL?
+## :material-target: ¿Qué es y qué no es TelegramDL?
 
-- ✅ **ES un gestor especializado de descargas**: Diseñado exclusivamente para descargar documentos, vídeos, archivos de audio, fotos y stickers a máxima velocidad, con soporte para descargas por fragmentos paralelos, rangos de mensajes, vigilancia de canales y control remoto.
-- ❌ **NO es un cliente de mensajería**: No está pensado para chatear, enviar mensajes de texto, llamadas ni gestionar contactos. Su único propósito es **recibir, vigilar y descargar contenido multimedia**.
+- :material-check-bold: **ES un gestor especializado de descargas**: Diseñado exclusivamente para descargar documentos, vídeos, archivos de audio, fotos y stickers a máxima velocidad, con soporte para descargas por fragmentos paralelos, rangos de mensajes, vigilancia de canales y control remoto.
+- :material-close-thick: **NO es un cliente de mensajería**: No está pensado para chatear, enviar mensajes de texto, llamadas ni gestionar contactos. Su único propósito es **recibir, vigilar y descargar contenido multimedia**.
 
 ---
 
-## ⚡ Características Principales
+## :material-lightning-bolt: Características Principales
 
 ```mermaid
 graph TD
@@ -37,7 +37,7 @@ graph TD
 
 ---
 
-## 🚀 Navegación Rápida
+## :material-rocket-launch: Navegación Rápida
 
 <div class="grid cards" markdown>
 

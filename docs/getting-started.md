@@ -4,7 +4,7 @@ Esta guía te guiará en la configuración inicial, los requisitos del sistema y
 
 ---
 
-## 📋 Requisitos del Sistema
+## :material-clipboard-list: Requisitos del Sistema
 
 TelegramDL está optimizado para funcionar en múltiples plataformas:
 
@@ -19,7 +19,7 @@ go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
 ---
 
-## 🔑 Obtención de Credenciales de Telegram
+## :material-key: Obtención de Credenciales de Telegram
 
 Para conectarte a la red MTProto de Telegram necesitas un **API ID** y un **API HASH** personales:
 
@@ -33,7 +33,7 @@ Para conectarte a la red MTProto de Telegram necesitas un **API ID** y un **API 
 
 ---
 
-## ⚙️ Configuración Inicial
+## :material-cog: Configuración Inicial
 
 Existen dos formas de introducir tus credenciales:
 
@@ -56,7 +56,7 @@ TGDL_PORT=8000
 
 ---
 
-## 📂 Ubicación de Datos y Almacenamiento
+## :material-folder: Ubicación de Datos y Almacenamiento
 
 TelegramDL guarda la configuración, sesiones y base de datos en una ruta dedicada en tu directorio de usuario:
 
@@ -67,7 +67,7 @@ Las descargas se guardan por defecto en la carpeta del sistema `Descargas/Telegr
 
 ---
 
-## 💻 Desarrollo y Compilación
+## :material-laptop: Desarrollo y Compilación
 
 ### 1. Instalar dependencias del panel (Vue 3)
 

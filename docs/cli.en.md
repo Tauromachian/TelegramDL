@@ -4,7 +4,7 @@ Beyond the standard desktop graphical window, the **TelegramDL** binary can be i
 
 ---
 
-## 💻 Execution Modes
+## :material-laptop: Execution Modes
 
 ```bash
 # Windows
@@ -25,7 +25,7 @@ TelegramDL.exe [options]
 
 ---
 
-## 🖥️ Headless Server Mode (`--server`)
+## :material-server: Headless Server Mode (`--server`)
 
 Headless mode is ideal for:
 - Home servers or NAS appliances (Synology, TrueNAS, unRAID).
@@ -44,7 +44,7 @@ When launched in this mode:
 
 ---
 
-## 🔄 Automatic Updater (`--update`)
+## :material-sync: Automatic Updater (`--update`)
 
 You can trigger an update check and installation directly from your terminal:
 
@@ -60,7 +60,7 @@ The integrated updater (`pkg/updater/updater.go`):
 
 ---
 
-## 🔒 Single-Instance Locking
+## :material-lock: Single-Instance Locking
 
 TelegramDL implements single-instance mutual exclusion to ensure database and socket safety:
 

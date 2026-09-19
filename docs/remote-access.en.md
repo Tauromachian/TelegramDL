@@ -4,7 +4,7 @@ TelegramDL features an integrated HTTP and WebSocket server (defaulting to port 
 
 ---
 
-## 🔐 Security: Bearer Token Authentication
+## :material-shield-key: Security: Bearer Token Authentication
 
 Every REST endpoint (`/api/*`) and WebSocket handshake requires a valid **Access Token**. No unauthorized party on your local network or the internet can view downloads, trigger transfers, or inspect your credentials without this token.
 
@@ -15,7 +15,7 @@ Every REST endpoint (`/api/*`) and WebSocket handshake requires a valid **Access
 
 ---
 
-## 📱 "Send to Telegram" (Saved Messages Delivery)
+## :material-cellphone: "Send to Telegram" (Saved Messages Delivery)
 
 If you are away from your PC and opening the web dashboard from your smartphone:
 
@@ -29,7 +29,7 @@ If you are away from your PC and opening the web dashboard from your smartphone:
 
 ---
 
-## 🏠 Local Network Access (LAN / Wi-Fi)
+## :material-home: Local Network Access (LAN / Wi-Fi)
 
 By default, TelegramDL binds to `0.0.0.0`, listening across all network interfaces:
 
@@ -48,7 +48,7 @@ To connect from your phone or secondary computer:
 
 ---
 
-## 🌐 Remote Access over the Internet
+## :material-web: Remote Access over the Internet
 
 > [!CAUTION]
 > **Never expose port 8000 directly via router port-forwarding** without an encrypted tunnel or firewall, as automated internet scanners will probe it within minutes.

@@ -6,14 +6,14 @@ TelegramDL is built with **Go**, **Wails v2**, and **Vue 3**, combining an ultra
 
 ---
 
-## 🎯 What TelegramDL IS and is NOT
+## :material-target: What TelegramDL IS and is NOT
 
-- ✅ **IS a specialized download manager**: Exclusively engineered to download documents, videos, audio files, photos, and stickers at peak speeds, featuring parallel chunk downloading, message range support, real-time channel monitoring, and remote control.
-- ❌ **IS NOT a chat client**: It is not designed for messaging, voice/video calls, or contact management. Its sole mission is to **receive, monitor, and download media content**.
+- :material-check-bold: **IS a specialized download manager**: Exclusively engineered to download documents, videos, audio files, photos, and stickers at peak speeds, featuring parallel chunk downloading, message range support, real-time channel monitoring, and remote control.
+- :material-close-thick: **IS NOT a chat client**: It is not designed for messaging, voice/video calls, or contact management. Its sole mission is to **receive, monitor, and download media content**.
 
 ---
 
-## ⚡ Key Highlights
+## :material-lightning-bolt: Key Highlights
 
 ```mermaid
 graph TD
@@ -37,7 +37,7 @@ graph TD
 
 ---
 
-## 🚀 Quick Navigation
+## :material-rocket-launch: Quick Navigation
 
 <div class="grid cards" markdown>
 

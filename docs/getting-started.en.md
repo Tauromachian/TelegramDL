@@ -4,7 +4,7 @@ This guide walks you through the system requirements, initial setup, and methods
 
 ---
 
-## 📋 System Requirements
+## :material-clipboard-list: System Requirements
 
 TelegramDL is optimized for cross-platform desktop environments:
 
@@ -19,7 +19,7 @@ go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
 ---
 
-## 🔑 Obtaining Telegram Credentials
+## :material-key: Obtaining Telegram Credentials
 
 To connect to the Telegram MTProto network, you need personal **API ID** and **API HASH** keys:
 
@@ -33,7 +33,7 @@ To connect to the Telegram MTProto network, you need personal **API ID** and **A
 
 ---
 
-## ⚙️ Initial Configuration
+## :material-cog: Initial Configuration
 
 Credentials can be supplied in two ways:
 
@@ -56,7 +56,7 @@ TGDL_PORT=8000
 
 ---
 
-## 📂 Data Directory & Storage
+## :material-folder: Data Directory & Storage
 
 TelegramDL stores all application state, sessions, and SQLite databases in your user directory:
 
@@ -67,7 +67,7 @@ Downloads default to your system's `Downloads/TelegramDL` folder, which can be m
 
 ---
 
-## 💻 Development & Building
+## :material-laptop: Development & Building
 
 ### 1. Install Dashboard Dependencies (Vue 3)
 

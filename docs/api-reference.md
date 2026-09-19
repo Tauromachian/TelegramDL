@@ -4,7 +4,7 @@ TelegramDL expone una API HTTP REST completa y un canal WebSocket en el puerto c
 
 ---
 
-## 🔒 Autenticación
+## :material-lock: Autenticación
 
 Todas las rutas bajo `/api/*` (excepto la petición para enviar el token a Telegram y el tema público) requieren autenticación mediante encabezado HTTP o parámetro de consulta:
 
@@ -18,7 +18,7 @@ http://127.0.0.1:8000/api/downloads?token=<TU_API_TOKEN>
 
 ---
 
-## 📥 Endpoints de Descargas
+## :material-download: Endpoints de Descargas
 
 ### 1. Listar Descargas
 - **Método**: `GET`
@@ -58,7 +58,7 @@ http://127.0.0.1:8000/api/downloads?token=<TU_API_TOKEN>
 
 ---
 
-## 🎧 Endpoints del Modo Escucha (Listener)
+## :material-headphones: Endpoints del Modo Escucha (Listener)
 
 - **`GET /api/listener/items`**: Obtiene la lista de archivos detectados pendientes de descarga.
 - **`GET /api/listener/settings`**: Devuelve la configuración de chats vigilados y filtros activos.
@@ -70,7 +70,7 @@ http://127.0.0.1:8000/api/downloads?token=<TU_API_TOKEN>
 
 ---
 
-## ⚙️ Configuración y Sistema
+## :material-cog: Configuración y Sistema
 
 - **`GET /api/settings`**: Obtiene la configuración general actual.
 - **`POST /api/settings`**: Actualiza rutas de guardado, workers de descarga, etc.
@@ -83,7 +83,7 @@ http://127.0.0.1:8000/api/downloads?token=<TU_API_TOKEN>
 
 ---
 
-## 🔄 WebSocket en Tiempo Real
+## :material-sync: WebSocket en Tiempo Real
 
 Para sincronizar la interfaz sin necesidad de peticiones HTTP constantes:
 

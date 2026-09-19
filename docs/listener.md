@@ -4,7 +4,7 @@ El **Modo Escucha** de TelegramDL convierte la aplicación en un receptor automa
 
 ---
 
-## 🎧 ¿Cómo Funciona la Escucha?
+## :material-headphones: ¿Cómo Funciona la Escucha?
 
 El motor de escucha (`pkg/listener/listener.go`) se conecta directamente al despachador de eventos MTProto de Telegram:
 
@@ -25,19 +25,19 @@ flowchart TD
 
 ---
 
-## 🎯 Filtros Granulares por Tipo de Contenido
+## :material-target: Filtros Granulares por Tipo de Contenido
 
 Para cada canal o grupo que agregues a la escucha, puedes configurar filtros independientes:
 
-- 📷 **Fotos**: Imágenes y capturas directas.
-- 🎬 **Vídeos**: Películas, series, clips y animaciones de vídeo.
-- 🎵 **Audios / Música**: Canciones, notas de voz y pistas de audio.
-- 📄 **Documentos / Archivos**: Archivos comprimidos (`.zip`, `.rar`, `.7z`), PDFs, instaladores, etc.
-- 🎭 **Stickers**: Stickers estáticos y animados.
+- :material-image: **Fotos**: Imágenes y capturas directas.
+- :material-video: **Vídeos**: Películas, series, clips y animaciones de vídeo.
+- :material-music: **Audios / Música**: Canciones, notas de voz y pistas de audio.
+- :material-file-document: **Documentos / Archivos**: Archivos comprimidos (`.zip`, `.rar`, `.7z`), PDFs, instaladores, etc.
+- :material-sticker-emoji: **Stickers**: Stickers estáticos y animados.
 
 ---
 
-## ⚙️ Modos de Operación
+## :material-cog: Modos de Operación
 
 ### 1. Descarga Automática (`AutoDownload = true`)
 Cualquier archivo entrante que cumpla con los filtros seleccionados se envía inmediatamente a la cola de descargas activas y comienza a transferirse sin intervención del usuario.
@@ -47,7 +47,7 @@ Los archivos se registran en la pestaña **"Multimedia Detectada"** con estado d
 
 ---
 
-## 💬 Soporte para Temas y Foros (Topics)
+## :material-forum: Soporte para Temas y Foros (Topics)
 
 TelegramDL incluye soporte para supergrupos con temas organizados:
 
@@ -57,7 +57,7 @@ TelegramDL incluye soporte para supergrupos con temas organizados:
 
 ---
 
-## ⚠️ Regla Importante de Aislamiento
+## :material-alert: Regla Importante de Aislamiento
 
 > [!NOTE]
 > **Las descargas manuales introducidas mediante enlace nunca se ven afectadas por los filtros del Listener.**
