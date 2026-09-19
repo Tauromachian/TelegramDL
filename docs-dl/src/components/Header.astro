@@ -128,7 +128,7 @@ const enPath = `/en/${baseRoute}`;
 
     .custom-lang-select {
         background-color: rgba(255, 255, 255, 0.15);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: none !important;
         border-radius: 20px;
         height: 24px;
         padding: 0 1.5rem 0 0.7rem;
@@ -154,9 +154,13 @@ const enPath = `/en/${baseRoute}`;
         width: 0.6rem;
         height: 0.6rem;
         pointer-events: none;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
         background-repeat: no-repeat;
         background-size: contain;
+    }
+
+    :global([data-theme='dark']) .custom-lang-select {
+        color: #000000 !important;
     }
 
     :global([data-theme='light']) .lang-arrow {

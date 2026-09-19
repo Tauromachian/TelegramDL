@@ -51,13 +51,16 @@ const isEn = currentPath.startsWith('/en/') || currentPath === '/en';
         opacity: 0.8;
     }
 
-    /* Left text (Developed by) in solid white */
-    .developed-by, .developed-by strong {
-        color: #ffffff !important;
-    }
-
-    /* Right text (Made with Starlight) in solid black */
-    .made-with, .made-with a {
+    /* Universal text color: solid black for maximum clarity on the gradient background across all themes */
+    .custom-footer,
+    .custom-footer p,
+    .custom-footer span,
+    .custom-footer strong,
+    .custom-footer a,
+    .developed-by,
+    .developed-by strong,
+    .made-with,
+    .made-with a {
         color: #000000 !important;
     }
 </style>

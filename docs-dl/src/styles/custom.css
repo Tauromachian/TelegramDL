@@ -58,8 +58,8 @@ header.header > .sl-flex {
 
 /* Header text and icon colors */
 [data-theme='dark'] .header :is(a, span, button, svg, select) {
-    color: #ffffff !important;
-    fill: #ffffff !important;
+    color: #000000 !important;
+    fill: #000000 !important;
 }
 
 [data-theme='dark'] .header svg.moon {
