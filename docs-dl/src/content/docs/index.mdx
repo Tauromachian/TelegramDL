@@ -23,45 +23,46 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 TelegramDL es un gestor de descargas especializado, desarrollado en **Go**, **Wails v2** y **Vue 3**. Combina un backend ultrarrápido y concurrente con una interfaz moderna y reactiva.
 
-<CardGrid stagger>
+<CardGrid>
 	<Card title="Descargas Multihilo" icon="rocket">
-		Divide cada archivo en bloques de 512 KB con hasta 8 workers en paralelo por descarga.
+		Bloques de 512 KB con hasta 8 workers en paralelo.
+
+		[Saber más](/features#multihilo)
 	</Card>
 	<Card title="Vigilante en Vivo" icon="magnifier">
-		Monitorea canales y grupos en tiempo real con filtros por tipo de multimedia y autodescarga.
+		Monitoreo en tiempo real con filtros y autodescarga.
+
+		[Saber más](/listener)
 	</Card>
-	<Card title="Acceso Remoto Protegido" icon="laptop">
-		Controla la aplicación desde cualquier dispositivo mediante autenticación segura por Token Bearer.
+	<Card title="Acceso Remoto" icon="laptop">
+		Control total seguro mediante API y Token Bearer.
+
+		[Saber más](/remote-access)
 	</Card>
-	<Card title="Reanudación Automática" icon="refresh">
-		Reanuda descargas incompletas desde los fragmentos ya guardados sin reiniciar desde cero.
+	<Card title="Reanudación Auto" icon="add-document">
+		Retoma descargas incompletas sin perder fragmentos.
+
+		[Saber más](/features#resumen)
+	</Card>
+	<Card title="Rangos de Mensajes" icon="list-format">
+		Descarga lotes de mensajes usando URLs de rango.
+
+		[Saber más](/features#rangos)
+	</Card>
+	<Card title="Soporte de Topics" icon="comment">
+		Gestión de temas específicos en grupos y canales.
+
+		[Saber más](/features#topics)
+	</Card>
+	<Card title="Modo Headless" icon="document">
+		Ejecución sin GUI ideal para servidores con `--server`.
+
+		[Saber más](/cli)
+	</Card>
+	<Card title="Base de Datos Local" icon="setting">
+		Gestión eficiente con SQLite integrada (CGO-free).
+
+		[Saber más](/architecture)
 	</Card>
 </CardGrid>
 
----
-
-## Características Destacadas
-
-- **Soporte para rangos de mensajes**: Descarga múltiples mensajes continuos utilizando URLs de rango.
-- **Canales y grupos con temas (topics)**: Capacidad para descargar temas específicos o escuchar grupos completos.
-- **Modo Servidor Headless**: Puede ejecutarse sin interfaz gráfica mediante el parámetro `--server`.
-- **Base de datos SQLite local**: Gestión eficiente sin dependencias externas (CGO-free).
-
----
-
-## Navegación Rápida
-
-<CardGrid>
-  <Card title="Funcionalidades" icon="list-format">
-    [Ver todas las capacidades del motor](/features)
-  </Card>
-  <Card title="Modo Escucha" icon="notification">
-    [Configurar monitoreo de canales](/listener)
-  </Card>
-  <Card title="API Reference" icon="code">
-    [Documentación de endpoints REST](/api-reference)
-  </Card>
-  <Card title="Comandos CLI" icon="terminal">
-    [Uso avanzado desde la terminal](/cli)
-  </Card>
-</CardGrid>

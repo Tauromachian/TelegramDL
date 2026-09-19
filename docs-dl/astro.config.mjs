@@ -84,6 +84,7 @@ export default defineConfig({
 			components: {
 				Header: './src/components/Header.astro',
 				ThemeSelect: './src/components/ThemeSelect.astro',
+                PageFrame: './src/components/PageFrame.astro',
 			},
 		}),
 	],

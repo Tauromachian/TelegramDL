@@ -1,0 +1,27 @@
+---
+import type { Props } from '@astrojs/starlight/props';
+import Default from '@astrojs/starlight/components/PageFrame.astro';
+import Footer from './Footer.astro';
+---
+
+<div class="page-layout-wrapper">
+    <Default {...Astro.props}>
+        <slot name="header" slot="header" />
+        <slot name="sidebar" slot="sidebar" />
+        <slot />
+    </Default>
+    <Footer />
+</div>
+
+<style>
+    .page-layout-wrapper {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    /* Ensure the default starlight frame doesn't force a full viewport height lock independently */
+    .page-layout-wrapper :global(.page) {
+        flex: 1;
+    }
+</style>

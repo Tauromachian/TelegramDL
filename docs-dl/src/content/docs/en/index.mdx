@@ -23,45 +23,46 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 TelegramDL is a specialized download manager built with **Go**, **Wails v2**, and **Vue 3**. It combines an ultra-fast, concurrent backend with a modern, responsive user interface.
 
-<CardGrid stagger>
+<CardGrid>
 	<Card title="Multi-worker Engine" icon="rocket">
-		Slices files into 512 KB chunks with up to 8 parallel workers per download.
+		512 KB chunks with up to 8 parallel workers.
+
+		[Learn more](/en/features#multihilo)
 	</Card>
 	<Card title="Real-time Listener" icon="magnifier">
-		Monitors channels and groups in real-time with granular media filters and auto-download.
+		Real-time monitoring with media filters and auto-download.
+
+		[Learn more](/en/listener)
 	</Card>
-	<Card title="Secure Remote Access" icon="laptop">
-		Control the application from any device via Bearer token authentication.
+	<Card title="Remote Access" icon="laptop">
+		Secure total control via API and Bearer token.
+
+		[Learn more](/en/remote-access)
 	</Card>
-	<Card title="Intelligent Resume" icon="refresh">
-		Resumes interrupted transfers from previously saved chunks without starting over.
+	<Card title="Intelligent Resume" icon="add-document">
+		Resumes transfers from saved chunks without restarting.
+
+		[Learn more](/en/features#resumen)
+	</Card>
+	<Card title="Message Ranges" icon="list-format">
+		Download batches of messages using range URLs.
+
+		[Learn more](/en/features#rangos)
+	</Card>
+	<Card title="Topics Support" icon="comment">
+		Manage specific topics in forum supergroups.
+
+		[Learn more](/en/features#topics)
+	</Card>
+	<Card title="Headless Mode" icon="document">
+		Run without GUI via `--server` flag, ideal for NAS.
+
+		[Learn more](/en/cli)
+	</Card>
+	<Card title="Local SQLite Database" icon="setting">
+		Efficient built-in state management (CGO-free).
+
+		[Learn more](/en/architecture)
 	</Card>
 </CardGrid>
 
----
-
-## Key Highlights
-
-- **Message Range Support**: Download continuous message sequences using range URLs.
-- **Forum Topics Support**: Monitor specific topics or entire forum supergroups.
-- **Headless Server Mode**: Run without a GUI using the `--server` flag for home servers or NAS.
-- **Pure Local SQLite**: Efficient state management with zero external dependencies (CGO-free).
-
----
-
-## Quick Navigation
-
-<CardGrid>
-  <Card title="Features" icon="list-format">
-    [Explore engine capabilities](/en/features)
-  </Card>
-  <Card title="Listener Mode" icon="notification">
-    [Setup channel monitoring](/en/listener)
-  </Card>
-  <Card title="API Reference" icon="code">
-    [REST endpoint documentation](/en/api-reference)
-  </Card>
-  <Card title="CLI Commands" icon="terminal">
-    [Advanced terminal usage](/en/cli)
-  </Card>
-</CardGrid>
