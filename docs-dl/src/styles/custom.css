@@ -134,10 +134,23 @@ header.header > .sl-flex {
     border-color: rgba(0, 0, 0, 0.1);
 }
 
-/* Sidebar adjustments */
+/* Sidebar adjustments (Finer width and seamless background) */
+:root {
+    --sl-sidebar-width: 13.5rem !important; /* Reducido para hacerlo más fino y discreto */
+}
+
 .sidebar-content {
   background-color: var(--sl-color-bg-nav);
-  border-inline-end: 1px solid var(--sl-color-gray-5) !important;
+  border-inline-end: none !important; /* Eliminamos la doble línea molesta del borde */
+}
+
+/* Remove the empty spacing background column layout between sidebar and content */
+.main-frame {
+    grid-template-columns: var(--sl-sidebar-width) 1fr !important;
+}
+
+:global(starlight-sidebar) {
+    border-inline-end: 1px solid var(--sl-color-gray-5) !important; /* Mantenemos una única línea limpia divisoria */
 }
 
 /* Cards style (wxt.dev style: small, compact, clean text, links highlighted) */
