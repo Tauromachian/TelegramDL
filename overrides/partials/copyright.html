@@ -1,0 +1,15 @@
+<div class="md-copyright">
+  <div class="md-copyright__highlight">
+    {% if page and page.meta and page.meta.locale == "en" or config.theme.language == "en" %}
+      Developed with <span class="twemoji" style="color: #e53935;">{% include ".icons/material/heart.svg" %}</span> by <strong>InfinityXGame</strong>. <span class="twemoji">{% include ".icons/material/code-tags.svg" %}</span> + <span class="twemoji" style="color: #8d6e63;">{% include ".icons/material/coffee.svg" %}</span> = <span class="twemoji" style="color: #e53935;">{% include ".icons/material/heart.svg" %}</span>
+    {% else %}
+      Desarrollado con <span class="twemoji" style="color: #e53935;">{% include ".icons/material/heart.svg" %}</span> por <strong>InfinityXGame</strong>. <span class="twemoji">{% include ".icons/material/code-tags.svg" %}</span> + <span class="twemoji" style="color: #8d6e63;">{% include ".icons/material/coffee.svg" %}</span> = <span class="twemoji" style="color: #e53935;">{% include ".icons/material/heart.svg" %}</span>
+    {% endif %}
+  </div>
+  {% if not config.extra.generator == false %}
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  {% endif %}
+</div>
