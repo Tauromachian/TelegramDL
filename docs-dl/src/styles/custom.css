@@ -1,0 +1,139 @@
+/* Custom styles for TelegramDL Documentation */
+
+:root {
+  /* Silent Cherry (Modo Claro) */
+  --sl-color-accent-low: #ffcbdc;
+  --sl-color-accent: #f48fb1;
+  --sl-color-accent-high: #e07b9d;
+  --sl-color-white: #4a3e4e;
+  --sl-color-gray-1: #4a3e4e;
+  --sl-color-gray-2: #6b6270;
+  --sl-color-gray-3: #9086bb;
+  --sl-color-gray-4: #ece2ee;
+  --sl-color-gray-5: #ece2ee;
+  --sl-color-gray-6: #f4eef6;
+  --sl-color-black: #ffffff;
+  --sl-color-bg: #f4eef6;
+  --sl-color-bg-nav: #ece2ee;
+  --tgdl-gradient: linear-gradient(120deg, #ffb7c5 0%, #f48fb1 52%, #a0e7e5 100%);
+}
+
+:root[data-theme='dark'] {
+  /* Twilight Comet (Modo Oscuro) */
+  --sl-color-accent-low: #3a2568;
+  --sl-color-accent: #b79af5;
+  --sl-color-accent-high: #e6e1f5;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #e6e1f5;
+  --sl-color-gray-2: #9086bb;
+  --sl-color-gray-3: #5f548a;
+  --sl-color-gray-4: #1d1539;
+  --sl-color-gray-5: #160f2d;
+  --sl-color-gray-6: #0d0a1e;
+  --sl-color-black: #0a0818;
+  --sl-color-bg: #160f2d;
+  --sl-color-bg-nav: #0d0a1e;
+  --tgdl-gradient: linear-gradient(135deg, #5b45b0 0%, #c0518c 52%, #f0803c 100%);
+}
+
+/* Header Base Styling */
+header.header {
+  background-image: var(--tgdl-gradient) !important;
+  background-color: transparent !important;
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  height: 4.5rem !important;
+  padding: 0 1.5rem !important;
+}
+
+header.header > .sl-flex {
+    justify-content: space-between !important;
+    width: 100%;
+    align-items: center !important;
+}
+
+/* Header text and icon colors */
+[data-theme='dark'] .header :is(a, span, button, svg, select, kbd) {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+}
+
+[data-theme='light'] .header :is(a, span, button, svg, select, kbd) {
+    color: #4a3e4e !important;
+    fill: #4a3e4e !important;
+}
+
+/* Search Container Styling */
+.header starlight-search {
+    flex-grow: 0 !important;
+}
+
+.header button[data-open-modal] {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 8px !important;
+    padding: 0 0.8rem !important;
+    width: 180px !important;
+    height: 2.2rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+[data-theme='light'] .header button[data-open-modal] {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Right Group Styling */
+.header .right-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 1.5rem !important;
+}
+
+.selectors-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+}
+
+/* Social Icons adjustment */
+.header .social-icons {
+    border-inline-end: 1px solid rgba(255, 255, 255, 0.2);
+    padding-inline-end: 1rem;
+    display: flex !important;
+    align-items: center !important;
+}
+
+[data-theme='light'] .header .social-icons {
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Sidebar adjustments */
+.sidebar-content {
+  background-color: var(--sl-color-bg-nav);
+  border-inline-end: 1px solid var(--sl-color-gray-5) !important;
+}
+
+/* Cards style */
+.card {
+  border-radius: 12px !important;
+  border: 1px solid var(--sl-color-gray-5) !important;
+  background-color: var(--sl-color-bg-nav) !important;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--sl-color-accent) !important;
+  box-shadow: 0 10px 20px -10px var(--sl-color-accent-low);
+}
+
+/* Hero section adjustments */
+.hero .action.primary {
+  background-image: var(--tgdl-gradient) !important;
+  border: none !important;
+  color: white !important;
+  font-weight: bold !important;
+}

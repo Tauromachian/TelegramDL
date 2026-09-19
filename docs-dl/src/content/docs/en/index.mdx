@@ -1,0 +1,67 @@
+---
+title: TelegramDL (TGDown)
+description: High-performance Telegram download manager engineered for desktop environments.
+template: splash
+hero:
+  tagline: Welcome to the official TelegramDL documentation.
+  image:
+    file: ../../../assets/houston.webp
+  actions:
+    - text: Getting Started
+      link: /en/getting-started
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/infinityxgame/TelegramDL
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What is TelegramDL?
+
+TelegramDL is a specialized download manager built with **Go**, **Wails v2**, and **Vue 3**. It combines an ultra-fast, concurrent backend with a modern, responsive user interface.
+
+<CardGrid stagger>
+	<Card title="Multi-worker Engine" icon="rocket">
+		Slices files into 512 KB chunks with up to 8 parallel workers per download.
+	</Card>
+	<Card title="Real-time Listener" icon="magnifier">
+		Monitors channels and groups in real-time with granular media filters and auto-download.
+	</Card>
+	<Card title="Secure Remote Access" icon="laptop">
+		Control the application from any device via Bearer token authentication.
+	</Card>
+	<Card title="Intelligent Resume" icon="refresh">
+		Resumes interrupted transfers from previously saved chunks without starting over.
+	</Card>
+</CardGrid>
+
+---
+
+## Key Highlights
+
+- **Message Range Support**: Download continuous message sequences using range URLs.
+- **Forum Topics Support**: Monitor specific topics or entire forum supergroups.
+- **Headless Server Mode**: Run without a GUI using the `--server` flag for home servers or NAS.
+- **Pure Local SQLite**: Efficient state management with zero external dependencies (CGO-free).
+
+---
+
+## Quick Navigation
+
+<CardGrid>
+  <Card title="Features" icon="list-format">
+    [Explore engine capabilities](/en/features)
+  </Card>
+  <Card title="Listener Mode" icon="notification">
+    [Setup channel monitoring](/en/listener)
+  </Card>
+  <Card title="API Reference" icon="code">
+    [REST endpoint documentation](/en/api-reference)
+  </Card>
+  <Card title="CLI Commands" icon="terminal">
+    [Advanced terminal usage](/en/cli)
+  </Card>
+</CardGrid>

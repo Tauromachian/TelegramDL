@@ -1,0 +1,169 @@
+---
+import type { Props } from '@astrojs/starlight/props';
+import Search from '@astrojs/starlight/components/Search.astro';
+import SiteTitle from '@astrojs/starlight/components/SiteTitle.astro';
+import SocialIcons from '@astrojs/starlight/components/SocialIcons.astro';
+import ThemeSelect from './ThemeSelect.astro';
+
+const currentPath = Astro.url.pathname;
+// Detección robusta del idioma basada en la URL
+const isEn = currentPath.startsWith('/en/') || currentPath === '/en';
+const prefix = isEn ? '/en' : '';
+
+// Lógica de limpieza de URL para el selector de idiomas
+// Eliminamos el prefijo /en/ si existe para obtener la ruta base
+const cleanPath = currentPath.replace(/^\/en(\/|$)/, '/');
+// Aseguramos que no haya dobles slashes y que la ruta sea válida
+const baseRoute = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+
+const esPath = `/${baseRoute}`;
+const enPath = `/en/${baseRoute}`;
+---
+
+<div class="header-content sl-flex">
+	<div class="left-group sl-flex">
+		<SiteTitle {...Astro.props} />
+        <div class="sl-flex search-container">
+            <Search {...Astro.props} />
+        </div>
+	</div>
+
+	<div class="sl-flex right-group">
+        <nav class="header-nav-links">
+            <a href={`${prefix}/getting-started`}>{isEn ? 'Guide' : 'Guía'}</a>
+            <a href={`${prefix}/features`}>{isEn ? 'Features' : 'Funcionalidades'}</a>
+            <a href={`${prefix}/api-reference`}>API</a>
+        </nav>
+		<div class="social-icons">
+			<SocialIcons {...Astro.props} />
+		</div>
+        <div class="selectors-group sl-flex">
+		    <ThemeSelect {...Astro.props} />
+
+            <div class="lang-selector-wrapper">
+                <select class="custom-lang-select" id="lang-select">
+                    <option value={esPath} selected={!isEn}>ES</option>
+                    <option value={enPath} selected={isEn}>EN</option>
+                </select>
+                <div class="lang-arrow"></div>
+            </div>
+        </div>
+	</div>
+</div>
+
+<script>
+    // Manejador de cambio de idioma más robusto
+    const select = document.getElementById('lang-select') as HTMLSelectElement;
+    if (select) {
+        select.addEventListener('change', (e) => {
+            const target = e.target as HTMLSelectElement;
+            window.location.pathname = target.value;
+        });
+    }
+</script>
+
+<style>
+	.header-content {
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+        width: 100%;
+        height: 100%;
+	}
+
+    .left-group {
+        align-items: center;
+        gap: 0.5rem;
+        flex-grow: 1;
+    }
+
+	.search-container {
+        display: flex;
+        justify-content: flex-start;
+        max-width: 320px;
+        width: 100%;
+	}
+
+	.right-group {
+		align-items: center;
+		gap: 1.2rem;
+        flex-shrink: 0;
+	}
+
+    .header-nav-links {
+        display: none;
+        gap: 1.2rem;
+        align-items: center;
+    }
+
+    .header-nav-links a {
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+        white-space: nowrap;
+        color: var(--sl-color-white);
+        opacity: 0.85;
+        transition: opacity 0.2s;
+    }
+
+    .header-nav-links a:hover {
+        opacity: 1;
+    }
+
+    .social-icons {
+        display: flex;
+        align-items: center;
+    }
+
+    .selectors-group {
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .lang-selector-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .custom-lang-select {
+        background-color: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
+        padding: 0.2rem 1.5rem 0.2rem 0.7rem;
+        cursor: pointer;
+        appearance: none;
+        font-size: 0.75rem;
+        font-weight: bold;
+        color: white;
+        text-transform: uppercase;
+        outline: none;
+    }
+
+    :global([data-theme='light']) .custom-lang-select {
+        background-color: rgba(0, 0, 0, 0.05);
+        border-color: rgba(0, 0, 0, 0.1);
+        color: var(--sl-color-gray-1);
+    }
+
+    .lang-arrow {
+        position: absolute;
+        right: 0.6rem;
+        width: 0.6rem;
+        height: 0.6rem;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-size: contain;
+    }
+
+    :global([data-theme='light']) .lang-arrow {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234a3e4e'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    }
+
+    @media (min-width: 50rem) {
+        .header-nav-links {
+            display: flex;
+        }
+    }
+</style>

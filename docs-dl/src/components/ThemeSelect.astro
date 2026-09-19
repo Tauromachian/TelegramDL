@@ -1,0 +1,131 @@
+---
+import type { Props } from '@astrojs/starlight/props';
+
+const { labels, locale } = Astro.props;
+
+// Fallback manual para el label de accesibilidad si Starlight no lo pasa correctamente
+const accessibleLabel = labels?.['themeSelect.accessibleLabel'] || (locale === 'en' ? 'Toggle theme' : 'Cambiar tema');
+---
+
+<starlight-theme-toggle>
+	<button
+		class="theme-toggle"
+		aria-label={accessibleLabel}
+		title={accessibleLabel}
+	>
+		<div class="toggle-track">
+			<div class="toggle-thumb">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="icon sun">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="icon moon">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </div>
+		</div>
+	</button>
+</starlight-theme-toggle>
+
+<style>
+	.theme-toggle {
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 0;
+		display: flex;
+		align-items: center;
+        margin: 0 0.5rem;
+	}
+
+	.toggle-track {
+		width: 42px;
+		height: 22px;
+		background-color: rgba(255, 255, 255, 0.2);
+		border-radius: 11px;
+		position: relative;
+		transition: background-color 0.3s;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+	}
+
+    :global([data-theme='light']) .toggle-track {
+        background-color: rgba(0, 0, 0, 0.15);
+        border-color: rgba(0, 0, 0, 0.1);
+    }
+
+	.toggle-thumb {
+		width: 18px;
+		height: 18px;
+		background-color: white;
+		border-radius: 50%;
+		position: absolute;
+		top: 1px;
+		left: 1px;
+		transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	}
+
+    :global([data-theme='dark']) .toggle-thumb {
+        transform: translateX(20px);
+        background-color: #160f2d;
+    }
+
+    .icon {
+        width: 12px;
+        height: 12px;
+        position: absolute;
+        transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .sun {
+        color: #ffb703;
+        opacity: 1;
+    }
+
+    .moon {
+        color: #b79af5;
+        opacity: 0;
+        transform: scale(0.5);
+    }
+
+    :global([data-theme='dark']) .sun {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+
+    :global([data-theme='dark']) .moon {
+        opacity: 1;
+        transform: scale(1);
+    }
+</style>
+
+<script>
+	class StarlightThemeToggle extends HTMLElement {
+		constructor() {
+			super();
+			const button = this.querySelector('button');
+			if (button) {
+				button.addEventListener('click', () => {
+					const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+					this.setTheme(theme);
+				});
+			}
+		}
+
+		setTheme(theme) {
+			document.documentElement.setAttribute('data-theme', theme);
+			localStorage.setItem('starlight-theme', theme);
+		}
+	}
+	customElements.define('starlight-theme-toggle', StarlightThemeToggle);
+</script>
