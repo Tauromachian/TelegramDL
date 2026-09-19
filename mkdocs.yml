@@ -1,0 +1,85 @@
+site_name: TelegramDL
+site_url: https://infinityxgame.github.io/TelegramDL/
+site_description: Gestor de descargas de Telegram de alto rendimiento para escritorio (Go + Wails + Vue).
+site_author: infinityxgame
+repo_url: https://github.com/infinityxgame/TelegramDL
+repo_name: infinityxgame/TelegramDL
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Cambiar a modo oscuro / Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Cambiar a modo claro / Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: es
+          name: Español
+          default: true
+          build: true
+        - locale: en
+          name: English
+          build: true
+          nav_translations:
+            Inicio: Home
+            Primeros Pasos: Getting Started
+            Funcionalidades: Features
+            Modo Escucha: Listener Mode
+            Acceso Remoto: Remote Access
+            Referencia API: API Reference
+            Arquitectura: Architecture
+            Línea de Comandos: CLI & Modes
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+
+nav:
+  - Inicio: index.md
+  - Primeros Pasos: getting-started.md
+  - Funcionalidades: features.md
+  - Modo Escucha: listener.md
+  - Acceso Remoto: remote-access.md
+  - Referencia API: api-reference.md
+  - Arquitectura: architecture.md
+  - Línea de Comandos: cli.md

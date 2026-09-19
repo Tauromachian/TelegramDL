@@ -2,6 +2,8 @@
 
 TelegramDL es un gestor de descargas de Telegram para escritorio, desarrollado con Go, Wails v2 y Vue 3. Está pensado exclusivamente para recibir, vigilar y descargar contenido multimedia; no es un cliente de mensajería.
 
+> 📖 **Documentación oficial (Español / English)**: [https://infinityxgame.github.io/TelegramDL/](https://infinityxgame.github.io/TelegramDL/)
+
 ## Características
 
 - Descarga de documentos, vídeos, audios, fotos y stickers desde enlaces de mensajes de Telegram.
