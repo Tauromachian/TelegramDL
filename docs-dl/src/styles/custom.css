@@ -42,7 +42,7 @@ header.header {
   background-color: transparent !important;
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
-  height: 4.5rem !important;
+  height: 3.5rem !important;
   padding: 0 1.5rem !important;
 }
 
@@ -53,14 +53,34 @@ header.header > .sl-flex {
 }
 
 /* Header text and icon colors */
-[data-theme='dark'] .header :is(a, span, button, svg, select, kbd) {
+[data-theme='dark'] .header :is(a, span, button, svg, select) {
     color: #ffffff !important;
     fill: #ffffff !important;
+}
+
+[data-theme='dark'] .header svg.moon {
+    color: #7c3aed !important;
+    fill: #7c3aed !important;
 }
 
 [data-theme='light'] .header :is(a, span, button, svg, select, kbd) {
     color: #4a3e4e !important;
     fill: #4a3e4e !important;
+}
+
+/* Custom styling for the search shortcut keys (Ctrl K) in dark mode */
+[data-theme='dark'] .header kbd {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Remove the individual background from each key to avoid the "double box" effect */
+[data-theme='dark'] .header kbd kbd {
+    background-color: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
 
 /* Search Container Styling */
@@ -131,9 +151,42 @@ header.header > .sl-flex {
 }
 
 /* Hero section adjustments */
+.hero {
+    padding-top: 0px !important;
+}
+
+.main-frame {
+    padding-top: 4.5rem !important;
+}
+
+.page {
+    padding-top: 0px !important;
+}
+
+.hero .actions {
+    gap: 1.2rem !important;
+    margin-top: 1.5rem !important;
+}
+
+.hero .action {
+    padding: 0.35rem 0.75rem !important;
+    font-size: 0.8rem !important;
+    border-radius: 6px !important;
+    min-width: unset !important;
+    max-width: fit-content !important;
+    width: auto !important;
+    display: inline-flex !important;
+}
+
 .hero .action.primary {
   background-image: var(--tgdl-gradient) !important;
   border: none !important;
   color: white !important;
-  font-weight: bold !important;
+  font-weight: 600 !important;
+}
+
+/* Remove or shrink any built-in icon within actions if they bloat the size */
+.hero .action svg {
+    width: 0.9rem !important;
+    height: 0.9rem !important;
 }
