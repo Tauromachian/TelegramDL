@@ -216,6 +216,18 @@ footer.sl-flex,
 
 .custom-footer {
     width: 100% !important;
+    position: relative;
+    z-index: 50 !important;
+}
+
+/* Ensure the main frame contents don't push layouts below outer footer stack */
+.page {
+    padding-bottom: 0px !important;
+}
+
+.right-sidebar {
+    border-inline-start: 1px solid var(--sl-color-gray-5);
+    height: calc(100vh - 3.5rem - 3rem) !important;
 }
 
 .main-pane {
