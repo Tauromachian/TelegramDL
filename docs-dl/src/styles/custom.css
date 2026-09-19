@@ -153,6 +153,14 @@ header.header > .sl-flex {
     border-inline-end: 1px solid var(--sl-color-gray-5) !important; /* Mantenemos una única línea limpia divisoria */
 }
 
+/* Force active/selected link in the sidebar to have black text in light mode for proper contrast */
+[data-theme='light'] .sidebar-content a[aria-current="page"],
+[data-theme='light'] .sidebar-content a[aria-current="page"] *,
+:root[data-theme='light'] .sidebar-content a[aria-current="page"] {
+    color: #000000 !important;
+    font-weight: 600 !important;
+}
+
 /* Cards style (wxt.dev style: small, compact, clean text, links highlighted) */
 .card {
   border-radius: 12px !important;
