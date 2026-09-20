@@ -43,13 +43,19 @@ jobs:
         working-directory: ./docs-dl
         run: npm run build
 
+      - name: Restructure for GitHub Pages
+        run: |
+          mkdir -p ./docs-dl/dist/TelegramDL
+          mv ./docs-dl/dist/* ./docs-dl/dist/TelegramDL/ 2>/dev/null || true
+          mv ./docs-dl/dist/TelegramDL/TelegramDL ./docs-dl/dist/TelegramDL/_telegramdl 2>/dev/null || true
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './docs-dl/dist'
+          path: './docs-dl/dist/TelegramDL'
 
       - name: Deploy to GitHub Pages
         id: deployment
