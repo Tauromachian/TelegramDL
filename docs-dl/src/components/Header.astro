@@ -18,8 +18,9 @@ const cleanPath = currentPath.replace(/^\/en(\/|$)/, '/');
 // Aseguramos que no haya dobles slashes y que la ruta sea válida
 const baseRoute = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
 
-const esPath = `${baseUrl}/${baseRoute}`;
-const enPath = `${baseUrl}/en/${baseRoute}`;
+// Construir rutas correctas para el selector de idioma
+const esPath = baseRoute ? `${baseUrl}/${baseRoute}` : baseUrl;
+const enPath = baseRoute ? `${baseUrl}/en/${baseRoute}` : `${baseUrl}/en`;
 ---
 
 <div class="header-content sl-flex">
