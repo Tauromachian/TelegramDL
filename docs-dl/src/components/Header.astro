@@ -13,10 +13,11 @@ const isEn = currentPath.startsWith('/en/') || currentPath === '/en';
 const prefix = isEn ? '/en' : '';
 
 // Lógica de limpieza de URL para el selector de idiomas
-// Eliminamos el prefijo /en/ si existe para obtener la ruta base
-const cleanPath = currentPath.replace(/^\/en(\/|$)/, '/');
+// Eliminamos el prefijo base y /en/ si existen para obtener la ruta base relativa
+let cleanPath = currentPath.replace(baseUrl, '');
+cleanPath = cleanPath.replace(/^\/en(\/|$)/, '/');
 // Aseguramos que no haya dobles slashes y que la ruta sea válida
-const baseRoute = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+const baseRoute = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanRoute;
 
 // Construir rutas correctas para el selector de idioma
 const esPath = baseRoute ? `${baseUrl}/${baseRoute}` : baseUrl;
