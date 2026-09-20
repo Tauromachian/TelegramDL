@@ -31,7 +31,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: 'docs-dl/package-lock.json'
 
@@ -45,8 +45,6 @@ jobs:
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        with:
-          static_site_generator: astro
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
