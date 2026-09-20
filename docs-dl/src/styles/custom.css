@@ -57,7 +57,10 @@ header.header > .sl-flex {
 }
 
 /* Header text and icon colors */
-[data-theme='dark'] .header :is(a, span, button, svg, select) {
+/* El diálogo de búsqueda (Ctrl+K) también vive dentro del header, pero se
+   excluye aquí: forzar texto negro lo vuelve ilegible sobre el fondo oscuro
+   del modal, así que conserva los colores propios de Starlight. */
+[data-theme='dark'] .header :is(a, span, button, svg, select):not(dialog *) {
     color: #000000 !important;
     fill: #000000 !important;
 }
