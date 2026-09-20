@@ -65,6 +65,11 @@ header.header > .sl-flex {
     fill: #000000 !important;
 }
 
+[data-theme='dark'] .header .tag-icon {
+    fill: none !important;
+    stroke: #000000 !important;
+}
+
 [data-theme='dark'] .header svg.moon {
     color: #7c3aed !important;
     fill: #7c3aed !important;
@@ -73,6 +78,11 @@ header.header > .sl-flex {
 [data-theme='light'] .header :is(a, span, button, svg, select, kbd) {
     color: #4a3e4e !important;
     fill: #4a3e4e !important;
+}
+
+[data-theme='light'] .header .tag-icon {
+    fill: none !important;
+    stroke: #4a3e4e !important;
 }
 
 /* Custom styling for the search shortcut keys (Ctrl K) in dark mode */
