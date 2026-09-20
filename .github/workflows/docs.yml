@@ -31,13 +31,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: 'docs-dl/package-lock.json'
 
       - name: Install dependencies
         working-directory: ./docs-dl
-        run: npm ci
+        run: npm install
 
       - name: Build documentation with Astro/Starlight
         working-directory: ./docs-dl
