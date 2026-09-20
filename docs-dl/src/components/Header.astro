@@ -8,8 +8,8 @@ import ThemeSelect from './ThemeSelect.astro';
 const currentPath = Astro.url.pathname;
 const baseUrl = '/TelegramDL';
 
-// Detección robusta del idioma basada en la URL
-const isEn = currentPath.startsWith('/en/') || currentPath === '/en';
+// Detección robusta del idioma basada en la URL con el prefijo base
+const isEn = currentPath.startsWith(`${baseUrl}/en/`) || currentPath === `${baseUrl}/en`;
 const prefix = isEn ? '/en' : '';
 
 // Lógica robusta para el selector de idiomas
