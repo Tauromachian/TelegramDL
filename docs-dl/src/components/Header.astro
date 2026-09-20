@@ -9,7 +9,7 @@ const currentPath = Astro.url.pathname;
 const baseUrl = '/TelegramDL';
 
 // Detección robusta del idioma basada en la URL con el prefijo base
-const isEn = currentPath.startsWith(`${baseUrl}/en/`) || currentPath === `${baseUrl}/en`;
+const isEn = currentPath.includes('/en/');
 const prefix = isEn ? '/en' : '';
 
 // Lógica robusta para el selector de idiomas
