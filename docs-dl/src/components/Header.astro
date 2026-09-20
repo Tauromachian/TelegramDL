@@ -34,17 +34,17 @@ const enPath = `/en/${baseRoute}`;
             <a href={`${prefix}/features`}>{isEn ? 'Features' : 'Funcionalidades'}</a>
             <a href={`${prefix}/api-reference`}>API</a>
         </nav>
-        <div class="version-info" id="version-info">
-            <a href="https://github.com/infinityxgame/TelegramDL/releases/latest" class="version-link" id="version-link">
-                <svg class="tag-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
-                    <line x1="7" y1="7" x2="7.01" y2="7"></line>
-                </svg>
-                <span id="version-text">Loading...</span>
-            </a>
-        </div>
 		<div class="social-icons">
 			<SocialIcons {...Astro.props} />
+            <div class="version-info" id="version-info">
+                <a href="https://github.com/infinityxgame/TelegramDL/releases/latest" class="version-link" id="version-link">
+                    <svg class="tag-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                        <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                    </svg>
+                    <span id="version-text">Loading...</span>
+                </a>
+            </div>
 		</div>
         <div class="selectors-group sl-flex">
 		    <ThemeSelect {...Astro.props} />
@@ -163,17 +163,15 @@ const enPath = `/en/${baseRoute}`;
     .version-info {
         display: flex;
         align-items: center;
-        gap: 0.3rem;
         font-size: 0.75rem;
         font-weight: 500;
-    }
-
-    .version-label {
-        color: var(--sl-color-white);
-        opacity: 0.7;
+        margin-left: 0.5rem;
     }
 
     .version-link {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
         text-decoration: none;
         color: var(--sl-color-white);
         font-weight: 600;
@@ -185,7 +183,10 @@ const enPath = `/en/${baseRoute}`;
         opacity: 1;
     }
 
-    :global([data-theme='light']) .version-label,
+    .tag-icon {
+        flex-shrink: 0;
+    }
+
     :global([data-theme='light']) .version-link {
         color: var(--sl-color-gray-1);
     }
