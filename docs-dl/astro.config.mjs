@@ -5,6 +5,7 @@ import starlight from '@astrojs/starlight';
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://infinityxgame.github.io/TelegramDL/',
+	base: '/TelegramDL',
 	integrations: [
 		starlight({
 			title: 'TelegramDL',
