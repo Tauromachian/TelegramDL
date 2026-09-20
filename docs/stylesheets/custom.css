@@ -1,0 +1,119 @@
+/* Custom styles to match the application themes */
+
+/* --- Twilight Comet (Modo Oscuro por Defecto) --- */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #3a2568;
+  --md-primary-fg-color--text: #ffffff;
+  --md-primary-fg-color--dark: #160f2d;
+  --md-primary-fg-color--light: #5b45b0;
+
+  --md-accent-fg-color: #b79af5;
+  --md-accent-fg-color--transparent: rgba(183, 154, 245, 0.1);
+
+  --md-default-bg-color: #160f2d;
+  --md-default-bg-color--light: #1d1539;
+
+  --md-default-fg-color: #e6e1f5;
+  --md-default-fg-color--light: #9086bb;
+  --md-default-fg-color--lighter: #5f548a;
+
+  --md-footer-bg-color: #0d0a1e;
+  --md-footer-bg-color--dark: #0a0818;
+
+  --md-code-bg-color: #1d1539;
+  --md-code-fg-color: #e6e1f5;
+
+  --tgdl-gradient: linear-gradient(135deg, #5b45b0 0%, #c0518c 52%, #f0803c 100%);
+}
+
+/* --- Silent Cherry (Modo Claro) --- */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #f48fb1;
+  --md-primary-fg-color--text: #4a3e4e;
+  --md-primary-fg-color--dark: #e07b9d;
+  --md-primary-fg-color--light: #ffcbdc;
+
+  --md-accent-fg-color: #2a6f69;
+  --md-accent-fg-color--transparent: rgba(42, 111, 105, 0.1);
+
+  --md-default-bg-color: #f4eef6;
+  --md-default-bg-color--light: #ece2ee;
+
+  /* Modificamos el color principal de los textos de navegación activos en el cuerpo a un tono ciruela oscuro de la app */
+  --md-default-fg-color: #4a3e4e;
+  --md-default-fg-color--light: #4a3e4e;
+  --md-default-fg-color--lighter: #6b6270;
+
+  --md-footer-bg-color: #e3dbea;
+  --md-footer-bg-color--dark: #d6c9d7;
+
+  --md-code-bg-color: #ece2ee;
+  --md-code-fg-color: #4a3e4e;
+
+  --tgdl-gradient: linear-gradient(120deg, #ffb7c5 0%, #f48fb1 52%, #a0e7e5 100%);
+}
+
+/* Aplicar los degradados exactos a la barra superior y pestañas */
+[data-md-color-scheme] .md-header {
+  background-image: var(--tgdl-gradient) !important;
+  background-color: transparent !important;
+}
+
+[data-md-color-scheme] .md-tabs {
+  background-image: var(--tgdl-gradient) !important;
+  background-color: transparent !important;
+}
+
+/* Asegurar legibilidad del texto sobre el degradado */
+[data-md-color-scheme="slate"] .md-header,
+[data-md-color-scheme="slate"] .md-tabs,
+[data-md-color-scheme="slate"] .md-header__button,
+[data-md-color-scheme="slate"] .md-tabs__link {
+  color: #ffffff !important;
+}
+
+[data-md-color-scheme="default"] .md-header,
+[data-md-color-scheme="default"] .md-tabs,
+[data-md-color-scheme="default"] .md-header__button,
+[data-md-color-scheme="default"] .md-tabs__link {
+  color: #4a3e4e !important;
+}
+
+/* Ajustes específicos para la barra de búsqueda en el modo claro */
+[data-md-color-scheme="default"] .md-search__form {
+  background-color: rgba(255, 255, 255, 0.4) !important;
+}
+[data-md-color-scheme="default"] .md-search__input {
+  color: #4a3e4e !important;
+}
+[data-md-color-scheme="default"] .md-search__input::placeholder {
+  color: rgba(74, 62, 78, 0.7) !important;
+}
+[data-md-color-scheme="default"] .md-search__icon {
+  color: #4a3e4e !important;
+}
+
+/* Opacidad para pestañas inactivas en el modo claro */
+[data-md-color-scheme="default"] .md-tabs__link {
+  opacity: 0.8;
+}
+[data-md-color-scheme="default"] .md-tabs__link--active,
+[data-md-color-scheme="default"] .md-tabs__link:hover {
+  opacity: 1;
+  font-weight: bold;
+}
+
+/* Corrección de contraste para los enlaces activos del menú lateral izquierdo (ej: "Primeros Pasos") */
+[data-md-color-scheme="default"] .md-nav__link--active {
+  color: #4a3e4e !important;
+  font-weight: bold;
+}
+
+/* Color base del fondo externo/general de la página */
+[data-md-color-scheme="slate"] body {
+  background-color: #0d0a1e;
+}
+
+[data-md-color-scheme="default"] body {
+  background-color: #e3dbea;
+}

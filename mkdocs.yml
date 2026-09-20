@@ -9,18 +9,14 @@ theme:
   name: material
   custom_dir: overrides
   palette:
-    - scheme: default
-      primary: indigo
-      accent: indigo
-      toggle:
-        icon: material/brightness-7
-        name: Cambiar a modo oscuro / Switch to dark mode
     - scheme: slate
-      primary: indigo
-      accent: indigo
       toggle:
         icon: material/brightness-4
         name: Cambiar a modo claro / Switch to light mode
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Cambiar a modo oscuro / Switch to dark mode
   features:
     - navigation.tabs
     - navigation.sections
@@ -29,6 +25,9 @@ theme:
     - search.suggest
     - search.highlight
     - content.code.copy
+
+extra_css:
+  - stylesheets/custom.css
 
 plugins:
   - search

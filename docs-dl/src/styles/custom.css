@@ -1,0 +1,332 @@
+/* Custom styles for TelegramDL Documentation */
+
+:root {
+  /* Silent Cherry (Modo Claro) */
+  --sl-color-accent-low: #ffcbdc;
+  --sl-color-accent: #f48fb1;
+  --sl-color-accent-high: #e07b9d;
+  --sl-color-white: #4a3e4e;
+  --sl-color-gray-1: #4a3e4e;
+  --sl-color-gray-2: #6b6270;
+  --sl-color-gray-3: #9086bb;
+  --sl-color-gray-4: #ece2ee;
+  --sl-color-gray-5: #ece2ee;
+  --sl-color-gray-6: #f4eef6;
+  --sl-color-black: #ffffff;
+  --sl-color-bg: #f4eef6;
+  --sl-color-bg-nav: #ece2ee;
+  --tgdl-gradient: linear-gradient(120deg, #ffb7c5 0%, #f48fb1 52%, #a0e7e5 100%);
+}
+
+:root[data-theme='dark'] {
+  /* Twilight Comet (Modo Oscuro) */
+  --sl-color-accent-low: #3a2568;
+  --sl-color-accent: #b79af5;
+  --sl-color-accent-high: #e6e1f5;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #e6e1f5;
+  --sl-color-gray-2: #9086bb;
+  --sl-color-gray-3: #5f548a;
+  --sl-color-gray-4: #1d1539;
+  --sl-color-gray-5: #160f2d;
+  --sl-color-gray-6: #0d0a1e;
+  --sl-color-black: #0a0818;
+  --sl-color-bg: #160f2d;
+  --sl-color-bg-nav: #0d0a1e;
+  --tgdl-gradient: linear-gradient(135deg, #5b45b0 0%, #c0518c 52%, #f0803c 100%);
+}
+
+/* Header Base Styling */
+header.header {
+  background-image: var(--tgdl-gradient) !important;
+  background-color: transparent !important;
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  height: 3.5rem !important;
+  padding: 0 1.5rem !important;
+}
+
+body {
+    overflow-x: hidden !important;
+}
+
+header.header > .sl-flex {
+    justify-content: space-between !important;
+    width: 100%;
+    align-items: center !important;
+}
+
+/* Header text and icon colors */
+/* El diálogo de búsqueda (Ctrl+K) también vive dentro del header, pero se
+   excluye aquí: forzar texto negro lo vuelve ilegible sobre el fondo oscuro
+   del modal, así que conserva los colores propios de Starlight. */
+[data-theme='dark'] .header :is(a, span, button, svg, select):not(dialog *) {
+    color: #000000 !important;
+    fill: #000000 !important;
+}
+
+[data-theme='dark'] .header .tag-icon {
+    fill: none !important;
+    stroke: #000000 !important;
+}
+
+[data-theme='dark'] .header svg.moon {
+    color: #7c3aed !important;
+    fill: #7c3aed !important;
+}
+
+[data-theme='light'] .header :is(a, span, button, svg, select, kbd) {
+    color: #4a3e4e !important;
+    fill: #4a3e4e !important;
+}
+
+[data-theme='light'] .header .tag-icon {
+    fill: none !important;
+    stroke: #4a3e4e !important;
+}
+
+/* Custom styling for the search shortcut keys (Ctrl K) in dark mode */
+[data-theme='dark'] .header kbd {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Remove the individual background from each key to avoid the "double box" effect */
+[data-theme='dark'] .header kbd kbd {
+    background-color: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Search Container Styling */
+.header starlight-search {
+    flex-grow: 0 !important;
+}
+
+.header button[data-open-modal] {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 8px !important;
+    padding: 0 0.8rem !important;
+    width: 180px !important;
+    height: 2.2rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+[data-theme='light'] .header button[data-open-modal] {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Right Group Styling */
+.header .right-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 1.5rem !important;
+}
+
+.selectors-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+}
+
+/* Social Icons adjustment */
+.header .social-icons {
+    border-inline-end: 1px solid rgba(255, 255, 255, 0.2);
+    padding-inline-end: 1rem;
+    display: flex !important;
+    align-items: center !important;
+}
+
+[data-theme='light'] .header .social-icons {
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Sidebar adjustments (Finer width and seamless background) */
+:root {
+    --sl-sidebar-width: 13.5rem !important; /* Reducido para hacerlo más fino y discreto */
+}
+
+.sidebar-content {
+  background-color: var(--sl-color-bg-nav);
+  border-inline-end: none !important; /* Eliminamos la doble línea molesta del borde */
+}
+
+/* Remove the empty spacing background column layout between sidebar and content */
+.main-frame {
+    grid-template-columns: var(--sl-sidebar-width) 1fr !important;
+}
+
+:global(starlight-sidebar) {
+    border-inline-end: 1px solid var(--sl-color-gray-5) !important; /* Mantenemos una única línea limpia divisoria */
+}
+
+/* Force active/selected link in the sidebar to have black text in light mode for proper contrast */
+[data-theme='light'] .sidebar-content a[aria-current="page"],
+[data-theme='light'] .sidebar-content a[aria-current="page"] *,
+:root[data-theme='light'] .sidebar-content a[aria-current="page"] {
+    color: #000000 !important;
+    font-weight: 600 !important;
+}
+
+/* Cards style (wxt.dev style: small, compact, clean text, links highlighted) */
+.card {
+  border-radius: 12px !important;
+  border: 1px solid var(--sl-color-gray-5) !important;
+  background-color: var(--sl-color-bg-nav) !important;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  padding: 1.2rem !important;
+}
+
+.card .title {
+  font-size: 1.05rem !important;
+  font-weight: 600 !important;
+  margin-top: 0.5rem !important;
+}
+
+.card p {
+  font-size: 0.85rem !important;
+  opacity: 0.8;
+  line-height: 1.4 !important;
+}
+
+ /* Tarjeta de texto - enlaces (Saber más) */
+.card p a {
+  display: block;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #7c3aed !important; /* Un tono morado/violeta visible en ambos modos */
+  text-decoration: none;
+}
+
+[data-theme='light'] .card p a {
+  color: #5b45b0 !important; /* Un morado más profundo y con alto contraste para fondo claro */
+}
+
+.card p a:hover {
+  text-decoration: underline;
+}
+
+.card .icon {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 0.35rem !important;
+  border-radius: 6px !important;
+  width: 1.8rem !important;
+  height: 1.8rem !important;
+}
+
+[data-theme='light'] .card .icon {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Make grid cards narrower, less wide and more square */
+.card-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+    gap: 1.5rem !important;
+    max-width: 1000px;
+    margin: 2rem auto 0 auto !important;
+}
+
+/* Hide the native Starlight pagination buttons and footer containers */
+footer.sl-flex,
+.page > footer,
+.main-frame > .sl-flex > footer,
+.main-pane > footer {
+    display: none !important;
+}
+
+/* Revert the previous complex hacks since Footer is now outside PageFrame globally */
+.main-frame {
+    padding-bottom: 0px !important;
+}
+
+.custom-footer {
+    width: 100% !important;
+    position: relative;
+    z-index: 50 !important;
+}
+
+/* Ensure the main frame contents don't push layouts below outer footer stack */
+.page {
+    padding-bottom: 0px !important;
+}
+
+.right-sidebar {
+    border-inline-start: 1px solid var(--sl-color-gray-5);
+    height: calc(100vh - 3.5rem - 3rem) !important;
+}
+
+.main-pane {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--sl-color-accent) !important;
+  box-shadow: 0 10px 20px -10px var(--sl-color-accent-low);
+}
+
+/* Hero section adjustments */
+.hero {
+    padding-top: 0px !important;
+}
+
+.main-frame {
+    padding-top: 4.5rem !important;
+}
+
+.page {
+    padding-top: 0px !important;
+}
+
+.hero .actions {
+    gap: 1.2rem !important;
+    margin-top: 1.5rem !important;
+}
+
+.hero .action {
+    padding: 0.35rem 0.75rem !important;
+    font-size: 0.8rem !important;
+    border-radius: 6px !important;
+    min-width: unset !important;
+    max-width: fit-content !important;
+    width: auto !important;
+    display: inline-flex !important;
+}
+
+.hero .action.primary {
+  background-image: var(--tgdl-gradient) !important;
+  border: none !important;
+  font-weight: 600 !important;
+}
+
+/* Bypass Starlight CSS layer and specific compound classes */
+:root[data-theme='light'] .hero .action.primary,
+:root[data-theme='light'] .hero .action.primary *,
+:root[data-theme='light'] .hero .action.primary a,
+:root[data-theme='light'] .hero .action.primary[class*="sl-link-button"] {
+  color: #000000 !important;
+  fill: #000000 !important;
+}
+
+[data-theme='light'] .hero .action.primary,
+[data-theme='light'] .hero .action.primary *,
+[data-theme='light'] .hero a.primary {
+  color: #000000 !important;
+  fill: #000000 !important;
+}
+
+/* Remove or shrink any built-in icon within actions if they bloat the size */
+.hero .action svg {
+    width: 0.9rem !important;
+    height: 0.9rem !important;
+}

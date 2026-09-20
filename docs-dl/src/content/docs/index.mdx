@@ -1,0 +1,68 @@
+---
+title: TelegramDL (TGDown)
+description: Gestor de descargas de alto rendimiento para Telegram diseñado para sistemas de escritorio.
+template: splash
+hero:
+  tagline: Bienvenido a la documentación oficial de TelegramDL.
+  image:
+    file: ../../assets/houston.webp
+  actions:
+    - text: Primeros Pasos
+      link: /getting-started
+      icon: right-arrow
+      variant: primary
+    - text: Ver en GitHub
+      link: https://github.com/infinityxgame/TelegramDL
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## ¿Qué es TelegramDL?
+
+TelegramDL es un gestor de descargas especializado, desarrollado en **Go**, **Wails v2** y **Vue 3**. Combina un backend ultrarrápido y concurrente con una interfaz moderna y reactiva.
+
+<CardGrid>
+	<Card title="Descargas Multihilo" icon="rocket">
+		Bloques de 512 KB con hasta 8 workers en paralelo.
+
+		[Saber más](/features#multihilo)
+	</Card>
+	<Card title="Vigilante en Vivo" icon="magnifier">
+		Monitoreo en tiempo real con filtros y autodescarga.
+
+		[Saber más](/listener)
+	</Card>
+	<Card title="Acceso Remoto" icon="laptop">
+		Control total seguro mediante API y Token Bearer.
+
+		[Saber más](/remote-access)
+	</Card>
+	<Card title="Reanudación Auto" icon="add-document">
+		Retoma descargas incompletas sin perder fragmentos.
+
+		[Saber más](/features#resumen)
+	</Card>
+	<Card title="Rangos de Mensajes" icon="list-format">
+		Descarga lotes de mensajes usando URLs de rango.
+
+		[Saber más](/features#rangos)
+	</Card>
+	<Card title="Soporte de Topics" icon="comment">
+		Gestión de temas específicos en grupos y canales.
+
+		[Saber más](/features#topics)
+	</Card>
+	<Card title="Modo Headless" icon="document">
+		Ejecución sin GUI ideal para servidores con `--server`.
+
+		[Saber más](/cli)
+	</Card>
+	<Card title="Base de Datos Local" icon="setting">
+		Gestión eficiente con SQLite integrada (CGO-free).
+
+		[Saber más](/architecture)
+	</Card>
+</CardGrid>
+

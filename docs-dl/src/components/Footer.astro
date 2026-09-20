@@ -1,0 +1,66 @@
+---
+const currentPath = Astro.url.pathname;
+const isEn = currentPath.startsWith('/en/') || currentPath === '/en';
+---
+
+<footer class="custom-footer">
+    <div class="footer-content">
+        <p class="developed-by">
+            {isEn ? 'Developed with' : 'Desarrollado con'} ❤️ {isEn ? 'by' : 'por'} <strong>InfinityXGame</strong>. ‹› + ☕ = ❤️
+        </p>
+        <p class="made-with">
+            {isEn ? 'Made with' : 'Hecho con'} <a href="https://starlight.astro.build" target="_blank" rel="noopener noreferrer">Starlight</a>
+        </p>
+    </div>
+</footer>
+
+<style>
+    .custom-footer {
+        background-image: var(--tgdl-gradient) !important;
+        background-color: transparent !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
+        padding: 0.8rem 1.5rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .footer-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .custom-footer p {
+        margin: 0 !important;
+        font-size: 0.75rem !important;
+        line-height: 1 !important;
+        white-space: nowrap;
+    }
+
+    .custom-footer a {
+        font-weight: bold;
+        text-decoration: underline;
+        transition: opacity 0.2s;
+    }
+
+    .custom-footer a:hover {
+        opacity: 0.8;
+    }
+
+    /* Universal text color: solid black for maximum clarity on the gradient background across all themes */
+    .custom-footer,
+    .custom-footer p,
+    .custom-footer span,
+    .custom-footer strong,
+    .custom-footer a,
+    .developed-by,
+    .developed-by strong,
+    .made-with,
+    .made-with a {
+        color: #000000 !important;
+    }
+</style>

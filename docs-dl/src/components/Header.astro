@@ -1,0 +1,251 @@
+---
+import type { Props } from '@astrojs/starlight/props';
+import Search from '@astrojs/starlight/components/Search.astro';
+import SiteTitle from '@astrojs/starlight/components/SiteTitle.astro';
+import SocialIcons from '@astrojs/starlight/components/SocialIcons.astro';
+import ThemeSelect from './ThemeSelect.astro';
+
+const currentPath = Astro.url.pathname;
+// Detección robusta del idioma basada en la URL
+const isEn = currentPath.startsWith('/en/') || currentPath === '/en';
+const prefix = isEn ? '/en' : '';
+
+// Lógica de limpieza de URL para el selector de idiomas
+// Eliminamos el prefijo /en/ si existe para obtener la ruta base
+const cleanPath = currentPath.replace(/^\/en(\/|$)/, '/');
+// Aseguramos que no haya dobles slashes y que la ruta sea válida
+const baseRoute = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+
+const esPath = `/${baseRoute}`;
+const enPath = `/en/${baseRoute}`;
+---
+
+<div class="header-content sl-flex">
+	<div class="left-group sl-flex">
+		<SiteTitle {...Astro.props} />
+        <div class="sl-flex search-container">
+            <Search {...Astro.props} />
+        </div>
+	</div>
+
+	<div class="sl-flex right-group">
+        <nav class="header-nav-links">
+            <a href={`${prefix}/getting-started`}>{isEn ? 'Guide' : 'Guía'}</a>
+            <a href={`${prefix}/features`}>{isEn ? 'Features' : 'Funcionalidades'}</a>
+            <a href={`${prefix}/api-reference`}>API</a>
+        </nav>
+		<div class="social-icons">
+			<SocialIcons {...Astro.props} />
+            <div class="version-info" id="version-info">
+                <a href="https://github.com/infinityxgame/TelegramDL/releases/latest" class="version-link" id="version-link">
+                    <svg class="tag-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                        <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                    </svg>
+                    <span id="version-text">Loading...</span>
+                </a>
+            </div>
+		</div>
+        <div class="selectors-group sl-flex">
+		    <ThemeSelect {...Astro.props} />
+
+            <div class="lang-selector-wrapper">
+                <select class="custom-lang-select" id="lang-select">
+                    <option value={esPath} selected={!isEn}>ES</option>
+                    <option value={enPath} selected={isEn}>EN</option>
+                </select>
+                <div class="lang-arrow"></div>
+            </div>
+        </div>
+	</div>
+</div>
+
+<script>
+    // Manejador de cambio de idioma más robusto
+    const select = document.getElementById('lang-select') as HTMLSelectElement;
+    if (select) {
+        select.addEventListener('change', (e) => {
+            const target = e.target as HTMLSelectElement;
+            window.location.pathname = target.value;
+        });
+    }
+
+    // Obtener la última versión de GitHub
+    async function fetchLatestVersion() {
+        const versionText = document.getElementById('version-text');
+        const versionLink = document.getElementById('version-link') as HTMLAnchorElement;
+        
+        try {
+            const response = await fetch('https://api.github.com/repos/infinityxgame/TelegramDL/releases/latest');
+            if (response.ok) {
+                const data = await response.json();
+                const version = data.tag_name;
+                const htmlUrl = data.html_url;
+                
+                if (versionText) {
+                    versionText.textContent = version;
+                }
+                if (versionLink && htmlUrl) {
+                    versionLink.href = htmlUrl;
+                }
+            } else {
+                if (versionText) {
+                    versionText.textContent = 'v0.0.0';
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching version:', error);
+            if (versionText) {
+                versionText.textContent = 'v0.0.0';
+            }
+        }
+    }
+
+    // Cargar la versión cuando el DOM esté listo
+    if (typeof document !== 'undefined') {
+        fetchLatestVersion();
+    }
+</script>
+
+<style>
+	.header-content {
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+        width: 100%;
+        height: 100%;
+	}
+
+    .left-group {
+        align-items: center;
+        gap: 1.5rem;
+        flex-grow: 1;
+    }
+
+	.search-container {
+        display: flex;
+        justify-content: flex-start;
+        max-width: 320px;
+        width: 100%;
+	}
+
+	.right-group {
+		align-items: center;
+		gap: 1.2rem;
+        flex-shrink: 0;
+	}
+
+    .header-nav-links {
+        display: none;
+        gap: 1.2rem;
+        align-items: center;
+    }
+
+    .header-nav-links a {
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+        white-space: nowrap;
+        color: var(--sl-color-white);
+        opacity: 0.85;
+        transition: opacity 0.2s;
+    }
+
+    .header-nav-links a:hover {
+        opacity: 1;
+    }
+
+    .social-icons {
+        display: flex;
+        align-items: center;
+    }
+
+    .version-info {
+        display: flex;
+        align-items: center;
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin-left: 0.5rem;
+    }
+
+    .version-link {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        text-decoration: none;
+        color: var(--sl-color-white);
+        font-weight: 600;
+        opacity: 0.9;
+        transition: opacity 0.2s;
+    }
+
+    .version-link:hover {
+        opacity: 1;
+    }
+
+    .tag-icon {
+        flex-shrink: 0;
+    }
+
+    :global([data-theme='light']) .version-link {
+        color: var(--sl-color-gray-1);
+    }
+
+    .selectors-group {
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .lang-selector-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .custom-lang-select {
+        background-color: rgba(255, 255, 255, 0.15);
+        border: none !important;
+        border-radius: 20px;
+        height: 24px;
+        padding: 0 1.5rem 0 0.7rem;
+        cursor: pointer;
+        appearance: none;
+        font-size: 0.75rem;
+        font-weight: bold;
+        color: white;
+        text-transform: uppercase;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+    :global([data-theme='light']) .custom-lang-select {
+        background-color: rgba(0, 0, 0, 0.05);
+        border-color: rgba(0, 0, 0, 0.1);
+        color: var(--sl-color-gray-1);
+    }
+
+    .lang-arrow {
+        position: absolute;
+        right: 0.6rem;
+        width: 0.6rem;
+        height: 0.6rem;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-size: contain;
+    }
+
+    :global([data-theme='dark']) .custom-lang-select {
+        color: #000000 !important;
+    }
+
+    :global([data-theme='light']) .lang-arrow {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234a3e4e'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    }
+
+    @media (min-width: 50rem) {
+        .header-nav-links {
+            display: flex;
+        }
+    }
+</style>
