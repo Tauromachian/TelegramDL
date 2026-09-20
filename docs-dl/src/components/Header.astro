@@ -6,6 +6,8 @@ import SocialIcons from '@astrojs/starlight/components/SocialIcons.astro';
 import ThemeSelect from './ThemeSelect.astro';
 
 const currentPath = Astro.url.pathname;
+const baseUrl = import.meta.env.BASE_URL;
+
 // Detección robusta del idioma basada en la URL
 const isEn = currentPath.startsWith('/en/') || currentPath === '/en';
 const prefix = isEn ? '/en' : '';
@@ -16,8 +18,8 @@ const cleanPath = currentPath.replace(/^\/en(\/|$)/, '/');
 // Aseguramos que no haya dobles slashes y que la ruta sea válida
 const baseRoute = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
 
-const esPath = `/${baseRoute}`;
-const enPath = `/en/${baseRoute}`;
+const esPath = `${baseUrl}/${baseRoute}`;
+const enPath = `${baseUrl}/en/${baseRoute}`;
 ---
 
 <div class="header-content sl-flex">
@@ -30,9 +32,9 @@ const enPath = `/en/${baseRoute}`;
 
 	<div class="sl-flex right-group">
         <nav class="header-nav-links">
-            <a href={`${prefix}/getting-started`}>{isEn ? 'Guide' : 'Guía'}</a>
-            <a href={`${prefix}/features`}>{isEn ? 'Features' : 'Funcionalidades'}</a>
-            <a href={`${prefix}/api-reference`}>API</a>
+            <a href={`${baseUrl}${prefix}/getting-started`}>{isEn ? 'Guide' : 'Guía'}</a>
+            <a href={`${baseUrl}${prefix}/features`}>{isEn ? 'Features' : 'Funcionalidades'}</a>
+            <a href={`${baseUrl}${prefix}/api-reference`}>API</a>
         </nav>
 		<div class="social-icons">
 			<SocialIcons {...Astro.props} />
