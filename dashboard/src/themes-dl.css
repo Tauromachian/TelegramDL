@@ -1714,6 +1714,14 @@ html.tema-silent-cherry .update-required-overlay {
   background-image: radial-gradient(circle at 70% -12%, var(--user-bg-top) 0, var(--user-bg-base) 52%);
 }
 
+/* --- Ajustes --- */
+html.tema-silent-cherry .ajuste-cabecera {
+  color: var(--claro-tinta);
+}
+html.tema-silent-cherry .ajuste-icono {
+  color: var(--claro-alerta);
+}
+
 
 /* -----------------------------------------------------------------------------
    osX (color 20)   ·   tema oscuro
