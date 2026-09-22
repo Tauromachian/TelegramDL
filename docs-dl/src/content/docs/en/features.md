@@ -16,7 +16,6 @@ TelegramDL features an intelligent URL parser (`pkg/downloader/parser.go`) that 
 | `https://t.me/c/2121902112/31449` | Single private channel message | Downloads media from message `31449` |
 | `https://t.me/c/2121902112/31449-31455` | **Message Range** | Queues all messages from `31449` to `31455` |
 | `https://t.me/publicchannel/1234` | Public channel or supergroup | Downloads message `1234` from public channel |
-| `https://t.me/b/botname/50` | Telegram Bot Link | Downloads media dispatched by the bot |
 | `https://t.me/c/2121902112/450/455` | Topic message | Downloads message `455` within topic `450` |
 
 ---

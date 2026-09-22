@@ -16,7 +16,6 @@ TelegramDL cuenta con un analizador sintáctico inteligente (`pkg/downloader/par
 | `https://t.me/c/2121902112/31449` | Mensaje único en canal privado | Descarga el archivo del mensaje `31449` |
 | `https://t.me/c/2121902112/31449-31455` | **Rango de mensajes** | Encola todos los mensajes desde el `31449` hasta el `31455` |
 | `https://t.me/nombrecanal/1234` | Canal o supergrupo público | Descarga el mensaje `1234` del canal público |
-| `https://t.me/b/botname/50` | Enlace a bot de Telegram | Descarga el contenido enviado por el bot |
 | `https://t.me/c/2121902112/450/455` | Mensaje en subtema (topic) | Descarga el mensaje `455` perteneciente al tema `450` |
 
 ---
