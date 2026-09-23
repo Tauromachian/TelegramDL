@@ -114,8 +114,7 @@ const load = async () => {
     }))
     items.value = detected
     error.value = ''
-  } catch (err) {
-  }
+  } catch (e) { console.error(e) }
 }
 
 const save = async () => {

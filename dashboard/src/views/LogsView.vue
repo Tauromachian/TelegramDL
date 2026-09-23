@@ -185,7 +185,7 @@ const copyAll = async () => {
   try {
     await navigator.clipboard.writeText(text)
     props.notify('Registro copiado al portapapeles')
-  } catch (err) {
+  } catch {
     // Navegadores sin permiso de portapapeles (o contexto no seguro).
     const area = document.createElement('textarea')
     area.value = text
@@ -196,7 +196,7 @@ const copyAll = async () => {
     try {
       document.execCommand('copy')
       props.notify('Registro copiado al portapapeles')
-    } catch (e) {
+    } catch {
       error.value = 'No se pudo copiar al portapapeles'
     }
     document.body.removeChild(area)

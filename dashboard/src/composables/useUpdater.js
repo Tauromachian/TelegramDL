@@ -31,7 +31,7 @@ export function useUpdater({ api, showMessage, openConfirm }) {
           if (res.status !== 'finishing') {
             setTimeout(pollProgress, 500)
           }
-        } catch (e) {
+        } catch {
           setTimeout(pollProgress, 1000)
         }
       }

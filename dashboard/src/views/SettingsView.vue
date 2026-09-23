@@ -69,7 +69,7 @@ const copyToken = async () => {
   try {
     await navigator.clipboard.writeText(props.apiToken)
     copyLabel.value = '¡Copiado!'
-  } catch (e) {
+  } catch {
     copyLabel.value = 'No se pudo copiar'
   }
   setTimeout(() => { copyLabel.value = 'Copiar' }, 2000)
@@ -167,7 +167,7 @@ const onImportFile = async (event) => {
     let parsed
     try {
       parsed = JSON.parse(text)
-    } catch (e) {
+    } catch {
       throw new Error('El archivo no es un JSON válido')
     }
 

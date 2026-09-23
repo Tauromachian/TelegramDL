@@ -118,7 +118,7 @@ const leerTamanoGuardado = () => {
   try {
     const guardado = Number(localStorage.getItem(CLAVE_TAMANO))
     return TAMANOS_PAGINA.includes(guardado) ? guardado : TAMANO_POR_DEFECTO
-  } catch (e) {
+  } catch {
     return TAMANO_POR_DEFECTO
   }
 }
@@ -130,7 +130,7 @@ const paginaHistorial = ref(1)
 // se vuelve al principio.
 watch(tamanoPagina, tamano => {
   paginaHistorial.value = 1
-  try { localStorage.setItem(CLAVE_TAMANO, tamano) } catch (e) {}
+  try { localStorage.setItem(CLAVE_TAMANO, tamano) } catch (e) { console.error(e) }
 })
 
 const historyDownloads = computed(() =>

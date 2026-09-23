@@ -103,7 +103,7 @@ const sendCode = async () => {
     cleanPhone = '+' + cleanPhone
   }
   phoneNumber.value = cleanPhone
-  const data = await apiCall('/api/auth/send-code', { phone_number: cleanPhone })
+  await apiCall('/api/auth/send-code', { phone_number: cleanPhone })
   emit('auth-success', { ...props.authStatus, state: 'WAITING_CODE', phone_number: cleanPhone })
 }
 
@@ -159,7 +159,7 @@ const goBack = async () => {
     password.value = ''
     try {
       await fetch('/api/auth/logout', { method: 'POST', headers: { ...authHeaders() } })
-    } catch (e) {}
+    } catch (e) { console.error(e) }
     loading.value = false
     stepOverride.value = 2
     // Se conserva phoneNumber a proposito: lo normal es reintentar con el

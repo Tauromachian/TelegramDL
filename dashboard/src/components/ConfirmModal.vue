@@ -1,7 +1,7 @@
 <script setup>
 import { X, AlertCircle, HelpCircle } from '../icons'
 
-const props = defineProps({
+defineProps({
   show: Boolean,
   title: String,
   message: String,
