@@ -1,8 +1,17 @@
 <script setup>
 import { onUnmounted, ref } from 'vue'
-import { KeyRound, ArrowRight, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff, Send, ShieldCheck } from '../icons'
+import {
+  KeyRound,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Send,
+  ShieldCheck
+} from '../icons'
 
-const props = defineProps({
+defineProps({
   error: { type: String, default: '' }
 })
 const emit = defineEmits(['submit'])
@@ -20,7 +29,7 @@ const sendMessage = ref('')
 const cooldown = ref(0)
 let cooldownTimer = null
 
-const startCooldown = seconds => {
+const startCooldown = (seconds) => {
   clearInterval(cooldownTimer)
   cooldown.value = Math.max(0, Math.round(Number(seconds) || 0))
   if (!cooldown.value) return
@@ -48,27 +57,30 @@ const sendTokenToTelegram = async () => {
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
       sendState.value = 'error'
-      sendMessage.value = data.detail || data.error || 'No se pudo enviar el token.'
+      sendMessage.value =
+        data.detail || data.error || 'No se pudo enviar el token.'
       startCooldown(data.retry_after)
       return
     }
     sendState.value = 'ok'
-    sendMessage.value = 'Enviado. Abre Telegram → Mensajes guardados, toca el token para copiarlo y pégalo aquí.'
+    sendMessage.value =
+      'Enviado. Abre Telegram → Mensajes guardados, toca el token para copiarlo y pégalo aquí.'
     startCooldown(data.retry_after || 60)
-  } catch (e) {
+  } catch {
     sendState.value = 'error'
-    sendMessage.value = 'No se pudo contactar con TelegramDL. Comprueba que el ordenador está encendido y accesible.'
+    sendMessage.value =
+      'No se pudo contactar con TelegramDL. Comprueba que el ordenador está encendido y accesible.'
   } finally {
     sending.value = false
   }
 }
 
-const handleSubmit = async () => {
+const handleSubmit = () => {
   const value = tokenInput.value.trim()
   if (!value) return
   submitting.value = true
   try {
-    await emit('submit', value)
+    emit('submit', value)
   } finally {
     submitting.value = false
   }
@@ -112,14 +124,23 @@ const handleSubmit = async () => {
             spellcheck="false"
             @keyup.enter="handleSubmit"
           />
-          <button type="button" class="ghost-icon-btn" @click="showToken = !showToken" :aria-label="showToken ? 'Ocultar token' : 'Mostrar token'">
+          <button
+            type="button"
+            :aria-label="showToken ? 'Ocultar token' : 'Mostrar token'"
+            class="ghost-icon-btn"
+            @click="showToken = !showToken"
+          >
             <EyeOff v-if="showToken" :size="16" />
             <Eye v-else :size="16" />
           </button>
         </div>
       </div>
 
-      <button class="auth-button primary" :disabled="submitting || !tokenInput.trim()" @click="handleSubmit">
+      <button
+        class="auth-button primary"
+        :disabled="submitting || !tokenInput.trim()"
+        @click="handleSubmit"
+      >
         <Loader2 v-if="submitting" class="spin" :size="18" />
         <template v-else>
           <span>Entrar</span>
@@ -129,16 +150,29 @@ const handleSubmit = async () => {
 
       <div class="send-divider"><span>¿No lo tienes a mano?</span></div>
 
-      <button class="auth-button ghost" :disabled="sending || cooldown > 0" @click="sendTokenToTelegram">
+      <button
+        class="auth-button ghost"
+        :disabled="sending || cooldown > 0"
+        @click="sendTokenToTelegram"
+      >
         <Loader2 v-if="sending" class="spin" :size="17" />
         <Send v-else :size="17" />
         <span v-if="sending">Enviando…</span>
-        <span v-else-if="cooldown > 0">Podrás repetirlo en {{ cooldown }} s</span>
+        <span v-else-if="cooldown > 0">
+          Podrás repetirlo en {{ cooldown }} s
+        </span>
         <span v-else>Enviármelo a Telegram</span>
       </button>
-      <p class="send-hint">Lo recibirás en tus <b>Mensajes guardados</b>, donde solo tú puedes leerlo.</p>
+      <p class="send-hint">
+        Lo recibirás en tus <b>Mensajes guardados</b>, donde solo tú puedes
+        leerlo.
+      </p>
 
-      <div v-if="sendMessage" class="auth-alert send-result" :class="sendState === 'ok' ? 'success' : 'danger'">
+      <div
+        v-if="sendMessage"
+        class="auth-alert send-result"
+        :class="sendState === 'ok' ? 'success' : 'danger'"
+      >
         <CheckCircle2 v-if="sendState === 'ok'" :size="18" />
         <AlertCircle v-else :size="18" />
         <span>{{ sendMessage }}</span>
@@ -311,7 +345,9 @@ const handleSubmit = async () => {
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.2s;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
 }
 
 .auth-button.primary:disabled {
@@ -354,7 +390,10 @@ const handleSubmit = async () => {
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.2s, color 0.2s, opacity 0.2s;
+  transition:
+    border-color 0.2s,
+    color 0.2s,
+    opacity 0.2s;
 }
 
 .auth-button.ghost:disabled {
@@ -380,6 +419,8 @@ const handleSubmit = async () => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
