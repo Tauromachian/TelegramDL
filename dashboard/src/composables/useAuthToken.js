@@ -11,8 +11,7 @@ import { ref } from 'vue'
 const token = ref('')
 const ready = ref(false)
 
-export const isWailsRuntime = () =>
-  typeof window !== 'undefined' && !!(window.go && window.go.main && window.go.main.App && window.go.main.App.GetLocalToken)
+export const isWailsRuntime = () => !!window.go?.main?.App?.GetLocalToken
 
 const STORAGE_KEY = 'tgdl_api_token'
 
