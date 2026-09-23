@@ -742,9 +742,10 @@ func (s *Server) buildStateSnapshot() map[string]any {
 	queuedCount := 0
 
 	for _, d := range downloads {
-		if d.Status == "downloading" {
+		switch d.Status {
+		case "downloading":
 			activeCount++
-		} else if d.Status == "queued" {
+		case "queued":
 			queuedCount++
 		}
 	}
@@ -1130,7 +1131,7 @@ func (s *Server) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 // Handlers de Descargas
-func (s *Server) handleGetDownloads(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetDownloads(w http.ResponseWriter, _ *http.Request) {
 	s.jsonResponse(w, http.StatusOK, s.downloader.GetDownloads())
 }
 

@@ -197,9 +197,10 @@ func extractDocumentInfo(msg *tg.Message, doc *tg.Document, firstCaptionLine str
 
 	mime := strings.ToLower(doc.MimeType)
 	if fileName == "" {
-		if kind == KindVideo {
+		switch kind {
+		case KindVideo:
 			fileName = fmt.Sprintf("video_%d.mp4", msg.ID)
-		} else if kind == KindSong {
+		case KindSong:
 			if isVoice {
 				fileName = fmt.Sprintf("voice_%d.ogg", msg.ID)
 			} else if audioPerformer != "" && audioTitle != "" {
@@ -209,15 +210,16 @@ func extractDocumentInfo(msg *tg.Message, doc *tg.Document, firstCaptionLine str
 			} else {
 				fileName = fmt.Sprintf("audio_%d.mp3", msg.ID)
 			}
-		} else if kind == KindSticker {
-			if mime == "application/x-tgsticker" {
+		case KindSticker:
+			switch mime {
+			case "application/x-tgsticker":
 				fileName = fmt.Sprintf("sticker_%d.tgs", msg.ID)
-			} else if mime == "video/webm" {
+			case "video/webm":
 				fileName = fmt.Sprintf("sticker_%d.webm", msg.ID)
-			} else {
+			default:
 				fileName = fmt.Sprintf("sticker_%d.webp", msg.ID)
 			}
-		} else {
+		default:
 			extByMime := extensionFromMime(mime)
 			if extByMime != "" {
 				fileName = fmt.Sprintf("file_%d%s", msg.ID, extByMime)
