@@ -24,7 +24,7 @@ export const hasStoredToken = () => {
   if (isWailsRuntime()) return true
   try {
     return !!localStorage.getItem(STORAGE_KEY)
-  } catch (e) {
+  } catch {
     return false
   }
 }
@@ -41,7 +41,7 @@ export function useAuthToken () {
     } else {
       try {
         token.value = localStorage.getItem(STORAGE_KEY) || ''
-      } catch (e) {
+      } catch {
         token.value = ''
       }
     }
@@ -58,7 +58,7 @@ export function useAuthToken () {
         } else {
           localStorage.removeItem(STORAGE_KEY)
         }
-      } catch (e) { /* localStorage no disponible: seguimos solo en memoria */ }
+      } catch { /* localStorage no disponible: seguimos solo en memoria */ }
     }
   }
 

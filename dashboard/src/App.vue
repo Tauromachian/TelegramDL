@@ -33,6 +33,7 @@ const { token, initToken, setToken, clearToken, authHeaders, isWailsRuntime } = 
 const startsAuthenticated = hasStoredToken()
 const needsRemoteLogin = ref(false)
 const remoteLoginError = ref('')
+const hasTelegramCredentials = ref(false)
 
 const downloads = ref([])
 const listenerItems = ref([])
@@ -147,7 +148,7 @@ const applyTheme = (colorId) => {
       user.color_id = colorId
       localStorage.setItem('tgdl_user', JSON.stringify(user))
     }
-  } catch (e) {}
+  } catch (e) { console.error(e) }
 }
 
 const storedUser = JSON.parse(localStorage.getItem('tgdl_user') || 'null')
@@ -181,8 +182,27 @@ const loadPublicTheme = async () => {
         ? data.color_id
         : data.loader_color_id
     )
-  } catch (e) {
+  } catch {
     // Sin respuesta del servidor se queda el color por defecto.
+  }
+}
+
+// Verifica si hay credenciales de Telegram configuradas (API ID y API Hash).
+// Es un endpoint público que solo devuelve un booleano sin información sensible.
+// Ahora también verifica si hay una sesión activa de Telegram.
+const checkTelegramCredentials = async () => {
+  try {
+    const response = await fetch('/api/auth/has-credentials')
+    if (!response.ok) return false
+    const data = await response.json()
+    // is_configured indica que hay credenciales Y sesión activa
+    // Si solo hay credenciales pero no sesión, devolvemos false para mostrar AuthWizard
+    hasTelegramCredentials.value = data.is_configured === true
+    return hasTelegramCredentials.value
+  } catch {
+    // Si falla, asumimos que no hay credenciales por seguridad
+    hasTelegramCredentials.value = false
+    return false
   }
 }
 
@@ -247,9 +267,13 @@ if (!startsAuthenticated) {
   Promise.race([
     loadPublicTheme(),
     new Promise(resolve => setTimeout(resolve, 400))
-  ]).finally(() => {
+  ]).finally(async () => {
     bootstrapping.value = false
-    needsRemoteLogin.value = true
+    // Verificar si hay credenciales de Telegram configuradas antes de decidir
+    // qué pantalla mostrar. Si no hay credenciales, se debe mostrar el AuthWizard
+    // para configurar Telegram primero. Si hay credenciales, se muestra RemoteLogin.
+    const hasCreds = await checkTelegramCredentials()
+    needsRemoteLogin.value = hasCreds
   })
 }
 const resolvedFileNames = new Map()
@@ -320,7 +344,11 @@ const api = async (url, options = {}) => {
   if (response.status === 401) {
     if (!isWailsRuntime()) {
       clearToken()
-      needsRemoteLogin.value = true
+      // Verificar si hay credenciales de Telegram configuradas antes de decidir
+      // qué pantalla mostrar. Si no hay credenciales, se debe mostrar el AuthWizard
+      // para configurar Telegram primero. Si hay credenciales, se muestra RemoteLogin.
+      const hasCreds = await checkTelegramCredentials()
+      needsRemoteLogin.value = hasCreds
       loadPublicTheme()
     }
     throw new Error('No autorizado: token de acceso inválido o ausente')
@@ -388,7 +416,7 @@ const fetchDownloads = async () => {
       websocketConnected.value = true
     }
     error.value = ''
-  } catch (err) { /* No mostramos error en poll constante */ }
+  } catch { /* No mostramos error en poll constante */ }
 }
 
 // El WebSocket (o los eventos nativos de Wails) ya empujan el estado en
@@ -582,7 +610,6 @@ const {
   updateInfo,
   isUpdating,
   isUpdateForced,
-  updatePostponedVersion,
   updateProgress,
   installUpdate,
   checkForUpdates,
@@ -721,13 +748,6 @@ const connectWebSocket = async () => {
     window.runtime.EventsOn("tgdl:state", handleStateUpdate)
   }
 
-  let wsUrl = ''
-  if (window.location.host && !window.location.host.includes('wails')) {
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    wsUrl = `${proto}//${window.location.host}/api/ws`
-  } else {
-    wsUrl = 'ws://127.0.0.1:8000/api/ws'
-  }
   // El token viaja como subprotocolo, no en la URL. Las URL completas quedan
   // registradas en cualquier proxy o túnel por el que pase la conexión, que es
   // justo lo que se usa para el acceso remoto; la cabecera del subprotocolo no.
@@ -735,6 +755,10 @@ const connectWebSocket = async () => {
   if (token.value) {
     protocolos.push(token.value)
   }
+
+  const wsUrl = (window.location.host && !window.location.host.includes('wails'))
+    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/ws`
+    : 'ws://127.0.0.1:8000/api/ws'
 
   try {
     socket = new WebSocket(wsUrl, protocolos)
@@ -745,7 +769,7 @@ const connectWebSocket = async () => {
         if (data.type === 'state') {
           handleStateUpdate(data)
         }
-      } catch {}
+      } catch (e) { console.error(e) }
     }
     socket.onclose = () => {
       if (!window.runtime) websocketConnected.value = false
@@ -804,7 +828,7 @@ const handleRemoteLogin = async (value) => {
     showSplash.value = true
     bootstrapping.value = true
     await startApp()
-  } catch (err) {
+  } catch {
     clearToken()
     remoteLoginError.value = 'Token inválido. Verifica que lo copiaste completo desde Ajustes → Acceso remoto.'
   }
@@ -819,7 +843,11 @@ onMounted(async () => {
     await startApp()
   } else {
     bootstrapping.value = false
-    needsRemoteLogin.value = true
+    // Verificar si hay credenciales de Telegram configuradas antes de decidir
+    // qué pantalla mostrar. Si no hay credenciales, se debe mostrar el AuthWizard
+    // para configurar Telegram primero. Si hay credenciales, se muestra RemoteLogin.
+    const hasCreds = await checkTelegramCredentials()
+    needsRemoteLogin.value = hasCreds
     // Solo si creíamos tener token y resultó no haberlo: en el otro caso el
     // color ya se pidió antes de pintar nada.
     if (startsAuthenticated) {

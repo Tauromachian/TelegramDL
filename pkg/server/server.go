@@ -145,6 +145,18 @@ const (
 	// El abuso se contiene con tokenSendCooldown.
 	tokenSendAPIPath = "/api/auth/token/send"
 
+	// hasCredentialsAPIPath indica si hay credenciales de Telegram configuradas.
+	// Es público porque se necesita saber qué pantalla mostrar antes de tener
+	// token. Solo devuelve un booleano sin revelar información sensible.
+	hasCredentialsAPIPath = "/api/auth/has-credentials"
+
+	// authAPIPrefix agrupa los endpoints de configuración de Telegram que
+	// necesitan ser públicos para permitir la configuración inicial sin token.
+	// Estos endpoints no revelan información sensible, solo permiten configurar
+	// la cuenta de Telegram. El abuso se limita por las protecciones de Telegram
+	// (rate limiting, código de verificación, 2FA).
+	authAPIPrefix = "/api/auth/"
+
 	// tokenSendCooldown es lo que hay que esperar entre dos envíos del token.
 	// Al ser un endpoint abierto, es lo que evita que alguien que alcance el
 	// puerto llene de mensajes los guardados del usuario.
@@ -169,12 +181,29 @@ const (
 
 // publicAPIPaths son los únicos endpoints de la API que responden sin token.
 var publicAPIPaths = map[string]bool{
-	publicAPIPath:    true,
-	tokenSendAPIPath: true,
+	publicAPIPath:         true,
+	tokenSendAPIPath:      true,
+	hasCredentialsAPIPath: true,
 }
 
+// isPublicAPIPath determina si un endpoint puede responder sin token.
+// Los endpoints de configuración de Telegram (/api/auth/credentials, /api/auth/send-code,
+// /api/auth/verify-code, /api/auth/verify-2fa, /api/auth/status, /api/auth/logout)
+// son públicos para permitir la configuración inicial sin token.
+// Los endpoints de token (/api/auth/token, /api/auth/token/regenerate) requieren autenticación.
 func isPublicAPIPath(path string) bool {
-	return publicAPIPaths[path]
+	if publicAPIPaths[path] {
+		return true
+	}
+	// Permitir endpoints de configuración de autenticación (pero no los de token)
+	if strings.HasPrefix(path, authAPIPrefix) {
+		// Proteger endpoints de token
+		if path == "/api/auth/token" || path == "/api/auth/token/regenerate" {
+			return false
+		}
+		return true
+	}
+	return false
 }
 
 func (s *Server) Handler() http.Handler {
@@ -492,6 +521,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/auth/verify-code", s.handleAuthVerifyCode)
 	mux.HandleFunc("/api/auth/verify-2fa", s.handleAuthVerify2FA)
 	mux.HandleFunc("/api/auth/logout", s.handleAuthLogout)
+	// Público: indica si hay credenciales de Telegram configuradas (sin token)
+	mux.HandleFunc(hasCredentialsAPIPath, s.handleHasCredentials)
 
 	// Token de acceso a la API (acceso remoto)
 	mux.HandleFunc("/api/auth/token", s.handleGetToken)
@@ -784,6 +815,29 @@ func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 
 	s.jsonResponse(w, http.StatusOK, st)
+}
+
+// handleHasCredentials indica si hay credenciales de Telegram configuradas Y
+// si hay una sesión activa. Es un endpoint público (sin token) porque se
+// necesita para decidir qué pantalla mostrar antes de que el usuario tenga
+// token de acceso. Solo devuelve un booleano sin revelar información sensible.
+func (s *Server) handleHasCredentials(w http.ResponseWriter, r *http.Request) {
+	apiID, apiHash, _ := s.storage.GetCredentials()
+	hasCreds := apiID != "" && apiHash != ""
+
+	// Verificar si hay una sesión activa de Telegram
+	var hasActiveSession bool
+	if hasCreds {
+		st := s.clientMgr.GetAuthStatus(r.Context())
+		hasActiveSession = st.Authenticated || st.State == "LOGGED_IN"
+	}
+
+	// Devolvemos si la app está completamente configurada (credenciales + sesión)
+	s.jsonResponse(w, http.StatusOK, map[string]bool{
+		"has_credentials":    hasCreds,
+		"has_active_session": hasActiveSession,
+		"is_configured":      hasCreds && hasActiveSession,
+	})
 }
 
 func (s *Server) handleAuthCredentials(w http.ResponseWriter, r *http.Request) {
