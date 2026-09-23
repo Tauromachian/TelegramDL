@@ -28,7 +28,7 @@ export const hasStoredToken = () => {
   }
 }
 
-export function useAuthToken () {
+export function useAuthToken() {
   const initToken = async () => {
     if (isWailsRuntime()) {
       try {
@@ -57,13 +57,24 @@ export function useAuthToken () {
         } else {
           localStorage.removeItem(STORAGE_KEY)
         }
-      } catch { /* localStorage no disponible: seguimos solo en memoria */ }
+      } catch {
+        console.error('localStorage no disponible: seguimos solo en memoria')
+      }
     }
   }
 
   const clearToken = () => setToken('')
 
-  const authHeaders = () => (token.value ? { Authorization: `Bearer ${token.value}` } : {})
+  const authHeaders = () =>
+    token.value ? { Authorization: `Bearer ${token.value}` } : {}
 
-  return { token, ready, initToken, setToken, clearToken, authHeaders, isWailsRuntime }
+  return {
+    token,
+    ready,
+    initToken,
+    setToken,
+    clearToken,
+    authHeaders,
+    isWailsRuntime
+  }
 }
