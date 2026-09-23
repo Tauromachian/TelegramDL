@@ -97,7 +97,7 @@ const handleSubmit = async () => {
         <ShieldCheck :size="16" />
         <span>
           Encuéntralo en la app de escritorio: <b>Ajustes → Acceso remoto</b>.
-          Cópialo y pégalo aquí una sola vez; este navegador lo recordará.
+          Cópialo y pégalo aquí una sola vez; su sesión se recordará.
         </span>
       </div>
 
