@@ -461,6 +461,9 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 			kv[k] = v
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return cfg, err
+	}
 
 	// Si está vacío e invocan con legacy JSON o existe en DataDir/BaseDir
 	if len(kv) == 0 {
@@ -485,6 +488,9 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 							if err := r2.Scan(&k, &v); err == nil {
 								kv[k] = v
 							}
+						}
+						if err := r2.Err(); err != nil {
+							// Log error but continue with existing kv
 						}
 						r2.Close()
 					}
@@ -559,6 +565,9 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 				c.FStickers = stickers != 0
 				chats = append(chats, c)
 			}
+		}
+		if err := chatRows.Err(); err != nil {
+			// Log error but continue with whatever chats we loaded
 		}
 		cfg.ListenerChats = chats
 	}
@@ -791,6 +800,9 @@ func (s *Storage) LoadDownloads(legacyPath string) (map[string]DownloadItem, err
 			items[item.ID] = item
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return items, err
+	}
 
 	return items, nil
 }
@@ -861,6 +873,9 @@ func (s *Storage) Chunks(downloadID string) (map[int64]bool, error) {
 		if err := rows.Scan(&idx); err == nil {
 			res[idx] = true
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return res, err
 	}
 	return res, nil
 }
