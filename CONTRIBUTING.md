@@ -57,10 +57,22 @@ se podrá fusionar.
   deben descartarse en silencio (`_ = err`); regístralos con `log.Printf`
   salvo que exista una razón explícita para ignorarlos (coméntala en el
   código).
-- **Vue/Frontend**: usa la Composition API con `<script setup>`. Si una
-  pieza de estado y lógica es autocontenida y reutilizable, considera
-  extraerla a un composable en `dashboard/src/composables/` en vez de
-  seguir creciendo `App.vue`.
+- **Vue/Frontend**: usa la Composition API con `<script setup>`. Extrae la
+  lógica reutilizable fuera de `App.vue`, eligiendo el lugar según si
+  depende o no de la instancia del componente:
+  - Si maneja estado reactivo (`ref`, `reactive`, `computed`), ciclo de vida
+    (`onMounted`, `watch`, ...) o recursos por instancia (temporizadores,
+    sockets, suscripciones), va a un composable en
+    `dashboard/src/composables/` con prefijo `use*`.
+  - Si es lógica sin estado reactivo (mapas de datos, formato, ayudantes del
+    DOM, llamadas `fetch` puras), va a un módulo simple con exportaciones
+    nombradas en `dashboard/src/utils/`, sin envoltorio `use*`: el prefijo
+    `use*` implica semántica de instancia de componente y no debe usarse
+    para funciones puras.
+  - Ejemplo: el sistema de temas (`themeMap`, `applyTheme`,
+    `loadPublicTheme`) vive en `dashboard/src/utils/theme.js` porque no
+    tiene estado reactivo; solo se convertiría en composable si pasara a
+    poseer un `activeThemeId` reactivo con sus observadores.
 - **Comentarios**: el código existente comenta el *porqué* de las
   decisiones no evidentes (por ejemplo, por qué se limita el tamaño de un
   mapa, o por qué se pospone una actualización); sigue ese mismo criterio
