@@ -66,7 +66,20 @@ const apiCall = async (url, body) => {
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(body)
     })
-    const data = await res.json()
+
+    // Verificar que la respuesta tenga contenido antes de intentar parsear JSON
+    const text = await res.text()
+    if (!text || text.trim() === '') {
+      throw new Error('El servidor no envió respuesta. Intenta nuevamente.')
+    }
+
+    let data
+    try {
+      data = JSON.parse(text)
+    } catch {
+      throw new Error('Respuesta del servidor inválida. Intenta nuevamente.')
+    }
+
     if (!res.ok) {
       throw new Error(data.detail || data.error || 'Error en el proceso')
     }

@@ -483,7 +483,9 @@ func (s *Server) RegenerateToken() string {
 func (s *Server) jsonResponse(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("[SERVER] error codificando respuesta JSON: %v", err)
+	}
 }
 
 func (s *Server) errorResponse(w http.ResponseWriter, status int, message string) {
@@ -861,7 +863,17 @@ func (s *Server) handleAuthCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = s.clientMgr.InitClient(body.APIID, body.APIHash)
+	if err := s.clientMgr.InitClient(body.APIID, body.APIHash); err != nil {
+		log.Printf("[SERVER] error inicializando cliente Telegram: %v", err)
+		s.errorResponse(w, http.StatusInternalServerError, "Error inicializando cliente Telegram")
+		return
+	}
+
+	// Esperar un momento para que el cliente MTProto tenga tiempo de iniciar
+	// la conexión antes de consultar su estado. Esto evita race conditions
+	// donde el cliente aún no está listo cuando consultamos GetAuthStatus.
+	time.Sleep(500 * time.Millisecond)
+
 	s.jsonResponse(w, http.StatusOK, s.clientMgr.GetAuthStatus(r.Context()))
 }
 

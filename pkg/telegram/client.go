@@ -797,8 +797,8 @@ func (cm *ClientManager) GetAuthStatus(ctx context.Context) AuthStatus {
 
 	// Esperar brevemente a que el cliente MTProto esté conectado.
 	// Si hay una sesión guardada, somos más pacientes (5s) porque es probable que conecte.
-	// Si no, fallamos rápido (500ms) para mostrar el login.
-	timeout := 500 * time.Millisecond
+	// Si no, damos tiempo suficiente (3s) para la primera conexión.
+	timeout := 3 * time.Second
 	if _, err := os.Stat(cm.sessionPath); err == nil {
 		timeout = 5 * time.Second
 	}
