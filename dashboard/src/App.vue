@@ -594,7 +594,7 @@ const viewTitle = computed(
 const speedText = computed(() =>
   settings.speed_limit.value > 0
     ? `${settings.speed_limit.value} ${settings.speed_limit.unit}/s`
-    : 'Sin límite'
+    : 'Velocidad de descarga: sin límites'
 )
 const totalSpeed = computed(() => {
   const totalBytes = downloads.value.reduce(
