@@ -1809,7 +1809,10 @@ onUnmounted(() => {
    detalle, que es lo urgente de ver. */
 .sidebar-shutdown {
   display: flex;
-  align-items: center;
+  /* Arriba, no centrado: cuando sale el subtexto «Activo: al acabar la cola»
+     el switch y el icono se quedan en la línea del título en vez de flotar
+     en medio de la caja. */
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   background: var(--user-bg-base);
@@ -1825,7 +1828,7 @@ onUnmounted(() => {
 }
 .sidebar-shutdown .shutdown-info {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-width: 0;
   color: var(--user-text-dim);
