@@ -708,19 +708,21 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 	now := float64(time.Now().UnixNano()) / 1e9
 
 	dlItem := storage.DownloadItem{
-		ID:         itemID,
-		JobID:      fmt.Sprintf("listener:%d", peerID),
-		MessageID:  int64(msg.ID),
-		ChatID:     peerID,
-		FileName:   mediaInfo.FileName,
-		Status:     "available",
-		Kind:       string(mediaInfo.Kind),
-		TotalStr:   config.FormatBytes(float64(mediaInfo.FileSize)),
-		TotalBytes: mediaInfo.FileSize,
-		SubFolder:  subCarpeta,
-		Source:     "listener",
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:               itemID,
+		JobID:            fmt.Sprintf("listener:%d", peerID),
+		MessageID:        int64(msg.ID),
+		ChatID:           peerID,
+		FileName:         mediaInfo.FileName,
+		CaptionFileName:  mediaInfo.CaptionFileName,
+		OriginalFileName: mediaInfo.OriginalFileName,
+		Status:           "available",
+		Kind:             string(mediaInfo.Kind),
+		TotalStr:         config.FormatBytes(float64(mediaInfo.FileSize)),
+		TotalBytes:       mediaInfo.FileSize,
+		SubFolder:        subCarpeta,
+		Source:           "listener",
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 
 	if chatCfg.AutoDownload {
@@ -781,6 +783,8 @@ func (le *ListenerEngine) DownloadItem(itemID string) error {
 
 		le.mu.Unlock()
 
+		log.Printf("[LISTENER] DEBUG: Descargando item %s desde memoria con nombre: '%s'", itemID, item.FileName)
+
 		go le.prepararCarpeta(item.SubFolder, config.ListenerChat{
 			ID:        item.ChatID,
 			Name:      item.GroupName,
@@ -821,6 +825,9 @@ func (le *ListenerEngine) DownloadItem(itemID string) error {
 	if le.storage != nil {
 		if saved, err := le.storage.LoadDownloads(""); err == nil {
 			if dl, exists := saved[itemID]; exists {
+				// Usar el nombre de archivo que ya está en la base de datos
+				// (puede haber sido actualizado por UpdateItemFileName)
+				log.Printf("[LISTENER] DEBUG: Descargando item %s desde BD con nombre: '%s'", itemID, dl.FileName)
 				dl.Status = "queued"
 				if err := le.storage.SaveDownload(dl); err != nil {
 					log.Printf("[LISTENER] error guardando estado de descarga en BD: %v", err)
@@ -868,6 +875,7 @@ func (le *ListenerEngine) UpdateItemFileName(itemID string, newFileName string) 
 		le.mu.Unlock()
 		return fmt.Errorf("item no encontrado: %s", itemID)
 	}
+	log.Printf("[LISTENER] DEBUG: Actualizando nombre item %s: '%s' -> '%s'", itemID, item.FileName, newFileName)
 	item.FileName = newFileName
 	cp := *item
 	le.mu.Unlock()
@@ -877,6 +885,7 @@ func (le *ListenerEngine) UpdateItemFileName(itemID string, newFileName string) 
 		if err := le.storage.UpdateDownloadFileName(itemID, newFileName); err != nil {
 			return fmt.Errorf("error actualizando nombre en BD: %w", err)
 		}
+		log.Printf("[LISTENER] DEBUG: Nombre actualizado en BD para item %s", itemID)
 	}
 
 	le.notifyState(cp)

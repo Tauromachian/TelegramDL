@@ -424,8 +424,11 @@ const selectBulkFileName = async (type) => {
     if (!hasManualNameSelection(item)) return false
     if (item.status !== 'available') return false
     const targetName = type === 'caption' ? item.caption_file_name : item.original_file_name
-    return targetName && targetName !== item.file_name
+    return targetName !== null && targetName !== undefined && targetName !== ''
   })
+
+  console.log(`[DEBUG] Items elegibles para cambio masivo:`, eligibleItems.length)
+  console.log(`[DEBUG] Tipo de cambio:`, type)
 
   if (!eligibleItems.length) {
     props.notify('No hay archivos pendientes aplicables para cambiar nombre')
@@ -435,6 +438,7 @@ const selectBulkFileName = async (type) => {
   let updatedCount = 0
   for (const item of eligibleItems) {
     const targetName = type === 'caption' ? item.caption_file_name : item.original_file_name
+    console.log(`[DEBUG] Actualizando item ${item.id}: nombre actual '${item.file_name}' -> '${targetName}'`)
     try {
       await api('/api/listener/update-filename', {
         method: 'POST',
@@ -443,13 +447,18 @@ const selectBulkFileName = async (type) => {
       })
       item.file_name = targetName
       updatedCount++
+      console.log(`[DEBUG] Item ${item.id} actualizado exitosamente`)
     } catch (err) {
       console.error(`Error actualizando nombre para ${item.id}:`, err)
     }
   }
 
+  console.log(`[DEBUG] Total actualizados: ${updatedCount}`)
+
   if (updatedCount > 0) {
     props.notify(`${updatedCount} nombres de archivos actualizados a ${type === 'caption' ? 'Caption' : 'Original'}`)
+    // Recargar los items desde el servidor para asegurar sincronización
+    await load()
   }
 }
 
