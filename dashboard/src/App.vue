@@ -1133,33 +1133,35 @@ onUnmounted(() => {
               pending: shutdownCountdown > 0
             }"
           >
-            <div class="shutdown-info">
-              <Power :size="15" />
-              <div class="shutdown-text">
-                <span class="shutdown-label">Apagar al terminar</span>
-                <small v-if="shutdownCountdown > 0">
-                  Apagando en {{ shutdownCountdown }} s…
-                </small>
-                <small v-else-if="settings.shutdown_when_done">
-                  Activo: al acabar la cola
-                </small>
+            <div class="shutdown-row">
+              <div class="shutdown-info">
+                <Power :size="15" />
+                <div class="shutdown-text">
+                  <span class="shutdown-label">Apagar al terminar</span>
+                </div>
               </div>
+              <label
+                class="switch"
+                :title="
+                  settings.shutdown_when_done
+                    ? 'Cancelar el apagado automático'
+                    : 'Apagar el PC cuando termine la cola de descargas'
+                "
+              >
+                <input
+                  type="checkbox"
+                  :checked="settings.shutdown_when_done"
+                  @change="onShutdownToggle"
+                />
+                <span></span>
+              </label>
             </div>
-            <label
-              class="switch"
-              :title="
-                settings.shutdown_when_done
-                  ? 'Cancelar el apagado automático'
-                  : 'Apagar el PC cuando termine la cola de descargas'
-              "
-            >
-              <input
-                type="checkbox"
-                :checked="settings.shutdown_when_done"
-                @change="onShutdownToggle"
-              />
-              <span></span>
-            </label>
+            <small v-if="shutdownCountdown > 0" class="shutdown-sub">
+              Apagando en {{ shutdownCountdown }} s…
+            </small>
+            <small v-else-if="settings.shutdown_when_done" class="shutdown-sub">
+              Activo: al acabar la cola
+            </small>
           </div>
 
           <div v-if="authStatus.user" class="sidebar-user-badge">
@@ -1809,12 +1811,8 @@ onUnmounted(() => {
    detalle, que es lo urgente de ver. */
 .sidebar-shutdown {
   display: flex;
-  /* Arriba, no centrado: cuando sale el subtexto «Activo: al acabar la cola»
-     el switch y el icono se quedan en la línea del título en vez de flotar
-     en medio de la caja. */
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  gap: 1px;
   background: var(--user-bg-base);
   border: 1px solid var(--user-border);
   border-radius: 10px;
@@ -1825,6 +1823,15 @@ onUnmounted(() => {
   transition:
     border-color 0.25s,
     box-shadow 0.25s;
+}
+/* Primera fila: icono + título a la izquierda y switch a la derecha. El
+   centrado vertical va aquí, así el switch queda a la altura del título y
+   el subtexto de estado (fila aparte) no lo desplaza hacia el medio. */
+.sidebar-shutdown .shutdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 .sidebar-shutdown .shutdown-info {
   display: flex;
@@ -1837,7 +1844,6 @@ onUnmounted(() => {
 .sidebar-shutdown .shutdown-text {
   display: flex;
   flex-direction: column;
-  gap: 1px;
   min-width: 0;
 }
 .sidebar-shutdown .shutdown-label {
@@ -1848,11 +1854,14 @@ onUnmounted(() => {
   white-space: normal;
   line-height: 1.25;
 }
-.sidebar-shutdown .shutdown-text small {
+.sidebar-shutdown .shutdown-sub {
   font-size: 10px;
   color: var(--user-text-dim);
   white-space: normal;
   line-height: 1.3;
+  /* Icono (15px) + hueco (8px): el subtexto arranca bajo el texto del
+     título, no bajo el icono. */
+  padding-left: 23px;
 }
 .sidebar-shutdown.armed {
   border-color: var(--user-primary);
@@ -1867,7 +1876,7 @@ onUnmounted(() => {
 .sidebar-shutdown.pending .shutdown-info {
   color: #f59e0b;
 }
-.sidebar-shutdown.pending .shutdown-text small {
+.sidebar-shutdown.pending .shutdown-sub {
   color: #fbbf24;
   animation: pulseWarning 1s infinite;
 }
