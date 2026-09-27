@@ -96,7 +96,17 @@ func (e *Engine) resolveItemMetadata(itemID string) {
 		return
 	}
 
-	it.FileName = media.FileName
+	// Un elemento de la bandeja de escucha ya trae el nombre que ve el usuario:
+	// el del caption por defecto, o el que eligió con el selector de nombres.
+	// Pisarlo aquí con el nombre del mensaje hacía que, al encolar varios de
+	// golpe, todos salvo el primero acabaran con el caption: la resolución se
+	// completaba mientras esperaban turno y executeDownload ya leía el nombre
+	// sobrescrito. Solo se rellena el nombre cuando está vacío o es un
+	// placeholder «mensaje_<id>», que es como llegan los rangos y las descargas
+	// manuales por ID.
+	if it.Source != "listener" || it.FileName == "" || strings.HasPrefix(strings.ToLower(it.FileName), "mensaje_") {
+		it.FileName = media.FileName
+	}
 	it.Kind = string(media.Kind)
 	it.TotalBytes = media.FileSize
 	it.TotalStr = config.FormatBytes(float64(media.FileSize))

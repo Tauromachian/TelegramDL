@@ -39,6 +39,11 @@ type ListenerItem struct {
 	OriginalFileName string  `json:"original_file_name,omitempty"`
 	Kind             string  `json:"kind"`
 	TotalStr         string  `json:"total_str"`
+	// TotalBytes viaja con el elemento para que, al descargarlo desde la
+	// bandeja, la tarea entre en cola con el tamaño ya conocido, igual que las
+	// descargas automáticas. Sin él, el motor creía que faltaban los metadatos
+	// y los volvía a pedir a Telegram, pisando el nombre elegido por el usuario.
+	TotalBytes       int64   `json:"total_bytes,omitempty"`
 	Status           string  `json:"status"` // "available"
 	UpdatedAt        float64 `json:"updated_at"`
 	CreatedAt        float64 `json:"created_at"`
@@ -104,6 +109,7 @@ func NewListenerEngine(cm *telegram.ClientManager, st *storage.Storage, eng *dow
 						OriginalFileName: d.OriginalFileName,
 						Kind:             d.Kind,
 						TotalStr:         d.TotalStr,
+						TotalBytes:       d.TotalBytes,
 						Status:           d.Status,
 						UpdatedAt:        d.UpdatedAt,
 						CreatedAt:        d.CreatedAt,
@@ -759,6 +765,7 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 			OriginalFileName: mediaInfo.OriginalFileName,
 			Kind:             string(mediaInfo.Kind),
 			TotalStr:         config.FormatBytes(float64(mediaInfo.FileSize)),
+			TotalBytes:       mediaInfo.FileSize,
 			Status:           "available",
 			UpdatedAt:        now,
 			CreatedAt:        now,
@@ -783,7 +790,7 @@ func (le *ListenerEngine) DownloadItem(itemID string) error {
 
 		le.mu.Unlock()
 
-		log.Printf("[LISTENER] DEBUG: Descargando item %s desde memoria con nombre: '%s'", itemID, item.FileName)
+		log.Printf("[LISTENER] Descargando desde la bandeja con el nombre: '%s'", item.FileName)
 
 		go le.prepararCarpeta(item.SubFolder, config.ListenerChat{
 			ID:        item.ChatID,
@@ -803,6 +810,7 @@ func (le *ListenerEngine) DownloadItem(itemID string) error {
 			Status:           "queued",
 			Kind:             item.Kind,
 			TotalStr:         item.TotalStr,
+			TotalBytes:       item.TotalBytes,
 			SubFolder:        item.SubFolder,
 			Source:           "listener",
 			CreatedAt:        float64(time.Now().Unix()),
@@ -827,7 +835,7 @@ func (le *ListenerEngine) DownloadItem(itemID string) error {
 			if dl, exists := saved[itemID]; exists {
 				// Usar el nombre de archivo que ya está en la base de datos
 				// (puede haber sido actualizado por UpdateItemFileName)
-				log.Printf("[LISTENER] DEBUG: Descargando item %s desde BD con nombre: '%s'", itemID, dl.FileName)
+				log.Printf("[LISTENER] Descargando desde la bandeja con el nombre: '%s'", dl.FileName)
 				dl.Status = "queued"
 				if err := le.storage.SaveDownload(dl); err != nil {
 					log.Printf("[LISTENER] error guardando estado de descarga en BD: %v", err)
@@ -875,7 +883,7 @@ func (le *ListenerEngine) UpdateItemFileName(itemID string, newFileName string) 
 		le.mu.Unlock()
 		return fmt.Errorf("item no encontrado: %s", itemID)
 	}
-	log.Printf("[LISTENER] DEBUG: Actualizando nombre item %s: '%s' -> '%s'", itemID, item.FileName, newFileName)
+	log.Printf("[LISTENER] Nombre cambiado: '%s' -> '%s'", item.FileName, newFileName)
 	item.FileName = newFileName
 	cp := *item
 	le.mu.Unlock()
@@ -885,7 +893,6 @@ func (le *ListenerEngine) UpdateItemFileName(itemID string, newFileName string) 
 		if err := le.storage.UpdateDownloadFileName(itemID, newFileName); err != nil {
 			return fmt.Errorf("error actualizando nombre en BD: %w", err)
 		}
-		log.Printf("[LISTENER] DEBUG: Nombre actualizado en BD para item %s", itemID)
 	}
 
 	le.notifyState(cp)
