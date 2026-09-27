@@ -1839,12 +1839,17 @@ onUnmounted(() => {
 }
 .sidebar-shutdown .shutdown-label {
   font-weight: 600;
-  white-space: nowrap;
+  /* Sin nowrap: la caja no da para el texto + el interruptor en una sola
+     línea (el sidebar siempre mide 230px), y con nowrap la cola del texto se
+     metía por debajo del switch. Mejor dos líneas dentro de su columna. */
+  white-space: normal;
+  line-height: 1.25;
 }
 .sidebar-shutdown .shutdown-text small {
   font-size: 10px;
   color: var(--user-text-dim);
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.3;
 }
 .sidebar-shutdown.armed {
   border-color: var(--user-primary);

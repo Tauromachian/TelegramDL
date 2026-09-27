@@ -1644,6 +1644,14 @@ html.tema-silent-cherry .status-dot.disconnected {
   box-shadow: 0 0 10px color-mix(in srgb, var(--claro-alerta), transparent 55%);
 }
 
+/* El interruptor «Apagar al terminar» armado hereda el rosa pastel del acento,
+   que sobre el papel claro del sidebar no llega a leerse: el icono y el texto
+   van en rosa oscuro, el mismo que los enlaces del tema. La etiqueta de estado
+   sigue en gris tinta porque ya tiene su propio color. */
+html.tema-silent-cherry .sidebar-shutdown.armed .shutdown-info {
+  color: var(--claro-alerta);
+}
+
 /* --- Barras de progreso --------------------------------------------------- */
 /* Pétalos flotando en la corriente. Misma técnica que los otros temas: capa
    propia movida con transform y recorrido fijo, para que el avance se vea
