@@ -1835,7 +1835,8 @@ onUnmounted(() => {
 }
 .sidebar-shutdown .shutdown-info {
   display: flex;
-  align-items: flex-start;
+  /* El icono se centra con las dos líneas del título, igual que el switch. */
+  align-items: center;
   gap: 8px;
   min-width: 0;
   color: var(--user-text-dim);
