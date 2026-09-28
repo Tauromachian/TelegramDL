@@ -1,14 +1,25 @@
 <script setup>
+import { computed } from 'vue'
 import { X, AlertCircle, HelpCircle } from '../icons'
+import { useI18n } from '../i18n'
 
-defineProps({
+const { t } = useI18n()
+
+const props = defineProps({
   show: Boolean,
   title: String,
   message: String,
-  confirmText: { type: String, default: 'Confirmar' },
-  cancelText: { type: String, default: 'Cancelar' },
+  confirmText: { type: String, default: '' },
+  cancelText: { type: String, default: undefined },
   type: { type: String, default: 'primary' } // 'primary', 'danger'
 })
+
+// Las etiquetas por defecto van traducidas y reaccionan al idioma; quien abre
+// el modal casi siempre pasa ya sus textos.
+const confirmLabel = computed(() => props.confirmText || t('common.confirm'))
+const cancelLabel = computed(() =>
+  props.cancelText === undefined ? t('common.cancel') : props.cancelText
+)
 
 const emit = defineEmits(['confirm', 'cancel'])
 </script>
@@ -30,8 +41,8 @@ const emit = defineEmits(['confirm', 'cancel'])
             <p>{{ message }}</p>
           </div>
           <div class="modal-footer">
-            <button v-if="cancelText" class="cancel-btn" @click="emit('cancel')">{{ cancelText }}</button>
-            <button class="confirm-btn" :class="type" @click="emit('confirm')">{{ confirmText }}</button>
+            <button v-if="cancelLabel" class="cancel-btn" @click="emit('cancel')">{{ cancelLabel }}</button>
+            <button class="confirm-btn" :class="type" @click="emit('confirm')">{{ confirmLabel }}</button>
           </div>
         </div>
       </div>

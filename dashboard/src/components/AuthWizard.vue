@@ -3,8 +3,15 @@ import { ref, computed, watch } from 'vue'
 import { KeyRound, Phone, ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Loader2, Info } from '../icons'
 import { useAuthToken } from '../composables/useAuthToken'
 import { openExternal } from '../composables/useExternalLink'
+import { useI18n } from '../i18n'
 
 const { authHeaders } = useAuthToken()
+const { t, splitOn } = useI18n()
+
+// El banner de las credenciales nombra la sección "API development tools",
+// que en my.telegram.org aparece siempre en inglés: va como marcador para
+// poder seguir pintándola en cursiva dentro de la frase traducida.
+const bannerBParts = computed(() => splitOn('auth.credsBannerB', 'apiTools'))
 
 const props = defineProps({
   authStatus: {
@@ -70,18 +77,18 @@ const apiCall = async (url, body) => {
     // Verificar que la respuesta tenga contenido antes de intentar parsear JSON
     const text = await res.text()
     if (!text || text.trim() === '') {
-      throw new Error('El servidor no envió respuesta. Intenta nuevamente.')
+      throw new Error(t('auth.errNoResponse'))
     }
 
     let data
     try {
       data = JSON.parse(text)
     } catch {
-      throw new Error('Respuesta del servidor inválida. Intenta nuevamente.')
+      throw new Error(t('auth.errInvalidResponse'))
     }
 
     if (!res.ok) {
-      throw new Error(data.detail || data.error || 'Error en el proceso')
+      throw new Error(data.detail || data.error || t('auth.errProcess'))
     }
     // La accion ha ido bien: devolvemos el mando al estado del servidor.
     stepOverride.value = null
@@ -96,7 +103,7 @@ const apiCall = async (url, body) => {
 
 const saveCredentials = async () => {
   if (!apiId.value || !apiHash.value) {
-    errorMessage.value = 'Por favor completa tanto el API ID como el API HASH'
+    errorMessage.value = t('auth.errFillBoth')
     return
   }
   const data = await apiCall('/api/auth/credentials', {
@@ -108,7 +115,7 @@ const saveCredentials = async () => {
 
 const sendCode = async () => {
   if (!phoneNumber.value) {
-    errorMessage.value = 'Ingresa un número de teléfono válido con código de país (ej. +34600112233)'
+    errorMessage.value = t('auth.errPhone')
     return
   }
   let cleanPhone = phoneNumber.value.trim().replace(/\s+/g, '')
@@ -122,7 +129,7 @@ const sendCode = async () => {
 
 const verifyCode = async () => {
   if (!code.value) {
-    errorMessage.value = 'Ingresa el código de 5 dígitos recibido en Telegram'
+    errorMessage.value = t('auth.errCode')
     return
   }
   const data = await apiCall('/api/auth/verify-code', {
@@ -138,7 +145,7 @@ const verifyCode = async () => {
 
 const verify2FA = async () => {
   if (!password.value) {
-    errorMessage.value = 'Ingresa tu contraseña de verificación en dos pasos'
+    errorMessage.value = t('auth.err2fa')
     return
   }
   const data = await apiCall('/api/auth/verify-2fa', { password: password.value })
@@ -205,8 +212,8 @@ const cancelBack = () => {
           </svg>
         </div>
         <div>
-          <h2>Instalación y Configuración</h2>
-          <p>Conecta tu cuenta de Telegram para comenzar</p>
+          <h2>{{ t('auth.title') }}</h2>
+          <p>{{ t('auth.subtitle') }}</p>
         </div>
       </div>
 
@@ -214,22 +221,22 @@ const cancelBack = () => {
       <div class="stepper">
         <div class="step-item" :class="{ active: currentStep === 1, done: currentStep > 1 }">
           <span class="step-num">1</span>
-          <span class="step-label">API</span>
+          <span class="step-label">{{ t('auth.stepApi') }}</span>
         </div>
         <div class="step-divider"></div>
         <div class="step-item" :class="{ active: currentStep === 2, done: currentStep > 2 }">
           <span class="step-num">2</span>
-          <span class="step-label">Teléfono</span>
+          <span class="step-label">{{ t('auth.stepPhone') }}</span>
         </div>
         <div class="step-divider"></div>
         <div class="step-item" :class="{ active: currentStep === 3 || currentStep === 4, done: currentStep > 4 }">
           <span class="step-num">3</span>
-          <span class="step-label">Código</span>
+          <span class="step-label">{{ t('auth.stepCode') }}</span>
         </div>
         <div class="step-divider"></div>
         <div class="step-item" :class="{ active: currentStep === 5, done: currentStep === 5 }">
           <span class="step-num">4</span>
-          <span class="step-label">Listo</span>
+          <span class="step-label">{{ t('auth.stepDone') }}</span>
         </div>
       </div>
 
@@ -238,8 +245,8 @@ const cancelBack = () => {
         <div class="step-intro">
           <KeyRound :size="28" class="icon-accent" />
           <div>
-            <h3>Credenciales de la App (API ID & Hash)</h3>
-            <p>Necesitas tus credenciales oficiales de Telegram Developer.</p>
+            <h3>{{ t('auth.credsTitle') }}</h3>
+            <p>{{ t('auth.credsText') }}</p>
           </div>
         </div>
 
@@ -251,33 +258,33 @@ const cancelBack = () => {
         <div class="info-banner">
           <Info :size="16" />
           <span>
-            ¿No las tienes? Consíguelas gratis en 
+            {{ t('auth.credsBannerA') }}
             <a
               href="https://my.telegram.org"
               target="_blank"
               rel="noopener noreferrer"
               @click="openExternal('https://my.telegram.org', $event)"
-            >my.telegram.org</a> 
-            (sección <i>API development tools</i>).
+            >my.telegram.org</a>
+            {{ bannerBParts[0] }}<i>API development tools</i>{{ bannerBParts[1] }}
           </span>
         </div>
 
         <div class="form-group">
           <label>TGDL_API_ID</label>
-          <input 
-            v-model="apiId" 
-            type="text" 
-            placeholder="Ejemplo: 12345678" 
+          <input
+            v-model="apiId"
+            type="text"
+            :placeholder="t('auth.apiIdPlaceholder')"
             @keyup.enter="saveCredentials"
           />
         </div>
 
         <div class="form-group">
           <label>TGDL_API_HASH</label>
-          <input 
-            v-model="apiHash" 
-            type="text" 
-            placeholder="Ejemplo: 0123456789abcdef0123456789abcdef" 
+          <input
+            v-model="apiHash"
+            type="text"
+            :placeholder="t('auth.apiHashPlaceholder')"
             @keyup.enter="saveCredentials"
           />
         </div>
@@ -290,12 +297,12 @@ const cancelBack = () => {
             @click="cancelBack"
           >
             <ArrowLeft :size="16" />
-            <span>Cancelar</span>
+            <span>{{ t('common.cancel') }}</span>
           </button>
           <button class="auth-button primary" :disabled="loading" @click="saveCredentials">
             <Loader2 v-if="loading" class="spin" :size="18" />
             <template v-else>
-              <span>Guardar y Continuar</span>
+              <span>{{ t('auth.saveContinue') }}</span>
               <ArrowRight :size="18" />
             </template>
           </button>
@@ -307,8 +314,8 @@ const cancelBack = () => {
         <div class="step-intro">
           <Phone :size="28" class="icon-accent" />
           <div>
-            <h3>Número de Teléfono</h3>
-            <p>Ingresa tu número de teléfono registrado en Telegram.</p>
+            <h3>{{ t('auth.phoneTitle') }}</h3>
+            <p>{{ t('auth.phoneText') }}</p>
           </div>
         </div>
 
@@ -318,25 +325,25 @@ const cancelBack = () => {
         </div>
 
         <div class="form-group">
-          <label>Número con código de país</label>
-          <input 
-            v-model="phoneNumber" 
-            type="tel" 
-            placeholder="+34 600 00 00 00 o +1 555 123 4567" 
+          <label>{{ t('auth.phoneLabel') }}</label>
+          <input
+            v-model="phoneNumber"
+            type="tel"
+            :placeholder="t('auth.phonePlaceholder')"
             @keyup.enter="sendCode"
           />
-          <small class="help-text">Asegúrate de incluir el prefijo internacional (ej. +34 para España, +52 para México, +1 para EE.UU.).</small>
+          <small class="help-text">{{ t('auth.phoneHelp') }}</small>
         </div>
 
         <div class="button-group">
           <button class="auth-button secondary btn-back" :disabled="loading" @click="goBack">
             <ArrowLeft :size="16" />
-            <span>Atrás</span>
+            <span>{{ t('common.back') }}</span>
           </button>
           <button class="auth-button primary" :disabled="loading" @click="sendCode">
             <Loader2 v-if="loading" class="spin" :size="18" />
             <template v-else>
-              <span>Enviar Código</span>
+              <span>{{ t('auth.sendCode') }}</span>
               <ArrowRight :size="18" />
             </template>
           </button>
@@ -348,8 +355,8 @@ const cancelBack = () => {
         <div class="step-intro">
           <ShieldCheck :size="28" class="icon-accent" />
           <div>
-            <h3>Código de Verificación</h3>
-            <p>Telegram ha enviado un código a tu aplicación o por SMS a {{ phoneNumber }}.</p>
+            <h3>{{ t('auth.codeTitle') }}</h3>
+            <p>{{ t('auth.codeText', { phone: phoneNumber }) }}</p>
           </div>
         </div>
 
@@ -359,11 +366,11 @@ const cancelBack = () => {
         </div>
 
         <div class="form-group">
-          <label>Código recibido</label>
-          <input 
-            v-model="code" 
-            type="text" 
-            placeholder="12345" 
+          <label>{{ t('auth.codeLabel') }}</label>
+          <input
+            v-model="code"
+            type="text"
+            :placeholder="t('auth.codePlaceholder')"
             maxlength="6"
             class="code-input"
             @keyup.enter="verifyCode"
@@ -373,12 +380,12 @@ const cancelBack = () => {
         <div class="button-group">
           <button class="auth-button secondary btn-back" :disabled="loading" @click="goBack">
             <ArrowLeft :size="16" />
-            <span>Atrás</span>
+            <span>{{ t('common.back') }}</span>
           </button>
           <button class="auth-button primary" :disabled="loading" @click="verifyCode">
             <Loader2 v-if="loading" class="spin" :size="18" />
             <template v-else>
-              <span>Verificar</span>
+              <span>{{ t('auth.verify') }}</span>
               <ArrowRight :size="18" />
             </template>
           </button>
@@ -390,8 +397,8 @@ const cancelBack = () => {
         <div class="step-intro">
           <ShieldCheck :size="28" class="icon-amber" />
           <div>
-            <h3>Verificación en 2 Pasos (2FA)</h3>
-            <p>Tu cuenta tiene activada una contraseña adicional.</p>
+            <h3>{{ t('auth.tfaTitle') }}</h3>
+            <p>{{ t('auth.tfaText') }}</p>
           </div>
         </div>
 
@@ -401,11 +408,11 @@ const cancelBack = () => {
         </div>
 
         <div class="form-group">
-          <label>Contraseña de 2 Pasos</label>
-          <input 
-            v-model="password" 
-            type="password" 
-            placeholder="Tu contraseña de Telegram" 
+          <label>{{ t('auth.tfaLabel') }}</label>
+          <input
+            v-model="password"
+            type="password"
+            :placeholder="t('auth.tfaPlaceholder')"
             @keyup.enter="verify2FA"
           />
         </div>
@@ -413,19 +420,18 @@ const cancelBack = () => {
         <div class="button-group">
           <button class="auth-button secondary btn-back" :disabled="loading" @click="goBack">
             <ArrowLeft :size="16" />
-            <span>Atrás</span>
+            <span>{{ t('common.back') }}</span>
           </button>
           <button class="auth-button primary" :disabled="loading" @click="verify2FA">
             <Loader2 v-if="loading" class="spin" :size="18" />
             <template v-else>
-              <span>Iniciar Sesión</span>
+              <span>{{ t('auth.signIn') }}</span>
               <ArrowRight :size="18" />
             </template>
           </button>
         </div>
         <small class="help-text back-note">
-          «Atrás» vuelve al paso del teléfono. Telegram ya usó el código anterior,
-          así que se te enviará uno nuevo.
+          {{ t('auth.backNote') }}
         </small>
       </div>
 
@@ -434,15 +440,15 @@ const cancelBack = () => {
         <div class="success-icon">
           <CheckCircle2 :size="48" />
         </div>
-        <h3>¡Conexión Exitosa!</h3>
+        <h3>{{ t('auth.successTitle') }}</h3>
         <p v-if="authStatus.user">
-          Conectado como <strong>{{ authStatus.user.first_name }}</strong> 
+          {{ t('auth.connectedAs') }} <strong>{{ authStatus.user.first_name }}</strong>
           <span v-if="authStatus.user.username">(@{{ authStatus.user.username }})</span>
         </p>
-        <p v-else>Tu sesión de Telegram está lista y activa.</p>
+        <p v-else>{{ t('auth.successFallback') }}</p>
 
         <button class="auth-button primary full-width" @click="$emit('auth-success', { ...authStatus, authenticated: true, state: 'LOGGED_IN' })">
-          <span>Ir al Dashboard</span>
+          <span>{{ t('auth.goDashboard') }}</span>
           <ArrowRight :size="18" />
         </button>
       </div>

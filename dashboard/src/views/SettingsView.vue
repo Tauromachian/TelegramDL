@@ -2,12 +2,18 @@
 import { ref, computed } from 'vue'
 import {
   Settings2, Zap, Trash2, Save, Copy, Eye, EyeOff, RefreshCw, Download, Upload,
-  ChevronRight, ArrowDownToLine, Image as Palette, KeyRound, HardDrive
+  ChevronRight, ArrowDownToLine, Image as Palette, KeyRound, HardDrive, Languages
 } from '../icons'
 import FolderPicker from '../components/FolderPicker.vue'
 import { useAuthToken } from '../composables/useAuthToken'
+import { useI18n } from '../i18n'
 
 const { authHeaders } = useAuthToken()
+const { t, locale, availableLocales, splitOn } = useI18n()
+
+// La descripción del acceso remoto menciona Tailscale con enlace; se parte por
+// el marcador {vpn} para mantener el <a> entre las dos mitades traducidas.
+const remoteDescParts = computed(() => splitOn('settings.remoteDesc', 'vpn'))
 
 const props = defineProps({
   settings: {
@@ -50,7 +56,16 @@ const alternar = (clave) => {
 }
 
 const showToken = ref(false)
-const copyLabel = ref('Copiar')
+// Estado del botón de copiar ('' = normal, 'ok', 'fail'): la etiqueta se deriva
+// así sigue la traducción si el idioma cambia mientras el aviso está en pantalla.
+const copyState = ref('')
+const copyLabel = computed(() =>
+  copyState.value === 'ok'
+    ? t('settings.copied')
+    : copyState.value === 'fail'
+      ? t('settings.copyFail')
+      : t('settings.copy')
+)
 const maskedToken = computed(() => props.apiToken ? '•'.repeat(Math.min(props.apiToken.length, 40)) : '')
 
 // Los colores 0-15 son los de Telegram Premium (el panel toma el de la cuenta
@@ -68,11 +83,11 @@ const copyToken = async () => {
   if (!props.apiToken) return
   try {
     await navigator.clipboard.writeText(props.apiToken)
-    copyLabel.value = '¡Copiado!'
+    copyState.value = 'ok'
   } catch {
-    copyLabel.value = 'No se pudo copiar'
+    copyState.value = 'fail'
   }
-  setTimeout(() => { copyLabel.value = 'Copiar' }, 2000)
+  setTimeout(() => { copyState.value = '' }, 2000)
 }
 
 // Exportar / importar la configuración de escucha (los chats del listener con
@@ -90,7 +105,7 @@ const listenerApi = async (options = {}) => {
     headers: { ...(options.headers || {}), ...authHeaders() }
   })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.detail || data.error || 'Error en el servidor')
+  if (!response.ok) throw new Error(data.detail || data.error || t('common.serverError'))
   return data
 }
 
@@ -130,7 +145,7 @@ const exportListener = async () => {
     const data = await listenerApi()
     const chats = (data.chats || []).map(normalizeChat).filter(Boolean)
     if (!chats.length) {
-      props.notify('No hay chats configurados en Escucha para exportar', true)
+      props.notify(t('settings.listenerExportEmpty'), true)
       return
     }
     const payload = {
@@ -142,9 +157,9 @@ const exportListener = async () => {
     }
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
     triggerBlobDownload(JSON.stringify(payload, null, 2), `tgdown-escucha-${stamp}.json`, 'application/json')
-    props.notify(`Escucha exportada (${chats.length} chat${chats.length === 1 ? '' : 's'})`)
+    props.notify(chats.length === 1 ? t('settings.listenerExportedOne') : t('settings.listenerExported', { n: chats.length }))
   } catch (err) {
-    props.notify(err.message || 'No se pudo exportar la escucha', true)
+    props.notify(err.message || t('settings.listenerExportFail'), true)
   } finally {
     exporting.value = false
   }
@@ -168,17 +183,17 @@ const onImportFile = async (event) => {
     try {
       parsed = JSON.parse(text)
     } catch {
-      throw new Error('El archivo no es un JSON válido')
+      throw new Error(t('settings.importInvalidJson'))
     }
 
     const rawChats = Array.isArray(parsed) ? parsed : (parsed?.chats || parsed?.listener_chats)
     if (!Array.isArray(rawChats)) {
-      throw new Error('El archivo no contiene una lista de chats de escucha')
+      throw new Error(t('settings.importNoChats'))
     }
 
     const incoming = rawChats.map(normalizeChat).filter(Boolean)
     if (!incoming.length) {
-      throw new Error('El archivo no tiene ningún chat válido')
+      throw new Error(t('settings.importNoValid'))
     }
 
     const current = await listenerApi()
@@ -205,9 +220,17 @@ const onImportFile = async (event) => {
       body: JSON.stringify(body)
     })
 
-    props.notify(`Escucha importada: ${added} nuevo${added === 1 ? '' : 's'}, ${updated} actualizado${updated === 1 ? '' : 's'}`)
+    if (added === 1 && updated === 1) {
+      props.notify(t('settings.listenerImportedOneEach'))
+    } else if (added === 1) {
+      props.notify(t('settings.listenerImportedOne', { updated }))
+    } else if (updated === 1) {
+      props.notify(t('settings.listenerImportedOneUpdated', { added }))
+    } else {
+      props.notify(t('settings.listenerImported', { added, updated }))
+    }
   } catch (err) {
-    props.notify(err.message || 'No se pudo importar la escucha', true)
+    props.notify(err.message || t('settings.listenerImportFail'), true)
   } finally {
     importing.value = false
   }
@@ -220,10 +243,10 @@ const onImportFile = async (event) => {
       <aside class="panel settings-panel-full">
         <div class="panel-heading">
           <div>
-            <span class="eyebrow"><Settings2 :size="12" /> PREFERENCIAS</span>
-            <h2>Configuración General</h2>
+            <span class="eyebrow"><Settings2 :size="12" /> {{ t('settings.kicker') }}</span>
+            <h2>{{ t('settings.title') }}</h2>
           </div>
-          <span class="save-state">{{ saving ? 'Guardando…' : 'Auto-guardado' }}</span>
+          <span class="save-state">{{ saving ? t('settings.saving') : t('settings.autosaved') }}</span>
         </div>
 
         <div class="ajustes-acordeon">
@@ -237,8 +260,8 @@ const onImportFile = async (event) => {
             >
               <span class="ajuste-icono"><ArrowDownToLine :size="15" /></span>
               <span class="ajuste-titulo">
-                <strong>Configuración de descarga</strong>
-                <small>Simultáneas, partes, límite de velocidad y carpeta</small>
+                <strong>{{ t('settings.downloadsTitle') }}</strong>
+                <small>{{ t('settings.downloadsSub') }}</small>
               </span>
               <ChevronRight class="ajuste-flecha" :size="16" />
             </button>
@@ -248,7 +271,7 @@ const onImportFile = async (event) => {
                 <!-- Concurrencia y Workers -->
                 <div class="settings-group">
                   <label class="setting-label">
-                    Descargas simultáneas <output>{{ settings.max_concurrent_downloads }}</output>
+                    {{ t('settings.concurrent') }} <output>{{ settings.max_concurrent_downloads }}</output>
                   </label>
                   <input
                     v-model.number="settings.max_concurrent_downloads"
@@ -261,8 +284,8 @@ const onImportFile = async (event) => {
 
                   <div class="setting-line">
                     <div>
-                      <strong>Partes simultáneas</strong>
-                      <small>Acelera cada archivo usando varios bloques.</small>
+                      <strong>{{ t('settings.chunks') }}</strong>
+                      <small>{{ t('settings.chunksSub') }}</small>
                     </div>
                     <label class="switch">
                       <input v-model="settings.parallel_chunks" type="checkbox" />
@@ -271,7 +294,7 @@ const onImportFile = async (event) => {
                   </div>
 
                   <label class="setting-label compact">
-                    Workers por archivo <output>{{ settings.chunk_workers }}</output>
+                    {{ t('settings.workers') }} <output>{{ settings.chunk_workers }}</output>
                   </label>
                   <input
                     v-model.number="settings.chunk_workers"
@@ -287,7 +310,7 @@ const onImportFile = async (event) => {
                 <!-- Velocidad y Directorio -->
                 <div class="settings-group">
                   <div class="speed-setting">
-                    <label class="setting-label compact">Límite global de velocidad</label>
+                    <label class="setting-label compact">{{ t('settings.speedLimit') }}</label>
                     <div class="speed-row">
                       <input
                         v-model.number="settings.speed_limit.value"
@@ -302,15 +325,15 @@ const onImportFile = async (event) => {
                       </select>
                       <span>/s</span>
                     </div>
-                    <small>Usa 0 para quitar el límite.</small>
+                    <small>{{ t('settings.speedHint') }}</small>
                   </div>
 
                   <FolderPicker v-model="settings.download_folder" />
 
                   <div class="setting-line">
                     <div>
-                      <strong>Carpeta por chat (escucha)</strong>
-                      <small>Lo que baje de un chat vigilado va a una subcarpeta con su nombre; si el nombre no se puede escribir en disco, se usa su ID.</small>
+                      <strong>{{ t('settings.organizeByChat') }}</strong>
+                      <small>{{ t('settings.organizeByChatSub') }}</small>
                     </div>
                     <label class="switch">
                       <input v-model="settings.organize_by_chat" type="checkbox" />
@@ -332,8 +355,8 @@ const onImportFile = async (event) => {
             >
               <span class="ajuste-icono"><Palette :size="15" /></span>
               <span class="ajuste-titulo">
-                <strong>Temas y color</strong>
-                <small>Color de acento, temas del panel y color del loader</small>
+                <strong>{{ t('settings.themesTitle') }}</strong>
+                <small>{{ t('settings.themesSub') }}</small>
               </span>
               <ChevronRight class="ajuste-flecha" :size="16" />
             </button>
@@ -342,12 +365,12 @@ const onImportFile = async (event) => {
               <div class="ajuste-columnas">
                 <!-- Paleta de Color y Tema -->
                 <div class="settings-group color-group">
-                  <span class="setting-label">Color de Acento y Tema</span>
+                  <span class="setting-label">{{ t('settings.accentTitle') }}</span>
 
                   <!-- Los 0-15 vienen de Telegram Premium; del 16 en adelante son las
                        paletas propias del panel. Van separados con su propio título
                        para que se vea de dónde sale cada grupo. -->
-                  <span class="grupo-color-titulo">Telegram</span>
+                  <span class="grupo-color-titulo">{{ t('settings.telegramGroup') }}</span>
                   <div class="color-selector-container">
                     <div class="color-row">
                       <button
@@ -357,7 +380,7 @@ const onImportFile = async (event) => {
                         class="color-dot"
                         :class="{ active: settings.color_id === id }"
                         :style="{ background: themeMap[id]?.gradient || '#38a7ff' }"
-                        :title="'Color ' + id"
+                        :title="t('settings.colorN', { n: id })"
                         @click="settings.color_id = id"
                       ></button>
                     </div>
@@ -371,7 +394,7 @@ const onImportFile = async (event) => {
                         :style="{
                           background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
                         }"
-                        :title="'Degradado ' + id"
+                        :title="t('settings.gradientN', { n: id })"
                         @click="settings.color_id = id"
                       ></button>
                     </div>
@@ -381,7 +404,7 @@ const onImportFile = async (event) => {
                        mismo ajuste (color_id) que los de arriba: elegir uno sustituye
                        al color de la cuenta, y "Restablecer color de la cuenta"
                        vuelve a dejar el de Telegram. -->
-                  <span class="grupo-color-titulo">Colores temáticos</span>
+                  <span class="grupo-color-titulo">{{ t('settings.thematicGroup') }}</span>
                   <div class="temas-lista">
                     <button
                       v-for="id in temasEspeciales"
@@ -389,24 +412,24 @@ const onImportFile = async (event) => {
                       type="button"
                       class="tema-chip"
                       :class="{ active: settings.color_id === id }"
-                      :title="themeMap[id]?.name || ('Tema ' + id)"
+                      :title="themeMap[id]?.name || t('settings.themeN', { n: id })"
                       @click="settings.color_id = id"
                     >
                       <span class="tema-muestra" :style="{ background: themeMap[id]?.gradient }"></span>
-                      <span class="tema-nombre">{{ themeMap[id]?.name || ('Tema ' + id) }}</span>
+                      <span class="tema-nombre">{{ themeMap[id]?.name || t('settings.themeN', { n: id }) }}</span>
                     </button>
                   </div>
 
                   <button type="button" class="reset-button-alt" @click="emit('reset-color')">
-                    <Zap :size="14" /> Restablecer color de la cuenta
+                    <Zap :size="14" /> {{ t('settings.resetAccountColor') }}
                   </button>
                 </div>
 
                 <!-- Color del Loader -->
                 <div class="settings-group color-group">
-                  <span class="setting-label">Color de Loader</span>
+                  <span class="setting-label">{{ t('settings.loaderTitle') }}</span>
 
-                  <span class="grupo-color-titulo">Telegram</span>
+                  <span class="grupo-color-titulo">{{ t('settings.telegramGroup') }}</span>
                   <div class="color-selector-container">
                     <div class="color-row">
                       <button
@@ -416,7 +439,7 @@ const onImportFile = async (event) => {
                         class="color-dot"
                         :class="{ active: settings.loader_color_id === id }"
                         :style="{ background: themeMap[id]?.gradient || '#38a7ff' }"
-                        :title="'Color Loader ' + id"
+                        :title="t('settings.colorLoaderN', { n: id })"
                         @click="settings.loader_color_id = id"
                       ></button>
                     </div>
@@ -430,7 +453,7 @@ const onImportFile = async (event) => {
                         :style="{
                           background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
                         }"
-                        :title="'Degradado Loader ' + id"
+                        :title="t('settings.gradientLoaderN', { n: id })"
                         @click="settings.loader_color_id = id"
                       ></button>
                     </div>
@@ -439,7 +462,7 @@ const onImportFile = async (event) => {
                   <!-- Aquí solo va el círculo con el degradado del tema, sin nombre:
                        del tema especial el loader únicamente toma el color, no el
                        decorado, así que no hay nada más que enseñar. -->
-                  <span class="grupo-color-titulo">Temáticos</span>
+                  <span class="grupo-color-titulo">{{ t('settings.thematicGroupShort') }}</span>
                   <div class="color-selector-container">
                     <div class="color-row">
                       <button
@@ -449,21 +472,61 @@ const onImportFile = async (event) => {
                         class="color-dot tema-dot"
                         :class="{ active: settings.loader_color_id === id }"
                         :style="{ background: themeMap[id]?.gradient }"
-                        :title="themeMap[id]?.name || ('Tema ' + id)"
+                        :title="themeMap[id]?.name || t('settings.themeN', { n: id })"
                         @click="settings.loader_color_id = id"
                       ></button>
                     </div>
                   </div>
 
                   <button type="button" class="reset-button-alt" @click="emit('reset-loader-color')">
-                    <Zap :size="14" /> Restablecer color del loader
+                    <Zap :size="14" /> {{ t('settings.resetLoaderColor') }}
                   </button>
                 </div>
               </div>
             </div>
           </section>
 
-          <!-- 3. Acceso remoto -->
+          <!-- 3. Idioma -->
+          <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'idioma' }">
+            <button
+              type="button"
+              class="ajuste-cabecera"
+              :aria-expanded="seccionAbierta === 'idioma'"
+              @click="alternar('idioma')"
+            >
+              <span class="ajuste-icono"><Languages :size="15" /></span>
+              <span class="ajuste-titulo">
+                <strong>{{ t('settings.langTitle') }}</strong>
+                <small>{{ t('settings.langSub') }}</small>
+              </span>
+              <ChevronRight class="ajuste-flecha" :size="16" />
+            </button>
+
+            <div v-show="seccionAbierta === 'idioma'" class="ajuste-cuerpo">
+              <div class="settings-group">
+                <!-- El idioma se aplica al instante y se guarda como un ajuste
+                     más (settings.language). El chip activo sigue a `locale`,
+                     que es el idioma realmente en uso, no al valor bruto del
+                     ajuste (vacío la primera vez, antes de autodetectar). -->
+                <div class="temas-lista">
+                  <button
+                    v-for="lang in availableLocales"
+                    :key="lang.id"
+                    type="button"
+                    class="tema-chip idioma-chip"
+                    :class="{ active: locale === lang.id }"
+                    :aria-pressed="locale === lang.id"
+                    @click="settings.language = lang.id"
+                  >
+                    <span class="tema-nombre">{{ lang.label }}</span>
+                  </button>
+                </div>
+                <small>{{ t('settings.langNote') }}</small>
+              </div>
+            </div>
+          </section>
+
+          <!-- 4. Acceso remoto -->
           <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'remoto' }">
             <button
               type="button"
@@ -473,8 +536,8 @@ const onImportFile = async (event) => {
             >
               <span class="ajuste-icono"><KeyRound :size="15" /></span>
               <span class="ajuste-titulo">
-                <strong>Acceso remoto</strong>
-                <small>Token para controlar TelegramDL desde otro dispositivo</small>
+                <strong>{{ t('settings.remoteTitle') }}</strong>
+                <small>{{ t('settings.remoteSub') }}</small>
               </span>
               <ChevronRight class="ajuste-flecha" :size="16" />
             </button>
@@ -482,10 +545,7 @@ const onImportFile = async (event) => {
             <div v-show="seccionAbierta === 'remoto'" class="ajuste-cuerpo">
               <div class="settings-group">
                 <small>
-                  Con este token puedes controlar TelegramDL desde otro dispositivo (celular, otra PC).
-                  No abras este puerto directamente a internet: combínalo con una VPN como
-                  <a class="inline-link" href="https://tailscale.com" target="_blank" rel="noopener">Tailscale</a>
-                  o un túnel como Cloudflare Tunnel, y pega el token en la pantalla de login remoto.
+                  {{ remoteDescParts[0] }}<a class="inline-link" href="https://tailscale.com" target="_blank" rel="noopener">Tailscale</a>{{ remoteDescParts[1] }}
                 </small>
 
                 <div class="token-row">
@@ -498,20 +558,20 @@ const onImportFile = async (event) => {
 
                 <div class="settings-actions" style="margin-top: 0; padding: 0; flex-wrap: wrap;">
                   <button type="button" class="reset-button-alt" @click="showToken = !showToken">
-                    <component :is="showToken ? EyeOff : Eye" :size="14" /> {{ showToken ? 'Ocultar' : 'Mostrar' }}
+                    <component :is="showToken ? EyeOff : Eye" :size="14" /> {{ showToken ? t('settings.hide') : t('settings.show') }}
                   </button>
                   <button type="button" class="reset-button-alt" @click="copyToken">
                     <Copy :size="14" /> {{ copyLabel }}
                   </button>
                   <button type="button" class="reset-button-alt" @click="emit('regenerate-token')">
-                    <RefreshCw :size="14" /> Regenerar token
+                    <RefreshCw :size="14" /> {{ t('settings.regenerate') }}
                   </button>
                 </div>
               </div>
             </div>
           </section>
 
-          <!-- 4. Datos: escucha e historial -->
+          <!-- 5. Datos: escucha e historial -->
           <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'datos' }">
             <button
               type="button"
@@ -521,8 +581,8 @@ const onImportFile = async (event) => {
             >
               <span class="ajuste-icono"><HardDrive :size="15" /></span>
               <span class="ajuste-titulo">
-                <strong>Datos y respaldo</strong>
-                <small>Exportar o importar la escucha y limpiar el historial</small>
+                <strong>{{ t('settings.dataTitle') }}</strong>
+                <small>{{ t('settings.dataSub') }}</small>
               </span>
               <ChevronRight class="ajuste-flecha" :size="16" />
             </button>
@@ -531,17 +591,17 @@ const onImportFile = async (event) => {
               <div class="settings-group">
                 <div class="settings-actions acciones-datos">
                   <button type="button" class="reset-button-alt" :disabled="exporting" @click="exportListener">
-                    <Download :size="14" /> {{ exporting ? 'Exportando…' : 'Exportar escucha' }}
+                    <Download :size="14" /> {{ exporting ? t('settings.exportingListener') : t('settings.exportListener') }}
                   </button>
                   <button type="button" class="reset-button-alt" :disabled="importing" @click="pickImportFile">
-                    <Upload :size="14" /> {{ importing ? 'Importando…' : 'Importar escucha' }}
+                    <Upload :size="14" /> {{ importing ? t('settings.importingListener') : t('settings.importListener') }}
                   </button>
                   <button
                     class="clear-history-button boton-historial"
                     type="button"
                     @click="emit('clear-history')"
                   >
-                    <Trash2 :size="15" /> Limpiar historial
+                    <Trash2 :size="15" /> {{ t('settings.clearHistory') }}
                   </button>
                   <input
                     ref="importInput"
@@ -565,8 +625,8 @@ const onImportFile = async (event) => {
       class="save-button save-fab"
       type="button"
       :disabled="saving"
-      :title="saving ? 'Guardando…' : 'Guardar ahora'"
-      aria-label="Guardar ahora"
+      :title="saving ? t('settings.saving') : t('settings.saveNow')"
+      :aria-label="t('settings.saveNow')"
       @click="emit('save-settings')"
     >
       <Save :size="19" />

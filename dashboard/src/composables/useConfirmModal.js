@@ -1,4 +1,5 @@
 import { reactive } from 'vue'
+import { t } from '../i18n'
 
 // Modal de confirmacion generico, reutilizado por todas las acciones
 // destructivas o que requieren aviso previo (borrar descargas, limpiar
@@ -10,7 +11,7 @@ export function useConfirmModal() {
     title: '',
     message: '',
     confirmText: '',
-    cancelText: 'Cancelar',
+    cancelText: '',
     type: 'primary',
     action: null,
     cancelAction: null
@@ -20,7 +21,7 @@ export function useConfirmModal() {
     modal.title = config.title
     modal.message = config.message
     modal.confirmText = config.confirmText
-    modal.cancelText = config.cancelText !== undefined ? config.cancelText : 'Cancelar'
+    modal.cancelText = config.cancelText !== undefined ? config.cancelText : t('common.cancel')
     modal.type = config.type || 'primary'
     modal.action = config.action
     modal.cancelAction = config.cancelAction

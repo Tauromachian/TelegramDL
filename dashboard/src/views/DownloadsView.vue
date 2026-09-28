@@ -17,6 +17,9 @@ import {
   Trash2,
   X
 } from '../icons'
+import { useI18n } from '../i18n'
+
+const { t, has } = useI18n()
 
 const props = defineProps({
   downloads: {
@@ -176,19 +179,11 @@ const skippedCount = computed(() =>
   props.downloads.filter(item => item.status === 'skipped').length
 )
 
-const statusText = (status) => {
-  const map = {
-    downloading: 'Descargando',
-    paused: 'Pausada',
-    queued: 'En cola',
-    pending: 'Pendiente',
-    completed: 'Completado',
-    skipped: 'Omitido',
-    failed: 'Fallido',
-    cancelled: 'Cancelado'
-  }
-  return map[status] || status
-}
+// El estado llega del backend; si apareciera uno sin traducción (p. ej.
+// 'duplicate', que solo sirve para disparar el aviso y nunca se pinta) se
+// muestra el valor crudo en vez de la clave.
+const statusText = (status) =>
+  has('downloads.status.' + status) ? t('downloads.status.' + status) : status
 
 const progress = (item) => Math.max(0, Math.min(100, Number(item.progress || 0)))
 
@@ -207,27 +202,27 @@ const allActivePaused = computed(() => {
     <!-- Hero Card / Formulario de Descarga -->
     <section class="hero-card">
       <div class="hero-copy">
-        <span class="hero-kicker">NUEVA TAREA</span>
-        <h2>Descarga contenido de Telegram</h2>
-        <p>Pega un enlace de mensaje o un rango para comenzar.</p>
+        <span class="hero-kicker">{{ t('downloads.heroKicker') }}</span>
+        <h2>{{ t('downloads.heroTitle') }}</h2>
+        <p>{{ t('downloads.heroText') }}</p>
       </div>
       <div class="download-form">
         <input
           v-model="inputUrl"
           @keyup.enter="handleStart"
           placeholder="https://t.me/c/..."
-          aria-label="Enlace de Telegram"
+          :aria-label="t('downloads.inputAria')"
         />
         <button
           class="primary-button"
           :disabled="loading || !inputUrl.trim()"
           @click="handleStart"
         >
-          <span>{{ loading ? 'Añadiendo…' : 'Iniciar descarga' }}</span>
+          <span>{{ loading ? t('downloads.adding') : t('downloads.start') }}</span>
           <ArrowUpRight :size="18" />
         </button>
       </div>
-      <small class="form-hint">Para rangos de mensajes (ej: .../100-250), el máximo permitido es de 500 mensajes por tarea.</small>
+      <small class="form-hint">{{ t('downloads.rangeHint') }}</small>
     </section>
 
     <!-- Métricas y Estadísticas -->
@@ -235,33 +230,33 @@ const allActivePaused = computed(() => {
       <div class="stat-card">
         <span class="stat-icon blue"><Activity :size="19" /></span>
         <div>
-          <span class="stat-label">ACTIVAS</span>
+          <span class="stat-label">{{ t('downloads.statActive') }}</span>
           <strong>{{ activeDownloads.length }}</strong>
-          <small>de {{ settings.max_concurrent_downloads }} permitidas</small>
+          <small>{{ t('downloads.statActiveSub', { n: settings.max_concurrent_downloads }) }}</small>
         </div>
       </div>
       <div class="stat-card">
         <span class="stat-icon amber"><Clock3 :size="19" /></span>
         <div>
-          <span class="stat-label">EN COLA</span>
+          <span class="stat-label">{{ t('downloads.statQueued') }}</span>
           <strong>{{ pendingDownloads.length }}</strong>
-          <small>esperando turno</small>
+          <small>{{ t('downloads.statQueuedSub') }}</small>
         </div>
       </div>
       <div class="stat-card">
         <span class="stat-icon green"><CheckCircle2 :size="19" /></span>
         <div>
-          <span class="stat-label">COMPLETADAS</span>
+          <span class="stat-label">{{ t('downloads.statCompleted') }}</span>
           <strong>{{ completedCount }}</strong>
-          <small>en esta sesión</small>
+          <small>{{ t('downloads.statCompletedSub') }}</small>
         </div>
       </div>
       <div class="stat-card">
         <span class="stat-icon gray"><FileCheck :size="19" /></span>
         <div>
-          <span class="stat-label">OMITIDAS</span>
+          <span class="stat-label">{{ t('downloads.statSkipped') }}</span>
           <strong>{{ skippedCount }}</strong>
-          <small>ya existían</small>
+          <small>{{ t('downloads.statSkippedSub') }}</small>
         </div>
       </div>
     </section>
@@ -271,8 +266,8 @@ const allActivePaused = computed(() => {
       <section class="panel activity-panel">
         <div class="panel-heading">
           <div>
-            <span class="eyebrow">MONITOR</span>
-            <h2>Actividad en tiempo real</h2>
+            <span class="eyebrow">{{ t('downloads.monitorKicker') }}</span>
+            <h2>{{ t('downloads.monitorTitle') }}</h2>
           </div>
           <div class="header-actions">
             <button
@@ -281,7 +276,7 @@ const allActivePaused = computed(() => {
               @click="allActivePaused ? emit('resume-all') : emit('pause-all')"
             >
               <component :is="allActivePaused ? Play : Pause" :size="12" />
-              {{ allActivePaused ? 'Reanudar todo' : 'Pausar todo' }}
+              {{ allActivePaused ? t('downloads.resumeAll') : t('downloads.pauseAll') }}
             </button>
             <button
               v-if="activeDownloads.length || pendingDownloads.length"
@@ -289,7 +284,7 @@ const allActivePaused = computed(() => {
               @click="emit('cancel-all')"
             >
               <X :size="12" />
-              <span>Cancelar todo</span>
+              <span>{{ t('downloads.cancelAll') }}</span>
             </button>
             <div v-if="disk" class="disk-monitor">
               <div class="disk-bar">
@@ -301,9 +296,9 @@ const allActivePaused = computed(() => {
                   }"
                 ></div>
               </div>
-              <small>Total/Libre: ({{ disk.total_str }} / {{ disk.projected_free_str }})</small>
+              <small>{{ t('downloads.diskLabel', { total: disk.total_str, free: disk.projected_free_str }) }}</small>
             </div>
-            <span class="count-pill">{{ activeDownloads.length + pendingDownloads.length }} tareas</span>
+            <span class="count-pill">{{ t('downloads.tasksPill', { n: activeDownloads.length + pendingDownloads.length }) }}</span>
           </div>
         </div>
 
@@ -312,8 +307,8 @@ const allActivePaused = computed(() => {
           class="empty-state"
         >
           <Activity :size="28" />
-          <p>No hay descargas activas</p>
-          <small>Las nuevas tareas aparecerán aquí.</small>
+          <p>{{ t('downloads.emptyTitle') }}</p>
+          <small>{{ t('downloads.emptySub') }}</small>
         </div>
 
         <div
@@ -326,7 +321,7 @@ const allActivePaused = computed(() => {
             <strong :title="item.file_name">{{ item.file_name }}</strong>
             <!-- El ETA solo se pinta mientras descarga de verdad: en pausa o en
                  cola la última estimación ya no vale para nada. -->
-            <span>{{ item.current_str }} / {{ item.total_str }} · {{ item.speed }}<template v-if="item.status === 'downloading' && item.eta"> · falta <b class="eta">{{ item.eta }}</b></template></span>
+            <span>{{ item.current_str }} / {{ item.total_str }} · {{ item.speed }}<template v-if="item.status === 'downloading' && item.eta"> · {{ t('downloads.etaPrefix') }} <b class="eta">{{ item.eta }}</b></template></span>
             <div class="progress-track">
               <div class="progress-fill" :style="{ width: `${progress(item)}%` }"></div>
             </div>
@@ -339,17 +334,17 @@ const allActivePaused = computed(() => {
               class="pause-action"
               @click="emit('pause-download', item.id)"
             >
-              <Gauge :size="12" /> Pausar
+              <Gauge :size="12" /> {{ t('downloads.pause') }}
             </button>
             <button
               v-if="item.status === 'paused'"
               class="resume-action"
               @click="emit('resume-download', item.id)"
             >
-              <ArrowUpRight :size="12" /> Reanudar
+              <ArrowUpRight :size="12" /> {{ t('downloads.resume') }}
             </button>
             <button @click="emit('cancel-download', item.id)">
-              <X :size="12" /> Cancelar
+              <X :size="12" /> {{ t('downloads.cancel') }}
             </button>
           </div>
         </div>
@@ -360,15 +355,15 @@ const allActivePaused = computed(() => {
     <section class="panel recent-panel">
       <div class="panel-heading">
         <div>
-          <span class="eyebrow">HISTORIAL</span>
-          <h2>Últimas descargas</h2>
+          <span class="eyebrow">{{ t('downloads.historyKicker') }}</span>
+          <h2>{{ t('downloads.historyTitle') }}</h2>
         </div>
         <div class="header-actions">
-          <span class="count-pill">{{ historyDownloads.length }} en total</span>
+          <span class="count-pill">{{ t('downloads.historyTotal', { n: historyDownloads.length }) }}</span>
         </div>
       </div>
       <div v-if="!recentDownloads.length" class="empty-small">
-        Todavía no hay descargas terminadas.
+        {{ t('downloads.historyEmpty') }}
       </div>
       <div
         v-for="item in recentDownloads"
@@ -385,8 +380,8 @@ const allActivePaused = computed(() => {
           v-if="item.status === 'completed'"
           class="open-button"
           type="button"
-          title="Abrir archivo"
-          aria-label="Abrir archivo"
+          :title="t('downloads.openFile')"
+          :aria-label="t('downloads.openFile')"
           @click="emit('open-file', item)"
         >
           <ExternalLink :size="14" />
@@ -395,8 +390,8 @@ const allActivePaused = computed(() => {
           v-if="['failed', 'cancelled'].includes(item.status)"
           class="retry-button"
           type="button"
-          title="Reintentar descarga"
-          aria-label="Reintentar descarga"
+          :title="t('downloads.retryDownload')"
+          :aria-label="t('downloads.retryDownload')"
           @click="emit('retry-download', item)"
         >
           <RotateCcw :size="14" />
@@ -405,8 +400,8 @@ const allActivePaused = computed(() => {
           v-if="['completed', 'failed', 'cancelled', 'skipped'].includes(item.status)"
           class="delete-button"
           type="button"
-          title="Eliminar del historial"
-          aria-label="Eliminar del historial"
+          :title="t('downloads.deleteEntry')"
+          :aria-label="t('downloads.deleteEntry')"
           @click="emit('delete-download', item)"
         >
           <Trash2 :size="14" />
@@ -423,8 +418,8 @@ const allActivePaused = computed(() => {
           <button
             class="pager-btn"
             type="button"
-            title="Página anterior"
-            aria-label="Página anterior"
+            :title="t('downloads.prevPage')"
+            :aria-label="t('downloads.prevPage')"
             :disabled="paginaHistorial === 1"
             @click="irAPagina(paginaHistorial - 1)"
           >
@@ -444,8 +439,8 @@ const allActivePaused = computed(() => {
           <button
             class="pager-btn"
             type="button"
-            title="Página siguiente"
-            aria-label="Página siguiente"
+            :title="t('downloads.nextPage')"
+            :aria-label="t('downloads.nextPage')"
             :disabled="paginaHistorial === totalPaginas"
             @click="irAPagina(paginaHistorial + 1)"
           >
@@ -455,16 +450,16 @@ const allActivePaused = computed(() => {
 
         <div class="pager-side">
           <span v-if="totalPaginas > 1" class="pager-info">
-            Página {{ paginaHistorial }} de {{ totalPaginas }}
+            {{ t('downloads.pageOf', { page: paginaHistorial, total: totalPaginas }) }}
           </span>
           <select
             v-model="tamanoPagina"
             class="pager-select"
-            title="Descargas por página"
-            aria-label="Descargas por página"
+            :title="t('downloads.perPageLabel')"
+            :aria-label="t('downloads.perPageLabel')"
           >
             <option v-for="tamano in TAMANOS_PAGINA" :key="tamano" :value="tamano">
-              {{ tamano }} por página
+              {{ t('downloads.perPage', { n: tamano }) }}
             </option>
           </select>
         </div>

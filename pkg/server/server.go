@@ -1516,6 +1516,11 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			cfg.LoaderColorID = &c
 		}
 	}
+	if v, ok := raw["language"]; ok && v != nil {
+		if sVal, ok := v.(string); ok {
+			cfg.Language = sVal
+		}
+	}
 	if v, ok := raw["speed_limit"].(map[string]any); ok {
 		if val, ok := v["value"]; ok && val != nil {
 			if f, ok := val.(float64); ok {

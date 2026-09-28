@@ -10,6 +10,9 @@ import {
   Send,
   ShieldCheck
 } from '../icons'
+import { useI18n } from '../i18n'
+
+const { t } = useI18n()
 
 defineProps({
   error: { type: String, default: '' }
@@ -57,19 +60,16 @@ const sendTokenToTelegram = async () => {
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
       sendState.value = 'error'
-      sendMessage.value =
-        data.detail || data.error || 'No se pudo enviar el token.'
+      sendMessage.value = data.detail || data.error || t('remote.sendFail')
       startCooldown(data.retry_after)
       return
     }
     sendState.value = 'ok'
-    sendMessage.value =
-      'Enviado. Abre Telegram → Mensajes guardados, toca el token para copiarlo y pégalo aquí.'
+    sendMessage.value = t('remote.sentOk')
     startCooldown(data.retry_after || 60)
   } catch {
     sendState.value = 'error'
-    sendMessage.value =
-      'No se pudo contactar con TelegramDL. Comprueba que el ordenador está encendido y accesible.'
+    sendMessage.value = t('remote.unreachable')
   } finally {
     sending.value = false
   }
@@ -95,8 +95,8 @@ const handleSubmit = () => {
           <ShieldCheck :size="22" />
         </div>
         <div>
-          <h2>Acceso remoto</h2>
-          <p>Este dispositivo necesita el token de acceso de tu TelegramDL</p>
+          <h2>{{ t('remote.title') }}</h2>
+          <p>{{ t('remote.subtitle') }}</p>
         </div>
       </div>
 
@@ -108,25 +108,25 @@ const handleSubmit = () => {
       <div class="info-banner">
         <ShieldCheck :size="16" />
         <span>
-          Encuéntralo en la app de escritorio: <b>Ajustes → Acceso remoto</b>.
-          Cópialo y pégalo aquí una sola vez; su sesión se recordará.
+          {{ t('remote.bannerA') }} <b>{{ t('remote.bannerB') }}</b>.
+          {{ t('remote.bannerC') }}
         </span>
       </div>
 
       <div class="form-group">
-        <label>Token de acceso</label>
+        <label>{{ t('remote.tokenLabel') }}</label>
         <div class="token-input-row">
           <input
             v-model="tokenInput"
             :type="showToken ? 'text' : 'password'"
-            placeholder="Pega aquí el token"
+            :placeholder="t('remote.tokenPlaceholder')"
             autocomplete="off"
             spellcheck="false"
             @keyup.enter="handleSubmit"
           />
           <button
             type="button"
-            :aria-label="showToken ? 'Ocultar token' : 'Mostrar token'"
+            :aria-label="showToken ? t('remote.hideToken') : t('remote.showToken')"
             class="ghost-icon-btn"
             @click="showToken = !showToken"
           >
@@ -143,12 +143,12 @@ const handleSubmit = () => {
       >
         <Loader2 v-if="submitting" class="spin" :size="18" />
         <template v-else>
-          <span>Entrar</span>
+          <span>{{ t('remote.enter') }}</span>
           <KeyRound :size="18" />
         </template>
       </button>
 
-      <div class="send-divider"><span>¿No lo tienes a mano?</span></div>
+      <div class="send-divider"><span>{{ t('remote.noToken') }}</span></div>
 
       <button
         class="auth-button ghost"
@@ -157,15 +157,14 @@ const handleSubmit = () => {
       >
         <Loader2 v-if="sending" class="spin" :size="17" />
         <Send v-else :size="17" />
-        <span v-if="sending">Enviando…</span>
+        <span v-if="sending">{{ t('remote.sending') }}</span>
         <span v-else-if="cooldown > 0">
-          Podrás repetirlo en {{ cooldown }} s
+          {{ t('remote.retryIn', { n: cooldown }) }}
         </span>
-        <span v-else>Enviármelo a Telegram</span>
+        <span v-else>{{ t('remote.sendToTelegram') }}</span>
       </button>
       <p class="send-hint">
-        Lo recibirás en tus <b>Mensajes guardados</b>, donde solo tú puedes
-        leerlo.
+        {{ t('remote.hintPre') }} <b>{{ t('remote.hintBold') }}</b>{{ t('remote.hintPost') }}
       </p>
 
       <div

@@ -60,7 +60,8 @@ import {
   Video01Icon,
   Cancel01Icon,
   DeliverySent02Icon,
-  FlashIcon
+  FlashIcon,
+  LanguagesIcon
 } from '@hugeicons/core-free-icons'
 
 // Grosor de línea del juego. HugeIcons no fija ninguno por defecto y sus trazos
@@ -103,6 +104,7 @@ export const Image = icono(Image02Icon) // foto
 export const Inbox = icono(InboxIcon) // bandeja de la escucha
 export const Info = icono(InformationCircleIcon) // nota informativa
 export const KeyRound = icono(Key02Icon) // credenciales y token
+export const Languages = icono(LanguagesIcon) // selector de idioma en ajustes
 export const Loader2 = icono(Loading03Icon) // espera en curso
 export const LogOut = icono(Logout03Icon) // cerrar sesión de Telegram
 export const Menu = icono(Menu01Icon) // menú en pantalla pequeña

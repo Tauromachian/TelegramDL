@@ -3,8 +3,10 @@ import { computed, onMounted, onUnmounted, ref, reactive, watch } from 'vue'
 import { Download, FileText, Folder, Image, Inbox, MessageCircle, Music, Plus, Radio, Trash2, Video, Settings2 } from '../icons'
 import ConfirmModal from '../components/ConfirmModal.vue'
 import { useAuthToken } from '../composables/useAuthToken'
+import { useI18n } from '../i18n'
 
 const { authHeaders } = useAuthToken()
+const { t, splitOn, has } = useI18n()
 
 const props = defineProps({
   notify: { type: Function, default: () => {} },
@@ -66,7 +68,7 @@ const chatKey = chat => (chat && chat.topic_id ? `${chat.id}:${chat.topic_id}` :
 
 const topicLabel = chat => {
   if (!chat || !chat.topic_id) return ''
-  return (chat.topic_name || '').trim() || `Tema ${chat.topic_id}`
+  return (chat.topic_name || '').trim() || t('listener.topicFallback', { id: chat.topic_id })
 }
 
 // Primero el nombre del tema y después el del grupo, para saber a dónde pertenece.
@@ -76,7 +78,11 @@ const chatLabel = chat => {
   return topic ? `${topic} · ${group}` : group
 }
 
-const chatMeta = chat => (chat && chat.topic_id ? `${chat.id} · tema ${chat.topic_id}` : String(chat ? chat.id : ''))
+const chatMeta = chat => (chat && chat.topic_id ? t('listener.chatMetaTopic', { id: chat.id, topic: chat.topic_id }) : String(chat ? chat.id : ''))
+
+// El texto de ayuda lleva un enlace de ejemplo en medio; se parte por el
+// marcador {link} para seguir mostrándolo con su <code> en ambos idiomas.
+const helperParts = computed(() => splitOn('listener.helper', 'link'))
 
 // Carpeta de descarga asignada a este chat. El backend la fija con el primer
 // archivo que llega, así que hasta entonces no hay nada que enseñar.
@@ -108,7 +114,7 @@ const parseChatInput = raw => {
 const api = async (url, options = {}) => {
   const response = await fetch(url, { ...options, headers: { ...(options.headers || {}), ...authHeaders() } })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.detail || data.error || 'Error en el servidor')
+  if (!response.ok) throw new Error(data.detail || data.error || t('common.serverError'))
   return data
 }
 
@@ -154,7 +160,7 @@ const save = async () => {
       }))
     }
     error.value = ''
-    props.notify('Configuración de escucha guardada')
+    props.notify(t('listener.saved'))
   } catch (err) { props.notify(err.message, true) } finally { saving.value = false }
 }
 
@@ -195,7 +201,7 @@ const addResolvedChat = async chat => {
     delete entry.topic_name
   }
   if (chats.value.some(existing => chatKey(existing) === chatKey(entry))) {
-    error.value = entry.topic_id ? 'Ese tema ya está configurado' : 'Ese chat ya está configurado'
+    error.value = entry.topic_id ? t('listener.errTopicExists') : t('listener.errChatExists')
     return
   }
   chats.value = [...chats.value, entry]
@@ -207,7 +213,7 @@ const addResolvedChat = async chat => {
 
 const addChat = async () => {
   const parsed = parseChatInput(newChatId.value)
-  if (!parsed) { error.value = 'Escribe el ID numérico del chat o un enlace https://t.me/c/...'; return }
+  if (!parsed) { error.value = t('listener.errInvalidInput', { link: 'https://t.me/c/...' }); return }
 
   let chat
   try {
@@ -249,7 +255,7 @@ const download = async item => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: item.id })
     })
-    props.notify('Descarga añadida a la cola')
+    props.notify(t('listener.queuedToast'))
     await load()
   } catch (err) {
     props.notify(err.message, true)
@@ -265,7 +271,7 @@ const removeItem = async item => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: item.id })
     })
-    props.notify('Multimedia descartada')
+    props.notify(t('listener.discarded'))
     await load()
   } catch (err) {
     props.notify(err.message, true)
@@ -278,7 +284,7 @@ const modal = reactive({
   title: '',
   message: '',
   confirmText: '',
-  cancelText: 'Cancelar',
+  cancelText: '',
   type: 'primary',
   action: null
 })
@@ -287,7 +293,7 @@ const openConfirm = (config) => {
   modal.title = config.title
   modal.message = config.message
   modal.confirmText = config.confirmText
-  modal.cancelText = config.cancelText !== undefined ? config.cancelText : 'Cancelar'
+  modal.cancelText = config.cancelText !== undefined ? config.cancelText : t('common.cancel')
   modal.type = config.type || 'primary'
   modal.action = config.action
   modal.show = true
@@ -301,14 +307,14 @@ const handleConfirm = () => {
 const downloadAll = async () => {
   const availableItems = items.value.filter(item => item.status === 'available')
   if (!availableItems.length) {
-    props.notify('No hay elementos pendientes por descargar')
+    props.notify(t('listener.nonePending'))
     return
   }
 
   openConfirm({
-    title: 'Descargar todo',
-    message: `¿Estás seguro de que quieres añadir ${availableItems.length} archivos a la cola de descarga?`,
-    confirmText: 'Sí, descargar todo',
+    title: t('listener.downloadAllModalTitle'),
+    message: t('listener.downloadAllModalText', { n: availableItems.length }),
+    confirmText: t('listener.downloadAllModalConfirm'),
     action: async () => {
       let successCount = 0
       for (const item of availableItems) {
@@ -324,7 +330,7 @@ const downloadAll = async () => {
           console.error(`Error descargando ${item.id}:`, err)
         }
       }
-      props.notify(`${successCount} descargas añadidas a la cola`)
+      props.notify(t('listener.addedToQueue', { n: successCount }))
       await load()
     }
   })
@@ -332,20 +338,20 @@ const downloadAll = async () => {
 
 const clearAll = async () => {
   if (!items.value.length) {
-    props.notify('La lista ya está vacía')
+    props.notify(t('listener.alreadyEmpty'))
     return
   }
 
   openConfirm({
-    title: 'Limpiar lista',
-    message: '¿Estás seguro de que quieres eliminar todos los elementos detectados? Esta acción no borrará los archivos ya descargados.',
-    confirmText: 'Limpiar lista',
+    title: t('listener.clearModalTitle'),
+    message: t('listener.clearModalText'),
+    confirmText: t('listener.clearModalConfirm'),
     type: 'danger',
     action: async () => {
       try {
         items.value = []
         await api('/api/listener/clear', { method: 'POST' })
-        props.notify('Lista de escucha limpiada')
+        props.notify(t('listener.listCleared'))
         await load()
       } catch (err) {
         props.notify(err.message, true)
@@ -354,7 +360,7 @@ const clearAll = async () => {
     }
   })
 }
-const statusText = status => ({ available: 'Disponible', queued: 'En cola', downloading: 'Descargando', completed: 'Completado', failed: 'Fallido' }[status] || status)
+const statusText = status => has('listener.status.' + status) ? t('listener.status.' + status) : status
 const availableCount = computed(() => items.value.filter(item => item.status === 'available').length)
 
 const getMediaKind = item => {
@@ -369,14 +375,14 @@ const getMediaKind = item => {
 const mediaMeta = kind => {
   switch (kind) {
     case 'photo':
-      return { label: 'Foto', icon: Image, class: 'media-photo' }
+      return { label: t('listener.mediaPhoto'), icon: Image, class: 'media-photo' }
     case 'video':
-      return { label: 'Vídeo', icon: Video, class: 'media-video' }
+      return { label: t('listener.mediaVideo'), icon: Video, class: 'media-video' }
     case 'song':
-      return { label: 'Canción', icon: Music, class: 'media-song' }
+      return { label: t('listener.mediaSong'), icon: Music, class: 'media-song' }
     case 'file':
     default:
-      return { label: 'Archivo', icon: FileText, class: 'media-file' }
+      return { label: t('listener.mediaFile'), icon: FileText, class: 'media-file' }
   }
 }
 
@@ -411,7 +417,7 @@ const selectFileName = async (item, selectedName) => {
     })
     item.file_name = selectedName
     nameSelectionMenus.value[item.id] = false
-    props.notify('Nombre de archivo actualizado')
+    props.notify(t('listener.nameUpdated'))
   } catch (err) {
     props.notify(err.message, true)
   }
@@ -428,7 +434,7 @@ const selectBulkFileName = async (type) => {
   })
 
   if (!eligibleItems.length) {
-    props.notify('No hay archivos pendientes aplicables para cambiar nombre')
+    props.notify(t('listener.bulkNoneEligible'))
     return
   }
 
@@ -449,7 +455,7 @@ const selectBulkFileName = async (type) => {
   }
 
   if (updatedCount > 0) {
-    props.notify(`${updatedCount} nombres de archivos actualizados a ${type === 'caption' ? 'Caption' : 'Original'}`)
+    props.notify(t('listener.bulkUpdated', { n: updatedCount, target: type === 'caption' ? t('listener.targetCaption') : t('listener.targetOriginal') }))
     // Recargar los items desde el servidor para asegurar sincronización
     await load()
   }
@@ -479,25 +485,25 @@ onUnmounted(() => {
 
 <template>
   <section class="listener-view">
-    <section class="listener-hero"><div><span class="hero-kicker"><Radio :size="13" /> MONITOR DE MENSAJES</span><h2>Escucha multimedia en tiempo real</h2><p>Cuando llegue un archivo a uno de tus chats, aparecerá aquí listo para descargar.</p></div><label class="switch large"><input v-model="enabled" type="checkbox" @change="toggle"><span></span><b>{{ enabled ? 'Escucha activa' : 'Escucha pausada' }}</b></label></section>
+    <section class="listener-hero"><div><span class="hero-kicker"><Radio :size="13" /> {{ t('listener.kicker') }}</span><h2>{{ t('listener.title') }}</h2><p>{{ t('listener.text') }}</p></div><label class="switch large"><input v-model="enabled" type="checkbox" @change="toggle"><span></span><b>{{ enabled ? t('listener.active') : t('listener.paused') }}</b></label></section>
     <div class="listener-grid">
-    <section class="panel listener-config"><div class="panel-heading"><div><span class="eyebrow"><MessageCircle :size="12" /> ORÍGENES</span><h2>Chats vigilados</h2></div><span class="count-pill">{{ chats.length }} configurados</span></div><p class="helper-text">Añade el ID numérico de un grupo, canal o chat privado, o pega un enlace <code>https://t.me/c/...</code>. Si el grupo usa temas podrás escuchar solo uno de ellos en lugar del grupo entero.</p><div class="listener-add"><input v-model="newChatId" @keyup.enter="addChat" placeholder="Ej. -1001234567890 o https://t.me/c/1234567890/57"><button class="save-button" :disabled="saving" @click="addChat"><Plus :size="15" /> Añadir</button></div>
+    <section class="panel listener-config"><div class="panel-heading"><div><span class="eyebrow"><MessageCircle :size="12" /> {{ t('listener.originsKicker') }}</span><h2>{{ t('listener.chatsTitle') }}</h2></div><span class="count-pill">{{ t('listener.chatsPill', { n: chats.length }) }}</span></div><p class="helper-text">{{ helperParts[0] }}<code>https://t.me/c/...</code>{{ helperParts[1] }}</p><div class="listener-add"><input v-model="newChatId" @keyup.enter="addChat" :placeholder="t('listener.placeholder')"><button class="save-button" :disabled="saving" @click="addChat"><Plus :size="15" /> {{ t('common.add') }}</button></div>
         <div v-if="error" class="listener-error">{{ error }}</div>
         <div v-if="topicPicker.visible" class="topic-picker">
           <div class="topic-picker-head">
             <strong>{{ topicPicker.chat?.name }}</strong>
-            <small>Este grupo usa temas. Elige qué quieres escuchar.</small>
+            <small>{{ t('listener.topicHint') }}</small>
           </div>
-          <div v-if="topicPicker.loading" class="empty-small">Cargando temas…</div>
+          <div v-if="topicPicker.loading" class="empty-small">{{ t('listener.topicsLoading') }}</div>
           <select v-else v-model="topicPicker.selected" class="topic-select">
-            <option value="all">Todo el grupo</option>
-            <option v-for="topic in topicPicker.topics" :key="topic.id" :value="String(topic.id)">{{ topic.name || ('Tema ' + topic.id) }}{{ topic.closed ? ' (cerrado)' : '' }}</option>
+            <option value="all">{{ t('listener.wholeGroup') }}</option>
+            <option v-for="topic in topicPicker.topics" :key="topic.id" :value="String(topic.id)">{{ topic.name || t('listener.topicFallback', { id: topic.id }) }}{{ topic.closed ? ' ' + t('listener.topicClosed') : '' }}</option>
           </select>
           <div class="topic-picker-actions">
-            <button class="save-button" :disabled="saving || topicPicker.loading" @click="confirmTopicSelection"><Plus :size="14" /> Añadir</button>
-            <button class="ghost-button" :disabled="saving" @click="closeTopicPicker">Cancelar</button>
+            <button class="save-button" :disabled="saving || topicPicker.loading" @click="confirmTopicSelection"><Plus :size="14" /> {{ t('common.add') }}</button>
+            <button class="ghost-button" :disabled="saving" @click="closeTopicPicker">{{ t('common.cancel') }}</button>
           </div>
-        </div><div v-if="!chats.length" class="empty-small">No hay chats configurados.</div>
+        </div><div v-if="!chats.length" class="empty-small">{{ t('listener.emptyChats') }}</div>
         <div v-for="chat in chats" :key="chatKey(chat)" class="chat-chip">
           <div class="chat-chip-main">
             <MessageCircle :size="14" />
@@ -509,65 +515,65 @@ onUnmounted(() => {
             <label class="auto-toggle switch" :class="{ disabled: saving }">
               <input type="checkbox" v-model="chat.auto_download" :disabled="saving" @change="save">
               <span></span>
-              <b>Auto</b>
+              <b>{{ t('listener.autoLabel') }}</b>
             </label>
-            <label class="auto-toggle switch" :class="{ disabled: saving }" title="Activar selección manual de nombres">
+            <label class="auto-toggle switch" :class="{ disabled: saving }" :title="t('listener.manualNameTip')">
               <input type="checkbox" v-model="chat.manual_name_selection" :disabled="saving" @change="save">
               <span></span>
-              <b>Nombre</b>
+              <b>{{ t('listener.nameLabel') }}</b>
             </label>
-            <button :disabled="saving" @click="removeChat(chat)" aria-label="Eliminar chat"><Trash2 :size="14" /></button>
+            <button :disabled="saving" @click="removeChat(chat)" :aria-label="t('listener.removeChatAria')"><Trash2 :size="14" /></button>
           </div>
           <div class="chat-filters">
-            <label class="filter-tag f-photos" :class="{ active: chat.f_photos }"><input type="checkbox" v-model="chat.f_photos" :disabled="saving" @change="save"><span>Fotos</span></label>
-            <label class="filter-tag f-videos" :class="{ active: chat.f_videos }"><input type="checkbox" v-model="chat.f_videos" :disabled="saving" @change="save"><span>Videos</span></label>
-            <label class="filter-tag f-audios" :class="{ active: chat.f_audios }"><input type="checkbox" v-model="chat.f_audios" :disabled="saving" @change="save"><span>Audios</span></label>
-            <label class="filter-tag f-docs" :class="{ active: chat.f_docs }"><input type="checkbox" v-model="chat.f_docs" :disabled="saving" @change="save"><span>Docs</span></label>
-            <label class="filter-tag f-stickers" :class="{ active: chat.f_stickers }"><input type="checkbox" v-model="chat.f_stickers" :disabled="saving" @change="save"><span>Stickers</span></label>
+            <label class="filter-tag f-photos" :class="{ active: chat.f_photos }"><input type="checkbox" v-model="chat.f_photos" :disabled="saving" @change="save"><span>{{ t('listener.filterPhotos') }}</span></label>
+            <label class="filter-tag f-videos" :class="{ active: chat.f_videos }"><input type="checkbox" v-model="chat.f_videos" :disabled="saving" @change="save"><span>{{ t('listener.filterVideos') }}</span></label>
+            <label class="filter-tag f-audios" :class="{ active: chat.f_audios }"><input type="checkbox" v-model="chat.f_audios" :disabled="saving" @change="save"><span>{{ t('listener.filterAudios') }}</span></label>
+            <label class="filter-tag f-docs" :class="{ active: chat.f_docs }"><input type="checkbox" v-model="chat.f_docs" :disabled="saving" @change="save"><span>{{ t('listener.filterDocs') }}</span></label>
+            <label class="filter-tag f-stickers" :class="{ active: chat.f_stickers }"><input type="checkbox" v-model="chat.f_stickers" :disabled="saving" @change="save"><span>{{ t('listener.filterStickers') }}</span></label>
           </div>
         </div>
-        <small class="save-hint">Los nombres y reglas se guardan automáticamente.</small></section>
+        <small class="save-hint">{{ t('listener.saveHint') }}</small></section>
       <section class="panel listener-feed">
         <div class="panel-heading">
           <div>
-            <span class="eyebrow"><Inbox :size="12" /> BANDEJA DE ENTRADA</span>
-            <h2>Multimedia detectada</h2>
+            <span class="eyebrow"><Inbox :size="12" /> {{ t('listener.inboxKicker') }}</span>
+            <h2>{{ t('listener.feedTitle') }}</h2>
           </div>
           <div class="header-actions">
             <div v-if="disk" class="disk-monitor">
               <div class="disk-bar"><div class="fill" :style="{ width: disk.percent + '%', backgroundColor: disk.status === 'red' ? '#ff4d4d' : '#4dff4d' }"></div></div>
-              <small>Total/Libre: ({{ disk.total_str }} / {{ disk.projected_free_str }})</small>
+              <small>{{ t('downloads.diskLabel', { total: disk.total_str, free: disk.projected_free_str }) }}</small>
             </div>
-            <span class="count-pill">{{ availableCount }} nuevas</span>
+            <span class="count-pill">{{ t('listener.newPill', { n: availableCount }) }}</span>
             <div v-if="items.length" class="bulk-actions">
               <div class="bulk-name-wrapper">
-                <button class="bulk-name-button" title="Cambiar nombre masivo" @click.stop="toggleBulkNameMenu">
-                  <Settings2 :size="14" /> Nombre
+                <button class="bulk-name-button" :title="t('listener.bulkNameTitle')" @click.stop="toggleBulkNameMenu">
+                  <Settings2 :size="14" /> {{ t('listener.nameLabel') }}
                 </button>
                 <div v-if="bulkNameMenuOpen" class="name-dropdown bulk-name-dropdown">
                   <div class="name-option" @click="selectBulkFileName('caption')">
-                    <span class="name-preview">Usar Caption</span>
-                    <small>(Solo chats con selección activa)</small>
+                    <span class="name-preview">{{ t('listener.useCaption') }}</span>
+                    <small>{{ t('listener.onlyManual') }}</small>
                   </div>
                   <div class="name-option" @click="selectBulkFileName('original')">
-                    <span class="name-preview">Usar Original</span>
-                    <small>(Solo chats con selección activa)</small>
+                    <span class="name-preview">{{ t('listener.useOriginal') }}</span>
+                    <small>{{ t('listener.onlyManual') }}</small>
                   </div>
                 </div>
               </div>
-              <button class="bulk-download" title="Descargar todo lo disponible" @click="downloadAll">
-                <Download :size="14" /> Todo
+              <button class="bulk-download" :title="t('listener.downloadAllTitleTip')" @click="downloadAll">
+                <Download :size="14" /> {{ t('listener.downloadAll') }}
               </button>
-              <button class="bulk-delete" title="Limpiar lista completa" @click="clearAll">
-                <Trash2 :size="14" /> Limpiar
+              <button class="bulk-delete" :title="t('listener.clearListTip')" @click="clearAll">
+                <Trash2 :size="14" /> {{ t('listener.clearList') }}
               </button>
             </div>
           </div>
         </div>
         <div v-if="!items.length" class="empty-state">
           <Inbox :size="28" />
-          <p>Aún no se detectó multimedia</p>
-          <small>Deja esta vista abierta o vuelve cuando llegue un archivo.</small>
+          <p>{{ t('listener.emptyTitle') }}</p>
+          <small>{{ t('listener.emptySub') }}</small>
         </div>
         <div v-for="item in items" :key="item.id" class="listener-item">
           <div class="file-symbol" :class="mediaMeta(getMediaKind(item)).class" :title="mediaMeta(getMediaKind(item)).label">
@@ -575,34 +581,34 @@ onUnmounted(() => {
           </div>
           <div class="file-info">
             <strong :title="item.file_name">{{ item.file_name }}</strong>
-            <span>{{ getChatName(item) }} · mensaje {{ item.message_id }} · {{ item.total_str }}</span>
+            <span>{{ getChatName(item) }} · {{ t('listener.itemMessage', { id: item.message_id }) }} · {{ item.total_str }}</span>
           </div>
           <div class="row-side">
             <span class="listener-status">{{ statusText(item.status) }}</span>
             <div class="row-actions">
               <div v-if="hasManualNameSelection(item) && item.status === 'available'" class="name-select-wrapper">
                 <button class="name-select-button" @click="toggleNameMenu(item.id)">
-                  <Settings2 :size="13" /> Nombre
+                  <Settings2 :size="13" /> {{ t('listener.nameLabel') }}
                 </button>
                 <div v-if="nameSelectionMenus[item.id]" class="name-dropdown">
                   <div v-if="item.caption_file_name && item.caption_file_name !== item.file_name"
                        class="name-option"
                        @click="selectFileName(item, item.caption_file_name)">
                     <span class="name-preview">{{ item.caption_file_name }}</span>
-                    <small>(Caption)</small>
+                    <small>({{ t('listener.captionTag') }})</small>
                   </div>
                   <div v-if="item.original_file_name && item.original_file_name !== item.file_name"
                        class="name-option"
                        @click="selectFileName(item, item.original_file_name)">
                     <span class="name-preview">{{ item.original_file_name }}</span>
-                    <small>(Original)</small>
+                    <small>({{ t('listener.originalTag') }})</small>
                   </div>
                 </div>
               </div>
               <button v-if="item.status === 'available'" class="download-small" @click="download(item)">
-                <Download :size="13" /> Descargar
+                <Download :size="13" /> {{ t('listener.download') }}
               </button>
-              <button class="delete-small" @click="removeItem(item)" aria-label="Eliminar">
+              <button class="delete-small" @click="removeItem(item)" :aria-label="t('listener.removeItemAria')">
                 <Trash2 :size="13" />
               </button>
             </div>

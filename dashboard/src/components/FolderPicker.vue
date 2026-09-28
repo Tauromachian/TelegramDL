@@ -2,8 +2,10 @@
 import { ref } from 'vue'
 import { ArrowLeft, Check, ChevronRight, Folder, HardDrive, X } from '../icons'
 import { useAuthToken } from '../composables/useAuthToken'
+import { useI18n } from '../i18n'
 
 const { authHeaders } = useAuthToken()
+const { t } = useI18n()
 
 defineProps({ modelValue: { type: String, default: '' } })
 const emit = defineEmits(['update:modelValue'])
@@ -19,7 +21,7 @@ const entries = ref([])
 const api = async (url) => {
   const response = await fetch(url, { headers: { ...authHeaders() } })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.detail || 'No se puede leer la carpeta')
+  if (!response.ok) throw new Error(data.detail || t('folder.readError'))
   return data
 }
 
@@ -90,23 +92,23 @@ const select = () => { if (currentPath.value) emit('update:modelValue', currentP
 
 <template>
   <div class="folder-picker">
-    <div class="setting-label compact"><span>Carpeta de descargas</span></div>
-    <button class="folder-current" type="button" @click="show"><Folder :size="16" /><span :title="modelValue">{{ modelValue || 'Seleccionar carpeta' }}</span><ChevronRight :size="15" /></button>
-    <small>Las próximas descargas usarán esta ubicación.</small>
+    <div class="setting-label compact"><span>{{ t('folder.label') }}</span></div>
+    <button class="folder-current" type="button" @click="show"><Folder :size="16" /><span :title="modelValue">{{ modelValue || t('folder.choosePlaceholder') }}</span><ChevronRight :size="15" /></button>
+    <small>{{ t('folder.nextHint') }}</small>
 
     <div v-if="open" class="folder-overlay" @click.self="close">
-      <div class="folder-dialog" role="dialog" aria-modal="true" aria-label="Seleccionar carpeta">
-        <div class="folder-dialog-header"><div><span class="eyebrow"><Folder :size="12" /> EXPLORADOR</span><h3>Seleccionar carpeta</h3></div><button class="icon-button" type="button" @click="close" aria-label="Cerrar"><X :size="18" /></button></div>
-        <div class="folder-path" :title="currentPath">{{ currentPath || 'Este equipo' }}</div>
+      <div class="folder-dialog" role="dialog" aria-modal="true" :aria-label="t('folder.dialogTitle')">
+        <div class="folder-dialog-header"><div><span class="eyebrow"><Folder :size="12" /> {{ t('folder.explorerKicker') }}</span><h3>{{ t('folder.dialogTitle') }}</h3></div><button class="icon-button" type="button" @click="close" :aria-label="t('common.close')"><X :size="18" /></button></div>
+        <div class="folder-path" :title="currentPath">{{ currentPath || t('folder.thisPC') }}</div>
         <div v-if="error" class="folder-error">{{ error }}</div>
-        <div v-if="loading" class="folder-loading"><Folder :size="20" /> Leyendo carpetas…</div>
+        <div v-if="loading" class="folder-loading"><Folder :size="20" /> {{ t('folder.loading') }}</div>
         <div v-else class="folder-list">
           <button v-for="root in roots" :key="root" class="folder-entry root-entry" type="button" @click="browse(root)"><HardDrive :size="18" /><span>{{ root }}</span><ChevronRight :size="15" /></button>
-          <button v-if="parentPath" class="folder-entry parent-entry" type="button" @click="browse(parentPath)"><ArrowLeft :size="17" /><span>Volver a la carpeta anterior</span></button>
+          <button v-if="parentPath" class="folder-entry parent-entry" type="button" @click="browse(parentPath)"><ArrowLeft :size="17" /><span>{{ t('folder.backToParent') }}</span></button>
           <button v-for="entry in entries" :key="entry.path" class="folder-entry" type="button" @click="browse(entry.path)"><Folder :size="18" /><span>{{ entry.name }}</span><ChevronRight :size="15" /></button>
-          <div v-if="!roots.length && !parentPath && !entries.length" class="folder-empty">No hay carpetas disponibles.</div>
+          <div v-if="!roots.length && !parentPath && !entries.length" class="folder-empty">{{ t('folder.noneAvailable') }}</div>
         </div>
-        <div class="folder-dialog-footer"><button class="secondary-button" type="button" @click="close">Cancelar</button><button class="primary-button compact-button" type="button" :disabled="!currentPath || loading" @click="select"><Check :size="15" /> Usar esta carpeta</button></div>
+        <div class="folder-dialog-footer"><button class="secondary-button" type="button" @click="close">{{ t('common.cancel') }}</button><button class="primary-button compact-button" type="button" :disabled="!currentPath || loading" @click="select"><Check :size="15" /> {{ t('folder.useThis') }}</button></div>
       </div>
     </div>
   </div>

@@ -17,6 +17,7 @@ import AuthWizard from './components/AuthWizard.vue'
 import RemoteLogin from './components/RemoteLogin.vue'
 import { hasStoredToken, useAuthToken } from './composables/useAuthToken'
 import { useConfirmModal } from './composables/useConfirmModal'
+import { useI18n } from './i18n'
 import {
   applyLoaderTheme,
   applyTheme,
@@ -42,6 +43,10 @@ import {
 
 const { token, initToken, setToken, clearToken, authHeaders, isWailsRuntime } =
   useAuthToken()
+
+// Idioma del panel. El valor inicial sale del navegador/equipo (ver i18n);
+// en cuanto llegan los ajustes del servidor manda settings.language.
+const { t, locale, setLocale } = useI18n()
 
 // Saber ya en el primer pintado si vamos a cargar la aplicación o a pedir el
 // token: leer el almacenamiento del navegador es inmediato, así que no hay
@@ -108,8 +113,19 @@ const settings = reactive({
   loader_color_id: 5,
   download_folder: '',
   organize_by_chat: true,
-  shutdown_when_done: false
+  shutdown_when_done: false,
+  language: ''
 })
+
+// El idioma elegido en Ajustes viaja en settings como cualquier otro ajuste:
+// aquí se aplica a la interfaz (y a la caché del dispositivo) y el watch de
+// siempre se encarga de guardarlo en el servidor un instante después.
+watch(
+  () => settings.language,
+  (newVal) => {
+    if (newVal) setLocale(newVal)
+  }
+)
 
 const resetColor = () => {
   if (authStatus.value.user && authStatus.value.user.color_id !== undefined) {
@@ -216,14 +232,16 @@ const syncSettings = async (nextSettings) => {
 
 const showMessage = (txt, isError = false) => {
   if (isError) {
+    // La heurística mira el texto en español porque es el idioma en que el
+    // backend redacta sus errores; el título del aviso sí va traducido.
     if (
       txt.toLowerCase().includes('espacio no es suficiente') ||
       txt.toLowerCase().includes('libera espacio')
     ) {
       openConfirm({
-        title: '¡Espacio en disco insuficiente!',
+        title: t('settings.spaceTitle'),
         message: txt,
-        confirmText: 'Entendido',
+        confirmText: t('common.understood'),
         cancelText: '',
         type: 'danger',
         action: () => {}
@@ -259,11 +277,11 @@ const api = async (url, options = {}) => {
       needsRemoteLogin.value = hasCreds
       loadPublicTheme()
     }
-    throw new Error('No autorizado: token de acceso inválido o ausente')
+    throw new Error(t('common.unauthorized'))
   }
   const data = await response.json().catch(() => ({}))
   if (!response.ok)
-    throw new Error(data.detail || data.error || 'Error en el servidor')
+    throw new Error(data.detail || data.error || t('common.serverError'))
   return data
 }
 
@@ -288,10 +306,9 @@ const fetchAuthStatus = async () => {
 
 const logoutTelegram = async () => {
   openConfirm({
-    title: 'Cerrar sesión de Telegram',
-    message:
-      '¿Estás seguro de que deseas cerrar sesión? Tendrás que volver a autenticarte desde la web.',
-    confirmText: 'Sí, cerrar sesión',
+    title: t('settings.logoutTitle'),
+    message: t('settings.logoutText'),
+    confirmText: t('settings.logoutConfirm'),
     type: 'danger',
     action: async () => {
       try {
@@ -299,7 +316,7 @@ const logoutTelegram = async () => {
         localStorage.removeItem('tgdl_auth')
         localStorage.removeItem('tgdl_user')
         await fetchAuthStatus()
-        showMessage('Sesión cerrada con éxito')
+        showMessage(t('settings.logoutOk'))
       } catch (err) {
         showMessage(err.message, true)
       }
@@ -359,6 +376,10 @@ const fetchSettings = async () => {
     const data = await api('/api/settings')
     await syncSettings(data.settings)
     hydrated.value = true
+    // Primera vez en este equipo (el servidor todavía no guarda idioma): se
+    // queda el que detectó el sistema y esta asignación lo manda guardar a
+    // través del autoguardado de ajustes.
+    if (!settings.language) settings.language = locale.value
   } catch (err) {
     showMessage(err.message, true)
   }
@@ -373,7 +394,7 @@ const saveSettings = async () => {
       body: JSON.stringify(settings)
     })
     await syncSettings(data.settings)
-    showMessage('Configuración guardada')
+    showMessage(t('settings.settingsSaved'))
   } catch (err) {
     showMessage(err.message, true)
   } finally {
@@ -384,10 +405,9 @@ const saveSettings = async () => {
 
 const regenerateToken = () => {
   openConfirm({
-    title: 'Regenerar token de acceso',
-    message:
-      'El token actual dejará de funcionar de inmediato. Cualquier otro dispositivo (celular, otra PC) que lo esté usando para acceso remoto necesitará que le pases el nuevo token.',
-    confirmText: 'Sí, regenerar',
+    title: t('settings.regenTitle'),
+    message: t('settings.regenText'),
+    confirmText: t('settings.regenConfirm'),
     type: 'danger',
     action: async () => {
       try {
@@ -401,7 +421,7 @@ const regenerateToken = () => {
           newToken = data.token
         }
         setToken(newToken)
-        showMessage('Token regenerado')
+        showMessage(t('settings.regenOk'))
       } catch (err) {
         showMessage(err.message, true)
       }
@@ -411,16 +431,15 @@ const regenerateToken = () => {
 
 const clearDownloadHistory = () => {
   openConfirm({
-    title: 'Limpiar estadísticas',
-    message:
-      '¿Quieres eliminar del historial todas las descargas completadas, omitidas, fallidas y canceladas? Los archivos del disco no se borrarán.',
-    confirmText: 'Sí, limpiar historial',
+    title: t('settings.clearHistoryTitle'),
+    message: t('settings.clearHistoryText'),
+    confirmText: t('settings.clearHistoryConfirm'),
     type: 'danger',
     action: async () => {
       try {
         const data = await api('/api/downloads/history', { method: 'DELETE' })
         await fetchDownloads()
-        showMessage(`${data.removed || 0} registros eliminados`)
+        showMessage(t('settings.historyCleared', { n: data.removed || 0 }))
       } catch (err) {
         showMessage(err.message, true)
       }
@@ -449,7 +468,7 @@ const startDownload = async (url) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: targetUrl })
     })
-    showMessage('Descarga añadida a la cola')
+    showMessage(t('downloads.added'))
     await fetchDownloads()
   } catch (err) {
     showMessage(err.message, true)
@@ -478,7 +497,7 @@ const setDownloadPause = async (id, paused) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id })
     })
-    showMessage(paused ? 'Descarga pausada' : 'Descarga reanudada')
+    showMessage(paused ? t('downloads.pausedMsg') : t('downloads.resumedMsg'))
     await fetchDownloads()
   } catch (err) {
     showMessage(err.message, true)
@@ -492,7 +511,7 @@ const retryDownload = async (item) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: item.id })
     })
-    showMessage('Reintentando descarga…')
+    showMessage(t('downloads.retrying'))
     await fetchDownloads()
   } catch (err) {
     showMessage(err.message, true)
@@ -502,7 +521,7 @@ const retryDownload = async (item) => {
 const pauseAllDownloads = async () => {
   try {
     await api('/api/downloads/pause-all', { method: 'POST' })
-    showMessage('Todas las descargas pausadas')
+    showMessage(t('downloads.allPaused'))
     await fetchDownloads()
   } catch (err) {
     showMessage(err.message, true)
@@ -512,7 +531,7 @@ const pauseAllDownloads = async () => {
 const resumeAllDownloads = async () => {
   try {
     await api('/api/downloads/resume-all', { method: 'POST' })
-    showMessage('Todas las descargas reanudadas')
+    showMessage(t('downloads.allResumed'))
     await fetchDownloads()
   } catch (err) {
     showMessage(err.message, true)
@@ -521,15 +540,14 @@ const resumeAllDownloads = async () => {
 
 const cancelAllDownloads = async () => {
   openConfirm({
-    title: 'Cancelar todo',
-    message:
-      '¿Estás seguro de que quieres cancelar todas las descargas activas y en cola?',
-    confirmText: 'Sí, cancelar todo',
+    title: t('downloads.cancelAllTitle'),
+    message: t('downloads.cancelAllText'),
+    confirmText: t('downloads.cancelAllConfirm'),
     type: 'danger',
     action: async () => {
       try {
         await api('/api/downloads/cancel-all', { method: 'POST' })
-        showMessage('Todas las descargas canceladas')
+        showMessage(t('downloads.allCancelled'))
         await fetchDownloads()
       } catch (err) {
         showMessage(err.message, true)
@@ -540,9 +558,9 @@ const cancelAllDownloads = async () => {
 
 const deleteDownload = async (item) => {
   openConfirm({
-    title: 'Borrar archivo',
-    message: `¿Estás seguro de que quieres eliminar "${item.file_name}" del servidor? Esta acción no se puede deshacer.`,
-    confirmText: 'Sí, borrar archivo',
+    title: t('downloads.deleteTitle'),
+    message: t('downloads.deleteText', { name: item.file_name }),
+    confirmText: t('downloads.deleteConfirm'),
     type: 'danger',
     action: async () => {
       try {
@@ -550,7 +568,7 @@ const deleteDownload = async (item) => {
           `/api/downloads/${encodeURIComponent(item.id)}?delete_file=true`,
           { method: 'DELETE' }
         )
-        showMessage('Archivo borrado')
+        showMessage(t('downloads.deletedMsg'))
         await fetchDownloads()
       } catch (err) {
         showMessage(err.message, true)
@@ -584,17 +602,17 @@ const {
 const viewTitle = computed(
   () =>
     ({
-      downloads: 'Descargas',
-      listener: 'Escucha',
-      logs: 'Logs',
-      settings: 'Ajustes'
-    })[activeView.value] || 'Descargas'
+      downloads: t('nav.downloads'),
+      listener: t('nav.listener'),
+      logs: t('nav.logs'),
+      settings: t('nav.settings')
+    })[activeView.value] || t('nav.downloads')
 )
 
 const speedText = computed(() =>
   settings.speed_limit.value > 0
     ? `${settings.speed_limit.value} ${settings.speed_limit.unit}/s`
-    : 'Velocidad de descarga: sin límites'
+    : t('sidebar.speedUnlimited')
 )
 const totalSpeed = computed(() => {
   const totalBytes = downloads.value.reduce(
@@ -619,10 +637,10 @@ const promptDuplicateDownload = (item) => {
 
   duplicatePrompted.add(item.id)
   openConfirm({
-    title: 'Archivo ya descargado',
-    message: `El archivo "${item.file_name}" ya existe en la carpeta de descargas. ¿Quieres descargarlo nuevamente?`,
-    confirmText: 'Descargar de nuevo',
-    cancelText: 'Cancelar',
+    title: t('downloads.duplicateTitle'),
+    message: t('downloads.duplicateText', { name: item.file_name }),
+    confirmText: t('downloads.duplicateConfirm'),
+    cancelText: t('common.cancel'),
     type: 'primary',
     action: async () => {
       try {
@@ -717,10 +735,9 @@ const onShutdownToggle = (event) => {
     return
   }
   openConfirm({
-    title: 'Apagar el PC al terminar',
-    message:
-      'Cuando la cola de descargas termine, el equipo se apagará automáticamente en 15 segundos. Puedes cancelarlo en cualquier momento con este mismo interruptor. El ajuste solo dura esta sesión: al cerrar la aplicación se desactiva solo.',
-    confirmText: 'Sí, activar',
+    title: t('settings.shutdownTitle'),
+    message: t('settings.shutdownText'),
+    confirmText: t('settings.shutdownConfirm'),
     type: 'primary',
     action: async () => {
       settings.shutdown_when_done = true
@@ -737,9 +754,9 @@ watch(
         wasSpaceCritical.value = true
         const needed = formatSize(Math.abs(newDisk.projected_free))
         openConfirm({
-          title: '¡Alerta de Espacio Crítico!',
-          message: `Debido a cambios externos en tu disco, ya no hay espacio suficiente para completar las descargas en cola. \n\nNecesitas liberar al menos ${needed} o cancelar algunas tareas para evitar errores.`,
-          confirmText: 'Entendido',
+          title: t('settings.spaceCriticalTitle'),
+          message: t('settings.spaceCriticalText', { needed }),
+          confirmText: t('common.understood'),
           cancelText: '',
           type: 'danger',
           action: () => {}
@@ -881,8 +898,7 @@ const handleRemoteLogin = async (value) => {
     await startApp()
   } catch {
     clearToken()
-    remoteLoginError.value =
-      'Token inválido. Verifica que lo copiaste completo desde Ajustes → Acceso remoto.'
+    remoteLoginError.value = t('remote.invalidToken')
   }
 }
 
@@ -964,10 +980,9 @@ onUnmounted(() => {
     <div v-if="updateInfo && isUpdateForced" class="update-required-overlay">
       <div class="update-card">
         <Zap :size="48" class="update-icon" />
-        <h2>Actualización Obligatoria</h2>
+        <h2>{{ t('update.forcedTitle') }}</h2>
         <p v-if="!isUpdating">
-          Hay una nueva versión disponible ({{ updateInfo.latest }}). Es
-          necesario actualizar para continuar.
+          {{ t('update.forcedText', { version: updateInfo.latest }) }}
         </p>
 
         <div class="update-action-area" :class="{ 'is-loading': isUpdating }">
@@ -976,7 +991,7 @@ onUnmounted(() => {
             class="primary-button update-btn"
             @click="installUpdate"
           >
-            <span>Actualizar ahora</span>
+            <span>{{ t('update.updateNow') }}</span>
             <ArrowUpRight :size="18" />
           </button>
 
@@ -984,12 +999,12 @@ onUnmounted(() => {
             <div class="update-status-text">
               {{
                 updateProgress.status === 'downloading'
-                  ? 'Descargando actualización...'
+                  ? t('update.statusDownloading')
                   : updateProgress.status === 'extracting'
-                    ? 'Extrayendo archivos...'
+                    ? t('update.statusExtracting')
                     : updateProgress.status === 'finishing'
-                      ? 'Finalizando e iniciando...'
-                      : 'Iniciando...'
+                      ? t('update.statusFinishing')
+                      : t('update.statusStarting')
               }}
             </div>
             <div class="update-progress-bar">
@@ -1013,10 +1028,10 @@ onUnmounted(() => {
         </div>
 
         <div v-if="isUpdating" class="update-warning">
-          Por favor, no cierres la aplicación.
+          {{ t('update.doNotClose') }}
         </div>
 
-        <small>Versión actual: {{ updateInfo.current }}</small>
+        <small>{{ t('update.currentVersion', { version: updateInfo.current }) }}</small>
       </div>
     </div>
 
@@ -1071,14 +1086,14 @@ onUnmounted(() => {
               class="mobile-menu-toggle"
               type="button"
               :aria-expanded="mobileMenuOpen"
-              aria-label="Abrir menú"
+              :aria-label="t('nav.openMenu')"
               @click="mobileMenuOpen = !mobileMenuOpen"
             >
               <X v-if="mobileMenuOpen" :size="20" />
               <Menu v-else :size="20" />
             </button>
           </div>
-          <p class="sidebar-copy">Centro de descargas personal</p>
+          <p class="sidebar-copy">{{ t('sidebar.tagline') }}</p>
           <nav class="sidebar-nav">
             <button
               :class="{ selected: activeView === 'downloads' }"
@@ -1089,7 +1104,7 @@ onUnmounted(() => {
                 }
               "
             >
-              <ArrowDownToLine :size="16" /> Descargas
+              <ArrowDownToLine :size="16" /> {{ t('nav.downloads') }}
             </button>
             <button
               :class="{ selected: activeView === 'listener' }"
@@ -1100,7 +1115,7 @@ onUnmounted(() => {
                 }
               "
             >
-              <Radio :size="16" /> Escucha
+              <Radio :size="16" /> {{ t('nav.listener') }}
             </button>
             <button
               :class="{ selected: activeView === 'logs' }"
@@ -1111,7 +1126,7 @@ onUnmounted(() => {
                 }
               "
             >
-              <ScrollText :size="16" /> Logs
+              <ScrollText :size="16" /> {{ t('nav.logs') }}
             </button>
             <button
               :class="{ selected: activeView === 'settings' }"
@@ -1122,7 +1137,7 @@ onUnmounted(() => {
                 }
               "
             >
-              <Settings2 :size="16" /> Ajustes
+              <Settings2 :size="16" /> {{ t('nav.settings') }}
             </button>
           </nav>
 
@@ -1137,15 +1152,15 @@ onUnmounted(() => {
               <div class="shutdown-info">
                 <Power :size="15" />
                 <div class="shutdown-text">
-                  <span class="shutdown-label">Apagar al terminar</span>
+                  <span class="shutdown-label">{{ t('sidebar.shutdownLabel') }}</span>
                 </div>
               </div>
               <label
                 class="switch"
                 :title="
                   settings.shutdown_when_done
-                    ? 'Cancelar el apagado automático'
-                    : 'Apagar el PC cuando termine la cola de descargas'
+                    ? t('sidebar.shutdownTipArmed')
+                    : t('sidebar.shutdownTipIdle')
                 "
               >
                 <input
@@ -1157,10 +1172,10 @@ onUnmounted(() => {
               </label>
             </div>
             <small v-if="shutdownCountdown > 0" class="shutdown-sub">
-              Apagando en {{ shutdownCountdown }} s…
+              {{ t('sidebar.shutdownCountdown', { n: shutdownCountdown }) }}
             </small>
             <small v-else-if="settings.shutdown_when_done" class="shutdown-sub">
-              Activo: al acabar la cola
+              {{ t('sidebar.shutdownArmed') }}
             </small>
           </div>
 
@@ -1171,7 +1186,7 @@ onUnmounted(() => {
             </div>
             <button
               class="logout-btn"
-              title="Cerrar sesión de Telegram"
+              :title="t('sidebar.logoutTip')"
               @click="logoutTelegram"
             >
               <LogOut :size="13" />
@@ -1188,14 +1203,14 @@ onUnmounted(() => {
             ></span>
             <span>{{
               websocketConnected
-                ? 'Servicio conectado'
-                : 'Servicio desconectado'
+                ? t('sidebar.serviceConnected')
+                : t('sidebar.serviceDisconnected')
             }}</span>
           </div>
         </div>
         <div class="sidebar-bottom">
-          <span class="mini-label">LÍMITE ACTUAL</span>
-          <strong>{{ settings.max_concurrent_downloads }} descargas</strong>
+          <span class="mini-label">{{ t('sidebar.currentLimit') }}</span>
+          <strong>{{ t('sidebar.downloadsCount', { n: settings.max_concurrent_downloads }) }}</strong>
           <span>{{ speedText }}</span>
         </div>
       </aside>
@@ -1203,10 +1218,10 @@ onUnmounted(() => {
       <main class="main-content">
         <header class="topbar">
           <div>
-            <span class="eyebrow">PANEL DE CONTROL</span>
+            <span class="eyebrow">{{ t('sidebar.controlPanel') }}</span>
             <h1>{{ viewTitle }}</h1>
           </div>
-          <div class="topbar-meta">Velocidad total: {{ totalSpeed }}</div>
+          <div class="topbar-meta">{{ t('sidebar.totalSpeed', { speed: totalSpeed }) }}</div>
         </header>
 
         <div v-if="message" class="toast success">
@@ -1277,8 +1292,7 @@ onUnmounted(() => {
         />
 
         <footer>
-          TelegramDL · Configuración persistida localmente en SQLite ·
-          {{ host }}
+          {{ t('sidebar.footer', { host }) }}
         </footer>
       </main>
     </div>

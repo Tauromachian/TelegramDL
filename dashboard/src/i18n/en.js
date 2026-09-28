@@ -35,6 +35,7 @@ export default {
     downloadsCount: '{n} downloads',
     controlPanel: 'CONTROL PANEL',
     totalSpeed: 'Total speed: {speed}',
+    speedUnlimited: 'Download speed: unlimited',
     footer: 'TelegramDL · Settings persisted locally in SQLite · {host}'
   },
 
@@ -167,6 +168,8 @@ export default {
     emptyTitle: 'No media detected yet',
     emptySub: 'Leave this view open or come back when a file arrives.',
     itemMessage: 'message {id}',
+    download: 'Download',
+    chatMetaTopic: '{id} · topic {topic}',
     status: {
       available: 'Available',
       queued: 'Queued',
@@ -242,6 +245,7 @@ export default {
     newEntries: '{n} new entries',
     clearModalTitle: 'Clear log',
     clearModalText: 'The on-screen entries will be removed. The log file on disk is kept.',
+    clearModalConfirm: 'Clear',
     levelTagError: 'ERROR',
     levelTagWarn: 'WARN',
     levelTagSuccess: 'OK',
@@ -366,7 +370,7 @@ export default {
     credsTitle: 'App Credentials (API ID & Hash)',
     credsText: 'You need your official Telegram Developer credentials.',
     credsBannerA: "Don't have them? Get them for free at",
-    credsBannerB: '(API development tools section).',
+    credsBannerB: '({apiTools} section).',
     apiIdPlaceholder: 'Example: 12345678',
     apiHashPlaceholder: 'Example: 0123456789abcdef0123456789abcdef',
     saveContinue: 'Save and Continue',

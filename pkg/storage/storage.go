@@ -551,6 +551,9 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 	if val, ok := kv["speed_unit"]; ok && val != "" {
 		cfg.SpeedLimit.Unit = val
 	}
+	if val, ok := kv["language"]; ok && val != "" {
+		cfg.Language = val
+	}
 
 	// Cargar listener_chats
 	chatRows, err := s.db.Query("SELECT chat_id, topic_id, topic_name, name, folder, topic_folder, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers, manual_name_selection FROM listener_chats ORDER BY chat_id, topic_id")
@@ -652,6 +655,7 @@ func (s *Storage) SaveConfig(cfg config.Config) error {
 		"organize_by_chat":         strconv.FormatBool(cfg.OrganizeByChat),
 		"speed_value":              fmt.Sprintf("%f", cfg.SpeedLimit.Value),
 		"speed_unit":               cfg.SpeedLimit.Unit,
+		"language":                 cfg.Language,
 	}
 
 	// shutdown_when_done queda fuera a propósito: no debe sobrevivir a un

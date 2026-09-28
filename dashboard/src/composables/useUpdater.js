@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { t } from '../i18n'
 
 // Chequeo, aviso e instalacion de actualizaciones de la app. Se aisla del
 // resto de App.vue porque su ciclo (poll de progreso, dialogo de
@@ -25,7 +26,7 @@ export function useUpdater({ api, showMessage, openConfirm }) {
           updateProgress.value = res
           if (res.status.startsWith('error')) {
             isUpdating.value = false
-            showMessage('Error: ' + res.status, true)
+            showMessage(t('update.progressError', { status: res.status }), true)
             return
           }
           if (res.status !== 'finishing') {
@@ -38,7 +39,7 @@ export function useUpdater({ api, showMessage, openConfirm }) {
       pollProgress()
     } catch (err) {
       isUpdating.value = false
-      showMessage('Error al iniciar la actualización: ' + err.message, true)
+      showMessage(t('update.installError', { message: err.message }), true)
     }
   }
 
@@ -52,10 +53,10 @@ export function useUpdater({ api, showMessage, openConfirm }) {
           isUpdateForced.value = true
         } else if (!isUpdateForced.value && updatePostponedVersion.value !== data.latest) {
           openConfirm({
-            title: 'Nueva versión disponible',
-            message: `Hay una actualización lista (${data.latest}). Se recomienda actualizar para obtener las mejoras.\n\nIMPORTANTE: No debe haber descargas activas durante el proceso para evitar que se corrompan. Si tienes tareas en curso, pospón la actualización y se aplicará automáticamente la próxima vez que inicies la aplicación.`,
-            confirmText: 'Actualizar ahora',
-            cancelText: 'Posponer',
+            title: t('update.availableTitle'),
+            message: t('update.availableText', { version: data.latest }),
+            confirmText: t('update.updateNow'),
+            cancelText: t('update.postpone'),
             type: 'primary',
             action: () => {
               isUpdateForced.value = true

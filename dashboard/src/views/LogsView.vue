@@ -4,9 +4,11 @@ import { ArrowDownToLine, Copy, Download, Pause, Play, ScrollText, Search, Trash
 import ConfirmModal from '../components/ConfirmModal.vue'
 import { useAuthToken } from '../composables/useAuthToken'
 import { useConfirmModal } from '../composables/useConfirmModal'
+import { useI18n } from '../i18n'
 
 const { authHeaders } = useAuthToken()
 const { modal, openConfirm, handleConfirm, handleCancel } = useConfirmModal()
+const { t, has } = useI18n()
 
 const props = defineProps({
   notify: { type: Function, default: () => {} },
@@ -24,11 +26,11 @@ const MAX_ENTRIES = 3000
 const MAX_RENDERED = 800
 
 const LEVELS = [
-  { id: 'error', label: 'Errores' },
-  { id: 'warn', label: 'Avisos' },
-  { id: 'success', label: 'Éxito' },
-  { id: 'info', label: 'Info' },
-  { id: 'debug', label: 'Detalle' }
+  { id: 'error', labelKey: 'logs.levelError' },
+  { id: 'warn', labelKey: 'logs.levelWarn' },
+  { id: 'success', labelKey: 'logs.levelSuccess' },
+  { id: 'info', labelKey: 'logs.levelInfo' },
+  { id: 'debug', labelKey: 'logs.levelDebug' }
 ]
 
 const entries = ref([])
@@ -51,7 +53,7 @@ let fetching = false
 const api = async (url, options = {}) => {
   const response = await fetch(url, { ...options, headers: { ...(options.headers || {}), ...authHeaders() } })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.detail || data.error || 'Error en el servidor')
+  if (!response.ok) throw new Error(data.detail || data.error || t('common.serverError'))
   return data
 }
 
@@ -82,7 +84,7 @@ const fetchDelta = async (reset = false) => {
     logFile.value = data.file || ''
     error.value = ''
   } catch (err) {
-    error.value = err.message || 'No se pudo leer el registro'
+    error.value = err.message || t('logs.readError')
   } finally {
     fetching = false
   }
@@ -95,6 +97,12 @@ const categories = computed(() => {
   entries.value.forEach(e => { if (e.category) seen.add(e.category) })
   return Array.from(seen).sort()
 })
+
+// La categoría la emite el backend con su nombre en español (es una clave
+// estable, no texto de interfaz); aquí se le pone la etiqueta del idioma
+// activo. Si llega una categoría nueva sin traducción se muestra tal cual.
+const categoryLabel = (cat) =>
+  has('logs.categories.' + cat) ? t('logs.categories.' + cat) : cat
 
 const filtered = computed(() => {
   const term = search.value.trim().toLowerCase()
@@ -173,18 +181,18 @@ watch(() => props.active, (isActive) => {
 // --- Acciones -------------------------------------------------------------
 
 const buildText = () => filtered.value
-  .map(e => `${formatTime(e.time)} ${e.level.toUpperCase().padEnd(7)} [${e.category}] ${e.message}${e.detail ? ' — ' + e.detail : ''}`)
+  .map(e => `${formatTime(e.time)} ${levelLabel(e.level).padEnd(7)} [${categoryLabel(e.category)}] ${e.message}${e.detail ? ' — ' + e.detail : ''}`)
   .join('\n')
 
 const copyAll = async () => {
   const text = buildText()
   if (!text) {
-    props.notify('No hay nada que copiar')
+    props.notify(t('logs.nothingToCopy'))
     return
   }
   try {
     await navigator.clipboard.writeText(text)
-    props.notify('Registro copiado al portapapeles')
+    props.notify(t('logs.copied'))
   } catch {
     // Navegadores sin permiso de portapapeles (o contexto no seguro).
     const area = document.createElement('textarea')
@@ -195,9 +203,9 @@ const copyAll = async () => {
     area.select()
     try {
       document.execCommand('copy')
-      props.notify('Registro copiado al portapapeles')
+      props.notify(t('logs.copied'))
     } catch {
-      error.value = 'No se pudo copiar al portapapeles'
+      error.value = t('logs.copyError')
     }
     document.body.removeChild(area)
   }
@@ -206,7 +214,7 @@ const copyAll = async () => {
 const exportFile = async () => {
   try {
     const response = await fetch('/api/logs/export', { headers: { ...authHeaders() } })
-    if (!response.ok) throw new Error('No se pudo exportar el registro')
+    if (!response.ok) throw new Error(t('logs.exportError'))
     const blob = await response.blob()
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -217,17 +225,17 @@ const exportFile = async () => {
     link.click()
     document.body.removeChild(link)
     setTimeout(() => URL.revokeObjectURL(url), 2000)
-    props.notify('Registro exportado')
+    props.notify(t('logs.exported'))
   } catch (err) {
-    error.value = err.message || 'No se pudo exportar el registro'
+    error.value = err.message || t('logs.exportError')
   }
 }
 
 const clearLogs = () => {
   openConfirm({
-    title: 'Limpiar registro',
-    message: 'Se borrarán las entradas en pantalla. El archivo de registro en disco se conserva.',
-    confirmText: 'Limpiar',
+    title: t('logs.clearModalTitle'),
+    message: t('logs.clearModalText'),
+    confirmText: t('logs.clearModalConfirm'),
     type: 'danger',
     action: async () => {
       try {
@@ -237,7 +245,7 @@ const clearLogs = () => {
         if (typeof data.last_id === 'number') lastId.value = data.last_id
         await fetchDelta()
       } catch (err) {
-        error.value = err.message || 'No se pudo limpiar el registro'
+        error.value = err.message || t('logs.clearError')
       }
     }
   })
@@ -252,13 +260,10 @@ const formatTime = (value) => {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`
 }
 
-const levelLabel = (level) => ({
-  error: 'ERROR',
-  warn: 'AVISO',
-  success: 'OK',
-  info: 'INFO',
-  debug: 'DEBUG'
-}[level] || 'INFO')
+const levelLabel = (level) => {
+  const key = 'logs.levelTag' + level.charAt(0).toUpperCase() + level.slice(1)
+  return has(key) ? t(key) : t('logs.levelTagInfo')
+}
 
 onMounted(async () => {
   disposed = false
@@ -280,17 +285,17 @@ onUnmounted(() => {
   <section class="logs-view">
     <section class="logs-hero">
       <div>
-        <span class="hero-kicker"><ScrollText :size="13" /> REGISTRO DE ACTIVIDAD</span>
-        <h2>Qué está haciendo TelegramDL</h2>
+        <span class="hero-kicker"><ScrollText :size="13" /> {{ t('logs.kicker') }}</span>
+        <h2>{{ t('logs.title') }}</h2>
         <p>
-          Cada descarga, error, archivo detectado y cambio de ajustes queda aquí en vivo.
-          <span v-if="logFile" class="log-path" :title="logFile">También se guarda en {{ logFile }}</span>
+          {{ t('logs.text') }}
+          <span v-if="logFile" class="log-path" :title="logFile">{{ t('logs.storedAt', { file: logFile }) }}</span>
         </p>
       </div>
       <div class="logs-counters">
-        <div class="counter"><strong>{{ entries.length }}</strong><span>entradas</span></div>
-        <div class="counter warn" :class="{ muted: !warnCount }"><strong>{{ warnCount }}</strong><span>avisos</span></div>
-        <div class="counter error" :class="{ muted: !errorCount }"><strong>{{ errorCount }}</strong><span>errores</span></div>
+        <div class="counter"><strong>{{ entries.length }}</strong><span>{{ t('logs.entries') }}</span></div>
+        <div class="counter warn" :class="{ muted: !warnCount }"><strong>{{ warnCount }}</strong><span>{{ t('logs.warnings') }}</span></div>
+        <div class="counter error" :class="{ muted: !errorCount }"><strong>{{ errorCount }}</strong><span>{{ t('logs.errors') }}</span></div>
       </div>
     </section>
 
@@ -304,32 +309,32 @@ onUnmounted(() => {
             :class="[level.id, { active: activeLevels.includes(level.id) }]"
             type="button"
             @click="toggleLevel(level.id)"
-          >{{ level.label }}</button>
+          >{{ t(level.labelKey) }}</button>
         </div>
 
         <div class="toolbar-right">
-          <select v-model="category" class="cat-select" aria-label="Filtrar por origen">
-            <option value="all">Todos los orígenes</option>
-            <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+          <select v-model="category" class="cat-select" :aria-label="t('logs.filterSourceAria')">
+            <option value="all">{{ t('logs.allSources') }}</option>
+            <option v-for="cat in categories" :key="cat" :value="cat">{{ categoryLabel(cat) }}</option>
           </select>
 
           <label class="search-box">
             <Search :size="14" />
-            <input v-model="search" type="search" placeholder="Buscar en el registro...">
+            <input v-model="search" type="search" :placeholder="t('logs.searchPlaceholder')">
           </label>
 
-          <button class="tool-button" type="button" :class="{ on: follow }" :title="follow ? 'Pausar el seguimiento automático' : 'Seguir el registro en vivo'" @click="toggleFollow">
+          <button class="tool-button" type="button" :class="{ on: follow }" :title="follow ? t('logs.followTitleOn') : t('logs.followTitleOff')" @click="toggleFollow">
             <Pause v-if="follow" :size="14" />
             <Play v-else :size="14" />
-            {{ follow ? 'En vivo' : 'Pausado' }}
+            {{ follow ? t('logs.live') : t('logs.paused') }}
           </button>
-          <button class="tool-button" type="button" title="Copiar lo que se ve al portapapeles" @click="copyAll">
+          <button class="tool-button" type="button" :title="t('logs.copyTitle')" @click="copyAll">
             <Copy :size="14" />
           </button>
-          <button class="tool-button" type="button" title="Descargar el registro completo" @click="exportFile">
+          <button class="tool-button" type="button" :title="t('logs.exportTitle')" @click="exportFile">
             <Download :size="14" />
           </button>
-          <button class="tool-button danger" type="button" title="Limpiar el registro" @click="clearLogs">
+          <button class="tool-button danger" type="button" :title="t('logs.clearTitle')" @click="clearLogs">
             <Trash2 :size="14" />
           </button>
         </div>
@@ -340,18 +345,18 @@ onUnmounted(() => {
       <div ref="listEl" class="logs-list" @scroll="onScroll">
         <div v-if="!filtered.length" class="empty-state">
           <ScrollText :size="28" />
-          <p>{{ entries.length ? 'Ninguna entrada coincide con el filtro' : 'Todavía no hay actividad registrada' }}</p>
-          <small>{{ entries.length ? 'Prueba a activar más niveles o a limpiar la búsqueda.' : 'En cuanto empieces una descarga aparecerá aquí.' }}</small>
+          <p>{{ entries.length ? t('logs.emptyFiltered') : t('logs.emptyNone') }}</p>
+          <small>{{ entries.length ? t('logs.emptyFilteredHint') : t('logs.emptyNoneHint') }}</small>
         </div>
 
         <p v-else-if="hiddenCount" class="logs-truncated">
-          Mostrando las últimas {{ visible.length }} de {{ filtered.length }} entradas.
+          {{ t('logs.truncated', { shown: visible.length, total: filtered.length }) }}
         </p>
 
         <article v-for="entry in visible" :key="entry.id" class="log-row" :class="entry.level">
           <span class="log-time">{{ formatTime(entry.time) }}</span>
           <span class="log-level" :class="entry.level">{{ levelLabel(entry.level) }}</span>
-          <span class="log-category">{{ entry.category }}</span>
+          <span class="log-category">{{ categoryLabel(entry.category) }}</span>
           <span class="log-body">
             <span class="log-message">{{ entry.message }}</span>
             <small v-if="entry.detail" class="log-detail">{{ entry.detail }}</small>
@@ -360,7 +365,7 @@ onUnmounted(() => {
       </div>
 
       <button v-if="unseen" class="jump-button" type="button" @click="follow = true; scrollToBottom()">
-        <ArrowDownToLine :size="14" /> {{ unseen }} {{ unseen === 1 ? 'entrada nueva' : 'entradas nuevas' }}
+        <ArrowDownToLine :size="14" /> {{ unseen === 1 ? t('logs.newEntry', { n: unseen }) : t('logs.newEntries', { n: unseen }) }}
       </button>
     </section>
 
