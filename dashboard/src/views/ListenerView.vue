@@ -775,32 +775,42 @@ onUnmounted(() => {
                 ><Folder :size="10" /> {{ chatFolder(chat) }}</small
               >
             </div>
-            <label class="auto-toggle switch" :class="{ disabled: saving }">
-              <input
-                type="checkbox"
-                v-model="chat.auto_download"
-                :disabled="saving"
-                @change="save"
-              />
-              <span></span>
-              <b>{{ t('listener.autoLabel') }}</b>
-            </label>
+            <div class="auto-toggle-wrapper" :class="{ active: chat.auto_download }">
+              <label class="auto-toggle switch" :class="{ disabled: saving }">
+                <input
+                  type="checkbox"
+                  v-model="chat.auto_download"
+                  :disabled="saving"
+                  @change="save"
+                />
+                <span></span>
+              </label>
+              <span class="auto-toggle-text">
+                <span class="line1">Descarga</span>
+                <span class="line2">auto</span>
+              </span>
+            </div>
             <div class="chat-name-mode-wrapper">
-              <button
-                type="button"
-                class="chat-name-mode-btn"
-                :class="{
-                  active: chat.name_mode && chat.name_mode !== 'manual',
-                  disabled: saving
-                }"
-                :disabled="saving"
-                @click.stop="toggleChatNameModeMenu(chat)"
-              >
-                <span class="chat-switch-pill">
-                  <span class="chat-switch-thumb"></span>
+              <div class="chat-name-mode-btn-wrapper" :class="{ active: chat.name_mode && chat.name_mode !== 'manual' }">
+                <button
+                  type="button"
+                  class="chat-name-mode-btn"
+                  :class="{
+                    active: chat.name_mode && chat.name_mode !== 'manual',
+                    disabled: saving
+                  }"
+                  :disabled="saving"
+                  @click.stop="toggleChatNameModeMenu(chat)"
+                >
+                  <span class="chat-switch-pill">
+                    <span class="chat-switch-thumb"></span>
+                  </span>
+                </button>
+                <span class="chat-name-mode-text">
+                  <span class="line1">Nombre:</span>
+                  <span class="line2">{{ nameModeLabel(chat.name_mode) }}</span>
                 </span>
-                <b>{{ nameModeLabel(chat.name_mode) }}</b>
-              </button>
+              </div>
               <div
                 v-if="chatNameModeMenus[chatKey(chat)]"
                 class="chat-name-mode-dropdown"
@@ -1483,10 +1493,14 @@ onUnmounted(() => {
 .chat-carpeta svg {
   flex: none;
 }
+.auto-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .auto-toggle {
   display: flex;
   align-items: center;
-  gap: 7px;
   color: var(--user-text-dim);
   cursor: pointer;
   white-space: nowrap;
@@ -1494,30 +1508,50 @@ onUnmounted(() => {
 .auto-toggle span {
   flex: none;
 }
-.auto-toggle b {
-  font-size: 10px;
+.auto-toggle.disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.auto-toggle-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  line-height: 1.1;
+}
+.auto-toggle-text .line1 {
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
   color: var(--user-text-dim);
   transition: color 0.2s;
 }
-.auto-toggle input:checked + span + b {
-  color: var(--user-accent);
+.auto-toggle-text .line2 {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--user-text-dim);
+  transition: color 0.2s;
 }
-.auto-toggle.disabled {
-  cursor: default;
-  opacity: 0.6;
+.auto-toggle-wrapper.active .auto-toggle-text .line1,
+.auto-toggle-wrapper.active .auto-toggle-text .line2 {
+  color: var(--user-accent);
 }
 .chat-name-mode-wrapper {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
+.chat-name-mode-btn-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .chat-name-mode-btn {
   display: flex;
   align-items: center;
-  gap: 7px;
   background: transparent;
   border: 0;
   padding: 0;
@@ -1559,16 +1593,31 @@ onUnmounted(() => {
   left: 18px;
   background: #fff;
 }
-.chat-name-mode-btn b {
-  font-size: 10px;
+.chat-name-mode-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  line-height: 1.1;
+}
+.chat-name-mode-text .line1 {
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
   color: var(--user-text-dim);
   transition: color 0.2s ease;
-  white-space: nowrap;
 }
-.chat-name-mode-btn.active b {
+.chat-name-mode-text .line2 {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--user-text-dim);
+  transition: color 0.2s ease;
+}
+.chat-name-mode-btn-wrapper.active .chat-name-mode-text .line1,
+.chat-name-mode-btn-wrapper.active .chat-name-mode-text .line2 {
   color: var(--user-accent);
 }
 .chat-name-mode-dropdown {
