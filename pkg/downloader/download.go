@@ -333,11 +333,13 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	if parallelChunks && chunkWorkers > 1 {
 		threads = chunkWorkers
 	}
-	// Más workers que conexiones no aporta: las peticiones de sobra se quedan
-	// haciendo cola dentro del cliente igual, y cada una que espera es una
-	// candidata a que Telegram nos frene.
-	if threads > telegram.ConexionesDescarga {
-		threads = telegram.ConexionesDescarga
+	// Más workers que bloques en vuelo no aporta: las peticiones de sobra se
+	// quedan haciendo cola esperando ranura. Con el límite actual de bloques
+	// (ConexionesDescarga * 8 = 64), permitimos hasta la mitad del límite global
+	// por descarga para que con pocas descargas trabajen a pleno rendimiento.
+	maxThreads := telegram.ConexionesDescarga * 4
+	if threads > maxThreads {
+		threads = maxThreads
 	}
 
 	// Los bloques salen por el grupo de conexiones de descarga; los metadatos
@@ -352,7 +354,7 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	cliente := envolverCliente(clienteDatos)
 
 	logbus.Debug(logbus.CatDownloads,
-		i18n.T("downloads.downloadingWorkers", finalName, threads, telegram.ConexionesDescarga),
+		i18n.T("downloads.downloadingWorkers", finalName, threads, maxThreads),
 		i18n.T("downloads.blocksDetail", downloadPartSize/1024, len(resumeChunks)))
 
 	writer := &progressWriterAt{

@@ -31,9 +31,10 @@ import (
 // acelera nada —la cola se forma igual, solo que dentro del cliente— y es la
 // forma más segura de que Telegram empiece a contestar FLOOD_WAIT.
 //
-// Dos por conexión es lo que hace falta para que ninguna se quede parada
-// esperando la ida y vuelta de la anterior.
-var maxBloquesEnVuelo = telegram.ConexionesDescarga * 2
+// Ocho por conexión permite que las descargas con pocos workers trabajen a
+// pleno rendimiento mientras se mantiene un límite razonable cuando se usan
+// muchas descargas a la vez.
+var maxBloquesEnVuelo = telegram.ConexionesDescarga * 8
 
 // bloquesEnVuelo reparte esas ranuras entre todos los workers del programa.
 var bloquesEnVuelo = make(chan struct{}, maxBloquesEnVuelo)
@@ -166,10 +167,10 @@ func (c clienteBloques) UploadGetFile(ctx context.Context, request *tg.UploadGet
 			i18n.T("downloads.floodWaitDetail",
 				request.Offset, intento+1, intentosPorFlood))
 
-		// El segundo extra es margen para no volver justo en el borde y que nos
-		// lo repitan. La espera la cumple la puerta al principio de la vuelta
-		// siguiente, y la cumplen todos los workers a la vez.
-		cerrarPuertaFlood(espera + time.Second)
+		// 500ms extra es margen suficiente para no volver justo al borde. La espera
+		// la cumple la puerta al principio de la vuelta siguiente, y la cumplen
+		// todos los workers a la vez.
+		cerrarPuertaFlood(espera + 500*time.Millisecond)
 	}
 
 	return respuesta, err

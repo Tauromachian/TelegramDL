@@ -432,7 +432,7 @@ func DefaultConfig() Config {
 	return Config{
 		MaxConcurrentDownloads: 6,
 		ParallelChunks:         true,
-		ChunkWorkers:           4,
+		ChunkWorkers:           6,
 		DownloadFolder:         GetDefaultDownloadFolder(),
 		OrganizeByChat:         true,
 		ColorID:                nil,
@@ -548,8 +548,8 @@ func NormalizeConfig(raw Config) Config {
 
 	if raw.ChunkWorkers < 1 {
 		raw.ChunkWorkers = 1
-	} else if raw.ChunkWorkers > 8 {
-		raw.ChunkWorkers = 8
+	} else if raw.ChunkWorkers > 16 {
+		raw.ChunkWorkers = 16
 	}
 
 	if strings.TrimSpace(raw.DownloadFolder) == "" {
