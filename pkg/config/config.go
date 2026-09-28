@@ -66,7 +66,10 @@ type ListenerChat struct {
 	// TopicFolder es lo mismo para el tema, y cuelga de Folder.
 	Folder              string `json:"folder,omitempty"`
 	TopicFolder         string `json:"topic_folder,omitempty"`
-	ManualNameSelection bool   `json:"manual_name_selection"`
+	// NameMode indica cómo se selecciona el nombre del archivo: "manual" (elige
+	// archivo por archivo), "original" (usa siempre el nombre original) o
+	// "caption" (usa siempre el caption). Por defecto es "manual".
+	NameMode            string `json:"name_mode,omitempty"`
 }
 
 // CarpetaRelativa es la ruta, relativa a la carpeta de descargas, donde van los

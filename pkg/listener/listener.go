@@ -714,12 +714,21 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 	// el mismo segundo: así la bandeja conserva el orden real de llegada.
 	now := float64(time.Now().UnixNano()) / 1e9
 
+	// Seleccionar el nombre inicial según el modo configurado
+	initialFileName := mediaInfo.FileName
+	if chatCfg.NameMode == "caption" && mediaInfo.CaptionFileName != "" {
+		initialFileName = mediaInfo.CaptionFileName
+	} else if chatCfg.NameMode == "original" && mediaInfo.OriginalFileName != "" {
+		initialFileName = mediaInfo.OriginalFileName
+	}
+	// Para "manual" (o fallback), se usa el nombre predeterminado
+
 	dlItem := storage.DownloadItem{
 		ID:               itemID,
 		JobID:            fmt.Sprintf("listener:%d", peerID),
 		MessageID:        int64(msg.ID),
 		ChatID:           peerID,
-		FileName:         mediaInfo.FileName,
+		FileName:         initialFileName,
 		CaptionFileName:  mediaInfo.CaptionFileName,
 		OriginalFileName: mediaInfo.OriginalFileName,
 		Status:           "available",
@@ -761,7 +770,7 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 			TopicID:          chatCfg.Topic(),
 			TopicName:        chatCfg.TopicLabel(),
 			SubFolder:        subCarpeta,
-			FileName:         mediaInfo.FileName,
+			FileName:         initialFileName,
 			CaptionFileName:  mediaInfo.CaptionFileName,
 			OriginalFileName: mediaInfo.OriginalFileName,
 			Kind:             string(mediaInfo.Kind),

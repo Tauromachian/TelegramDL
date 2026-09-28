@@ -165,8 +165,17 @@ func (s *Storage) initSchema() error {
 	for _, col := range []string{"folder", "topic_folder"} {
 		_, _ = s.db.Exec(fmt.Sprintf("ALTER TABLE listener_chats ADD COLUMN %s TEXT NOT NULL DEFAULT ''", col))
 	}
-	// Selección manual de nombres para archivos de la escucha
-	_, _ = s.db.Exec("ALTER TABLE listener_chats ADD COLUMN manual_name_selection INTEGER NOT NULL DEFAULT 0")
+	// Selección de nombres para archivos de la escucha: "manual", "original" o "caption"
+	_, _ = s.db.Exec("ALTER TABLE listener_chats ADD COLUMN name_mode TEXT NOT NULL DEFAULT 'manual'")
+	// Migración: si existe la columna antigua manual_name_selection, convertirla a name_mode
+	cols, err := s.tableColumns("listener_chats")
+	if err == nil {
+		if cols["manual_name_selection"] {
+			// Migrar datos: manual_name_selection = 1 -> 'manual', = 0 -> 'original' (como antes se activaba solo para selección manual)
+			_, _ = s.db.Exec("UPDATE listener_chats SET name_mode = CASE WHEN manual_name_selection = 1 THEN 'manual' ELSE 'original' END")
+			// Eliminar la columna antigua (SQLite no soporta DROP COLUMN en todas las versiones, así que la dejamos)
+		}
+	}
 
 	if err := s.migrateListenerTopics(); err != nil {
 		return err
@@ -193,7 +202,7 @@ const listenerChatsSchema = `
 		f_audios INTEGER NOT NULL DEFAULT 1,
 		f_docs INTEGER NOT NULL DEFAULT 1,
 		f_stickers INTEGER NOT NULL DEFAULT 1,
-		manual_name_selection INTEGER NOT NULL DEFAULT 0,
+		name_mode TEXT NOT NULL DEFAULT 'manual',
 		PRIMARY KEY(chat_id, topic_id)
 	);
 `
@@ -246,10 +255,10 @@ func (s *Storage) migrateListenerTopics() error {
 		listenerChatsSchema,
 		`INSERT OR IGNORE INTO listener_chats(
 			chat_id, topic_id, topic_name, name, auto_download,
-			f_photos, f_videos, f_audios, f_docs, f_stickers, manual_name_selection
+			f_photos, f_videos, f_audios, f_docs, f_stickers, name_mode
 		)
 		SELECT chat_id, 0, '', name, auto_download,
-			f_photos, f_videos, f_audios, f_docs, f_stickers, 0
+			f_photos, f_videos, f_audios, f_docs, f_stickers, 'manual'
 		FROM listener_chats_legacy`,
 		"DROP TABLE listener_chats_legacy",
 	}
@@ -557,16 +566,16 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 	}
 
 	// Cargar listener_chats
-	chatRows, err := s.db.Query("SELECT chat_id, topic_id, topic_name, name, folder, topic_folder, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers, manual_name_selection FROM listener_chats ORDER BY chat_id, topic_id")
+	chatRows, err := s.db.Query("SELECT chat_id, topic_id, topic_name, name, folder, topic_folder, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers, name_mode FROM listener_chats ORDER BY chat_id, topic_id")
 	if err == nil {
 		defer chatRows.Close()
 		chats := make([]config.ListenerChat, 0)
 		for chatRows.Next() {
 			var c config.ListenerChat
 			var topicID int64
-			var topicName, folder, topicFolder string
-			var auto, photos, videos, audios, docs, stickers, manualNameSelection int
-			if err := chatRows.Scan(&c.ID, &topicID, &topicName, &c.Name, &folder, &topicFolder, &auto, &photos, &videos, &audios, &docs, &stickers, &manualNameSelection); err == nil {
+			var topicName, folder, topicFolder, nameMode string
+			var auto, photos, videos, audios, docs, stickers int
+			if err := chatRows.Scan(&c.ID, &topicID, &topicName, &c.Name, &folder, &topicFolder, &auto, &photos, &videos, &audios, &docs, &stickers, &nameMode); err == nil {
 				c.TopicID = config.TopicPointer(topicID)
 				if c.HasTopic() {
 					c.TopicName = topicName
@@ -574,7 +583,10 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 				}
 				c.Folder = folder
 				c.AutoDownload = auto != 0
-				c.ManualNameSelection = manualNameSelection != 0
+				c.NameMode = nameMode
+				if c.NameMode == "" {
+					c.NameMode = "manual"
+				}
 				c.FPhotos = photos != 0
 				c.FVideos = videos != 0
 				c.FAudios = audios != 0
@@ -623,10 +635,14 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 						c.FAudios = true
 						c.FDocs = true
 						c.FStickers = true
+						nameMode := c.NameMode
+						if nameMode == "" {
+							nameMode = "manual"
+						}
 						_, _ = s.db.Exec(`
-							INSERT OR REPLACE INTO listener_chats(chat_id, topic_id, topic_name, name, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers, manual_name_selection)
+							INSERT OR REPLACE INTO listener_chats(chat_id, topic_id, topic_name, name, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers, name_mode)
 							VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-						`, c.ID, c.Topic(), c.TopicName, c.Name, c.AutoDownload, c.FPhotos, c.FVideos, c.FAudios, c.FDocs, c.FStickers, c.ManualNameSelection)
+						`, c.ID, c.Topic(), c.TopicName, c.Name, c.AutoDownload, c.FPhotos, c.FVideos, c.FAudios, c.FDocs, c.FStickers, nameMode)
 						cfg.ListenerChats = append(cfg.ListenerChats, c)
 					}
 				}
@@ -691,7 +707,7 @@ func (s *Storage) SaveConfig(cfg config.Config) error {
 		if c.AutoDownload {
 			auto = 1
 		}
-		fPhotos, fVideos, fAudios, fDocs, fStickers, fManualNameSelection := 1, 1, 1, 1, 1, 0
+		fPhotos, fVideos, fAudios, fDocs, fStickers := 1, 1, 1, 1, 1
 		if !c.FPhotos {
 			fPhotos = 0
 		}
@@ -707,11 +723,10 @@ func (s *Storage) SaveConfig(cfg config.Config) error {
 		if !c.FStickers {
 			fStickers = 0
 		}
-		if c.ManualNameSelection {
-			fManualNameSelection = 1
-		}
-		if !c.ManualNameSelection {
-			fManualNameSelection = 0
+
+		nameMode := c.NameMode
+		if nameMode == "" {
+			nameMode = "manual"
 		}
 
 		name := c.Name
@@ -720,9 +735,9 @@ func (s *Storage) SaveConfig(cfg config.Config) error {
 		}
 
 		_, err := tx.Exec(`
-			INSERT OR REPLACE INTO listener_chats(chat_id, topic_id, topic_name, name, folder, topic_folder, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers, manual_name_selection)
+			INSERT OR REPLACE INTO listener_chats(chat_id, topic_id, topic_name, name, folder, topic_folder, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers, name_mode)
 			VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, c.ID, c.Topic(), c.TopicName, name, c.Folder, c.TopicFolder, auto, fPhotos, fVideos, fAudios, fDocs, fStickers, fManualNameSelection)
+		`, c.ID, c.Topic(), c.TopicName, name, c.Folder, c.TopicFolder, auto, fPhotos, fVideos, fAudios, fDocs, fStickers, nameMode)
 		if err != nil {
 			return err
 		}

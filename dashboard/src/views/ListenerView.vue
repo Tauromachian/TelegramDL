@@ -48,7 +48,7 @@ watch(() => props.settings.listener_chats, (newVal) => {
     chats.value = (newVal || []).map(chat => ({
       ...chat,
       auto_download: !!chat.auto_download,
-      manual_name_selection: !!chat.manual_name_selection,
+      name_mode: chat.name_mode || 'manual',
       f_photos: chat.f_photos ?? true,
       f_videos: chat.f_videos ?? true,
       f_audios: chat.f_audios ?? true,
@@ -58,8 +58,9 @@ watch(() => props.settings.listener_chats, (newVal) => {
   }
 }, { deep: true })
 
-watch(() => props.initialItems, (newItems) => {
+watch(() => props.initialItems, async (newItems) => {
   items.value = newItems
+  await applyAutomaticNamesAll()
 }, { deep: true })
 
 // Una entrada de escucha se identifica por el grupo Y el tema: el mismo grupo
@@ -126,7 +127,7 @@ const load = async () => {
     chats.value = (settings.chats || []).map(chat => ({
       ...chat,
       auto_download: !!chat.auto_download,
-      manual_name_selection: !!chat.manual_name_selection,
+      name_mode: chat.name_mode || 'manual',
       f_photos: chat.f_photos ?? true,
       f_videos: chat.f_videos ?? true,
       f_audios: chat.f_audios ?? true,
@@ -134,6 +135,7 @@ const load = async () => {
       f_stickers: chat.f_stickers ?? true
     }))
     items.value = detected
+    await applyAutomaticNamesAll()
     error.value = ''
   } catch (e) { console.error(e) }
 }
@@ -151,7 +153,7 @@ const save = async () => {
       chats.value = data.chats.map(chat => ({
         ...chat,
         auto_download: !!chat.auto_download,
-        manual_name_selection: !!chat.manual_name_selection,
+        name_mode: chat.name_mode || 'manual',
         f_photos: chat.f_photos ?? true,
         f_videos: chat.f_videos ?? true,
         f_audios: chat.f_audios ?? true,
@@ -397,7 +399,7 @@ const getChatName = item => {
 const hasManualNameSelection = item => {
   const found = chats.value.find(c => String(c.id) === String(item.chat_id) && Number(c.topic_id || 0) === Number(item.topic_id || 0))
     || chats.value.find(c => String(c.id) === String(item.chat_id))
-  return !!(found && found.manual_name_selection)
+  return !!(found && found.name_mode === 'manual')
 }
 
 const toggleNameMenu = (itemId) => {
@@ -461,6 +463,60 @@ const selectBulkFileName = async (type) => {
   }
 }
 
+const applyAutomaticNamesForChat = async (chat) => {
+  if (!chat || !chat.name_mode || chat.name_mode === 'manual') return
+
+  const targetMode = chat.name_mode
+  const matchingItems = items.value.filter(item => {
+    if (item.status !== 'available') return false
+    const matchChat = String(item.chat_id) === String(chat.id)
+    const matchTopic = Number(chat.topic_id || 0) === Number(item.topic_id || 0)
+    return matchChat && matchTopic
+  })
+
+  for (const item of matchingItems) {
+    let targetName = null
+    if (targetMode === 'caption' && item.caption_file_name) {
+      targetName = item.caption_file_name
+    } else if (targetMode === 'original' && item.original_file_name) {
+      targetName = item.original_file_name
+    }
+
+    if (targetName && item.file_name !== targetName) {
+      try {
+        await api('/api/listener/update-filename', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.id, file_name: targetName })
+        })
+        item.file_name = targetName
+      } catch (err) {
+        console.error(`Error actualizando nombre para ${item.id}:`, err)
+      }
+    }
+  }
+}
+
+const applyAutomaticNamesAll = async () => {
+  if (!chats.value || !items.value) return
+  for (const chat of chats.value) {
+    if (chat.name_mode && chat.name_mode !== 'manual') {
+      await applyAutomaticNamesForChat(chat)
+    }
+  }
+}
+
+const onNameModeChange = async (chat) => {
+  await save()
+  await applyAutomaticNamesForChat(chat)
+}
+
+const nameModeLabel = (mode) => {
+  if (mode === 'original') return t('listener.nameModeOriginal')
+  if (mode === 'caption') return t('listener.nameModeCaption')
+  return t('listener.nameModeManual')
+}
+
 
 const handleClickOutside = (e) => {
   if (!e.target.closest('.name-select-wrapper') && !e.target.closest('.bulk-name-wrapper')) {
@@ -517,11 +573,23 @@ onUnmounted(() => {
               <span></span>
               <b>{{ t('listener.autoLabel') }}</b>
             </label>
-            <label class="auto-toggle switch" :class="{ disabled: saving }" :title="t('listener.manualNameTip')">
-              <input type="checkbox" v-model="chat.manual_name_selection" :disabled="saving" @change="save">
-              <span></span>
-              <b>{{ t('listener.nameLabel') }}</b>
-            </label>
+            <div class="name-mode-selector" :class="{ disabled: saving }">
+              <div class="name-mode-label">{{ t('listener.nameLabel') }}: <span class="active-mode-text">{{ nameModeLabel(chat.name_mode) }}</span></div>
+              <div class="name-mode-options">
+                <label class="name-mode-option" :class="{ active: chat.name_mode === 'manual' }">
+                  <input type="radio" :name="`name-mode-${chatKey(chat)}`" value="manual" v-model="chat.name_mode" :disabled="saving" @change="onNameModeChange(chat)">
+                  <span>{{ t('listener.nameModeManual') }}</span>
+                </label>
+                <label class="name-mode-option" :class="{ active: chat.name_mode === 'original' }">
+                  <input type="radio" :name="`name-mode-${chatKey(chat)}`" value="original" v-model="chat.name_mode" :disabled="saving" @change="onNameModeChange(chat)">
+                  <span>{{ t('listener.nameModeOriginal') }}</span>
+                </label>
+                <label class="name-mode-option" :class="{ active: chat.name_mode === 'caption' }">
+                  <input type="radio" :name="`name-mode-${chatKey(chat)}`" value="caption" v-model="chat.name_mode" :disabled="saving" @change="onNameModeChange(chat)">
+                  <span>{{ t('listener.nameModeCaption') }}</span>
+                </label>
+              </div>
+            </div>
             <button :disabled="saving" @click="removeChat(chat)" :aria-label="t('listener.removeChatAria')"><Trash2 :size="14" /></button>
           </div>
           <div class="chat-filters">
@@ -655,7 +723,7 @@ onUnmounted(() => {
 .topic-picker-actions .save-button{width:auto;margin:0;padding:0 15px}
 .ghost-button{border:1px solid var(--user-border-light);background:transparent;color:var(--user-text-dim);border-radius:9px;padding:0 15px;font:inherit;font-size:12px;cursor:pointer}
 .ghost-button:hover{color:#dbe7f5;border-color:var(--user-primary)}
-.chat-details{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.chat-details strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-details small{color:var(--user-text-dim);font-size:10px}.chat-carpeta{display:flex;align-items:center;gap:4px;color:var(--user-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-carpeta svg{flex:none}.auto-toggle{display:flex;align-items:center;gap:7px;color:var(--user-text-dim);cursor:pointer;white-space:nowrap}.auto-toggle span{flex:none}.auto-toggle b{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--user-text-dim);transition:color .2s}.auto-toggle input:checked+span+b{color:var(--user-accent)}.auto-toggle.disabled{cursor:default;opacity:.6}
+.chat-details{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.chat-details strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-details small{color:var(--user-text-dim);font-size:10px}.chat-carpeta{display:flex;align-items:center;gap:4px;color:var(--user-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-carpeta svg{flex:none}.auto-toggle{display:flex;align-items:center;gap:7px;color:var(--user-text-dim);cursor:pointer;white-space:nowrap}.auto-toggle span{flex:none}.auto-toggle b{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--user-text-dim);transition:color .2s}.auto-toggle input:checked+span+b{color:var(--user-accent)}.auto-toggle.disabled{cursor:default;opacity:.6}.name-mode-selector{display:flex;flex-direction:column;gap:4px}.name-mode-selector.disabled{opacity:.6;pointer-events:none}.name-mode-label{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--user-text-dim)}.name-mode-label .active-mode-text{color:var(--user-accent);font-weight:700}.name-mode-options{display:flex;gap:4px}.name-mode-option{display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;border:1px solid var(--user-border-light);background:var(--user-bg-base);cursor:pointer;transition:all .2s;font-size:10px;color:var(--user-text-dim)}.name-mode-option input{display:none}.name-mode-option:hover{border-color:var(--user-primary);background:var(--user-icon-bg)}.name-mode-option.active{background:var(--user-icon-bg);border-color:var(--user-primary);color:var(--user-accent);font-weight:600}
 .file-symbol{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;border:1px solid var(--user-border);flex-shrink:0;transition:all .2s ease}
 .media-badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-right:6px;border:1px solid transparent;vertical-align:middle}
 .media-photo{color:#38bdf8;background:rgba(56,189,248,.12);border-color:rgba(56,189,248,.3)}
