@@ -19,6 +19,7 @@ const props = defineProps({
 // Estado local para el menú de selección de nombre por archivo
 const nameSelectionMenus = ref({})
 const bulkNameMenuOpen = ref(false)
+const chatNameModeMenus = ref({})
 
 const enabled = ref(props.settings.listener_enabled)
 const chats = ref(props.settings.listener_chats || [])
@@ -36,6 +37,7 @@ watch(() => props.active, (newActive) => {
   if (!newActive) {
     nameSelectionMenus.value = {}
     bulkNameMenuOpen.value = false
+    chatNameModeMenus.value = {}
   }
 })
 
@@ -517,11 +519,24 @@ const nameModeLabel = (mode) => {
   return t('listener.nameModeManual')
 }
 
+const toggleChatNameModeMenu = (chat) => {
+  const key = chatKey(chat)
+  const isCurrentlyOpen = !!chatNameModeMenus.value[key]
+  chatNameModeMenus.value = { [key]: !isCurrentlyOpen }
+}
+
+const selectChatNameMode = async (chat, mode) => {
+  chatNameModeMenus.value = {}
+  if (chat.name_mode === mode) return
+  chat.name_mode = mode
+  await onNameModeChange(chat)
+}
 
 const handleClickOutside = (e) => {
-  if (!e.target.closest('.name-select-wrapper') && !e.target.closest('.bulk-name-wrapper')) {
+  if (!e.target.closest('.name-select-wrapper') && !e.target.closest('.bulk-name-wrapper') && !e.target.closest('.chat-name-mode-wrapper')) {
     nameSelectionMenus.value = {}
     bulkNameMenuOpen.value = false
+    chatNameModeMenus.value = {}
   }
 }
 
@@ -535,6 +550,7 @@ onUnmounted(() => {
   disposed = true;
   window.removeEventListener('click', handleClickOutside);
   nameSelectionMenus.value = {};
+  chatNameModeMenus.value = {};
   clearInterval(timer);
 })
 </script>
@@ -573,21 +589,41 @@ onUnmounted(() => {
               <span></span>
               <b>{{ t('listener.autoLabel') }}</b>
             </label>
-            <div class="name-mode-selector" :class="{ disabled: saving }">
-              <div class="name-mode-label">{{ t('listener.nameLabel') }}: <span class="active-mode-text">{{ nameModeLabel(chat.name_mode) }}</span></div>
-              <div class="name-mode-options">
-                <label class="name-mode-option" :class="{ active: chat.name_mode === 'manual' }">
-                  <input type="radio" :name="`name-mode-${chatKey(chat)}`" value="manual" v-model="chat.name_mode" :disabled="saving" @change="onNameModeChange(chat)">
+            <div class="chat-name-mode-wrapper">
+              <button
+                type="button"
+                class="chat-name-mode-btn"
+                :class="{ active: chat.name_mode && chat.name_mode !== 'manual', disabled: saving }"
+                :disabled="saving"
+                @click.stop="toggleChatNameModeMenu(chat)"
+              >
+                <span class="chat-switch-pill">
+                  <span class="chat-switch-thumb"></span>
+                </span>
+                <b>{{ nameModeLabel(chat.name_mode) }}</b>
+              </button>
+              <div v-if="chatNameModeMenus[chatKey(chat)]" class="chat-name-mode-dropdown" @click.stop>
+                <div
+                  class="chat-name-mode-item"
+                  :class="{ active: chat.name_mode === 'manual' }"
+                  @click="selectChatNameMode(chat, 'manual')"
+                >
                   <span>{{ t('listener.nameModeManual') }}</span>
-                </label>
-                <label class="name-mode-option" :class="{ active: chat.name_mode === 'original' }">
-                  <input type="radio" :name="`name-mode-${chatKey(chat)}`" value="original" v-model="chat.name_mode" :disabled="saving" @change="onNameModeChange(chat)">
+                </div>
+                <div
+                  class="chat-name-mode-item"
+                  :class="{ active: chat.name_mode === 'original' }"
+                  @click="selectChatNameMode(chat, 'original')"
+                >
                   <span>{{ t('listener.nameModeOriginal') }}</span>
-                </label>
-                <label class="name-mode-option" :class="{ active: chat.name_mode === 'caption' }">
-                  <input type="radio" :name="`name-mode-${chatKey(chat)}`" value="caption" v-model="chat.name_mode" :disabled="saving" @change="onNameModeChange(chat)">
+                </div>
+                <div
+                  class="chat-name-mode-item"
+                  :class="{ active: chat.name_mode === 'caption' }"
+                  @click="selectChatNameMode(chat, 'caption')"
+                >
                   <span>{{ t('listener.nameModeCaption') }}</span>
-                </label>
+                </div>
               </div>
             </div>
             <button :disabled="saving" @click="removeChat(chat)" :aria-label="t('listener.removeChatAria')"><Trash2 :size="14" /></button>
@@ -723,7 +759,19 @@ onUnmounted(() => {
 .topic-picker-actions .save-button{width:auto;margin:0;padding:0 15px}
 .ghost-button{border:1px solid var(--user-border-light);background:transparent;color:var(--user-text-dim);border-radius:9px;padding:0 15px;font:inherit;font-size:12px;cursor:pointer}
 .ghost-button:hover{color:#dbe7f5;border-color:var(--user-primary)}
-.chat-details{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.chat-details strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-details small{color:var(--user-text-dim);font-size:10px}.chat-carpeta{display:flex;align-items:center;gap:4px;color:var(--user-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-carpeta svg{flex:none}.auto-toggle{display:flex;align-items:center;gap:7px;color:var(--user-text-dim);cursor:pointer;white-space:nowrap}.auto-toggle span{flex:none}.auto-toggle b{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--user-text-dim);transition:color .2s}.auto-toggle input:checked+span+b{color:var(--user-accent)}.auto-toggle.disabled{cursor:default;opacity:.6}.name-mode-selector{display:flex;flex-direction:column;gap:4px}.name-mode-selector.disabled{opacity:.6;pointer-events:none}.name-mode-label{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--user-text-dim)}.name-mode-label .active-mode-text{color:var(--user-accent);font-weight:700}.name-mode-options{display:flex;gap:4px}.name-mode-option{display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;border:1px solid var(--user-border-light);background:var(--user-bg-base);cursor:pointer;transition:all .2s;font-size:10px;color:var(--user-text-dim)}.name-mode-option input{display:none}.name-mode-option:hover{border-color:var(--user-primary);background:var(--user-icon-bg)}.name-mode-option.active{background:var(--user-icon-bg);border-color:var(--user-primary);color:var(--user-accent);font-weight:600}
+.chat-details{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.chat-details strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-details small{color:var(--user-text-dim);font-size:10px}.chat-carpeta{display:flex;align-items:center;gap:4px;color:var(--user-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-carpeta svg{flex:none}.auto-toggle{display:flex;align-items:center;gap:7px;color:var(--user-text-dim);cursor:pointer;white-space:nowrap}.auto-toggle span{flex:none}.auto-toggle b{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--user-text-dim);transition:color .2s}.auto-toggle input:checked+span+b{color:var(--user-accent)}.auto-toggle.disabled{cursor:default;opacity:.6}.chat-name-mode-wrapper{position:relative;display:inline-flex;align-items:center}
+.chat-name-mode-btn{display:flex;align-items:center;gap:7px;background:transparent;border:0;padding:0;cursor:pointer;outline:none;font:inherit;user-select:none}
+.chat-name-mode-btn.disabled{opacity:.6;cursor:default}
+.chat-switch-pill{display:block;width:35px;height:20px;background:var(--user-border-light);border-radius:999px;position:relative;transition:background .2s ease;flex-shrink:0}
+.chat-switch-thumb{position:absolute;width:14px;height:14px;top:3px;left:3px;background:#9bb0c7;border-radius:50%;transition:left .2s ease,background .2s ease}
+.chat-name-mode-btn.active .chat-switch-pill{background:var(--user-primary)}
+.chat-name-mode-btn.active .chat-switch-thumb{left:18px;background:#fff}
+.chat-name-mode-btn b{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--user-text-dim);transition:color .2s ease;white-space:nowrap}
+.chat-name-mode-btn.active b{color:var(--user-accent)}
+.chat-name-mode-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:var(--user-surface);border:1px solid var(--user-primary);border-radius:10px;padding:6px;min-width:125px;z-index:1000;box-shadow:0 8px 20px rgba(0,0,0,0.4);display:flex;flex-direction:column;gap:4px;animation:fadeIn .15s ease-out}
+.chat-name-mode-item{padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;color:var(--user-text-dim);cursor:pointer;transition:all .15s ease;display:flex;align-items:center;justify-content:space-between}
+.chat-name-mode-item:hover{background:var(--user-icon-bg);color:#d6e4f1}
+.chat-name-mode-item.active{background:var(--user-icon-bg);color:var(--user-accent)}
 .file-symbol{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;border:1px solid var(--user-border);flex-shrink:0;transition:all .2s ease}
 .media-badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-right:6px;border:1px solid transparent;vertical-align:middle}
 .media-photo{color:#38bdf8;background:rgba(56,189,248,.12);border-color:rgba(56,189,248,.3)}
