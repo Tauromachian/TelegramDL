@@ -10,7 +10,7 @@ package server
 // administrador se pide con AppleScript sobre System Events.
 
 import (
-	"fmt"
+	"errors"
 	"os/exec"
 	"runtime"
 
@@ -30,5 +30,5 @@ func shutdownSystem() error {
 	if _, err := exec.LookPath("shutdown"); err == nil {
 		return exec.Command("shutdown", "-h", "now").Start()
 	}
-	return fmt.Errorf(i18n.T("server.shutdownToolNotFound"))
+	return errors.New(i18n.T("server.shutdownToolNotFound"))
 }

@@ -580,7 +580,7 @@ func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 
 func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 	if rel == nil || strings.TrimSpace(rel.asset.DownloadURL) == "" {
-		return fmt.Errorf(i18n.T("updater.updateInfoInvalid"))
+		return errors.New(i18n.T("updater.updateInfoInvalid"))
 	}
 	asset := rel.asset
 
