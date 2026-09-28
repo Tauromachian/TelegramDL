@@ -19,6 +19,8 @@ import {
 } from '../icons'
 import { useI18n } from '../i18n'
 
+import AppPill from '../components/AppPill.vue'
+
 const { t, has } = useI18n()
 
 const props = defineProps({
@@ -55,12 +57,13 @@ const emit = defineEmits([
 
 const inputUrl = ref('')
 
-const statusPriority = status => ({
-  downloading: 2,
-  paused: 2,
-  queued: 2,
-  pending: 2
-}[status] || 1)
+const statusPriority = (status) =>
+  ({
+    downloading: 2,
+    paused: 2,
+    queued: 2,
+    pending: 2
+  })[status] || 1
 
 const compareDownloads = (a, b) => {
   const sA = statusPriority(a.status)
@@ -87,10 +90,14 @@ const compareDownloads = (a, b) => {
   return (b.updated_at || 0) - (a.updated_at || 0)
 }
 
-const orderedDownloads = computed(() => [...props.downloads].sort(compareDownloads))
+const orderedDownloads = computed(() =>
+  [...props.downloads].sort(compareDownloads)
+)
 
 const monitorDownloads = computed(() =>
-  orderedDownloads.value.filter(item => ['downloading', 'paused', 'pending', 'queued'].includes(item.status))
+  orderedDownloads.value.filter((item) =>
+    ['downloading', 'paused', 'pending', 'queued'].includes(item.status)
+  )
 )
 
 const handleStart = () => {
@@ -101,11 +108,15 @@ const handleStart = () => {
 }
 
 const activeDownloads = computed(() =>
-  orderedDownloads.value.filter(item => ['downloading', 'paused'].includes(item.status))
+  orderedDownloads.value.filter((item) =>
+    ['downloading', 'paused'].includes(item.status)
+  )
 )
 
 const pendingDownloads = computed(() =>
-  orderedDownloads.value.filter(item => ['pending', 'queued'].includes(item.status))
+  orderedDownloads.value.filter((item) =>
+    ['pending', 'queued'].includes(item.status)
+  )
 )
 
 // --- Historial paginado -----------------------------------------------------
@@ -131,14 +142,19 @@ const paginaHistorial = ref(1)
 
 // Al cambiar el tamaño, la página en la que estabas ya no significa lo mismo:
 // se vuelve al principio.
-watch(tamanoPagina, tamano => {
+watch(tamanoPagina, (tamano) => {
   paginaHistorial.value = 1
-  try { localStorage.setItem(CLAVE_TAMANO, tamano) } catch (e) { console.error(e) }
+  try {
+    localStorage.setItem(CLAVE_TAMANO, tamano)
+  } catch (e) {
+    console.error(e)
+  }
 })
 
 const historyDownloads = computed(() =>
-  orderedDownloads.value
-    .filter(item => ['completed', 'skipped', 'failed', 'cancelled'].includes(item.status))
+  orderedDownloads.value.filter((item) =>
+    ['completed', 'skipped', 'failed', 'cancelled'].includes(item.status)
+  )
 )
 
 const totalPaginas = computed(() =>
@@ -147,7 +163,7 @@ const totalPaginas = computed(() =>
 
 // Al borrar elementos la última página puede desaparecer: si estábamos en ella,
 // retrocedemos para no quedarnos mirando una lista vacía.
-watch(totalPaginas, total => {
+watch(totalPaginas, (total) => {
   if (paginaHistorial.value > total) paginaHistorial.value = total
 })
 
@@ -162,21 +178,24 @@ const paginasVisibles = computed(() => {
   const total = totalPaginas.value
   const maximo = 5
   if (total <= maximo) return Array.from({ length: total }, (_, i) => i + 1)
-  const fin = Math.min(total, Math.max(1, paginaHistorial.value - 2) + maximo - 1)
+  const fin = Math.min(
+    total,
+    Math.max(1, paginaHistorial.value - 2) + maximo - 1
+  )
   const inicio = Math.max(1, fin - maximo + 1)
   return Array.from({ length: fin - inicio + 1 }, (_, i) => inicio + i)
 })
 
-const irAPagina = pagina => {
+const irAPagina = (pagina) => {
   paginaHistorial.value = Math.min(totalPaginas.value, Math.max(1, pagina))
 }
 
-const completedCount = computed(() =>
-  props.downloads.filter(item => item.status === 'completed').length
+const completedCount = computed(
+  () => props.downloads.filter((item) => item.status === 'completed').length
 )
 
-const skippedCount = computed(() =>
-  props.downloads.filter(item => item.status === 'skipped').length
+const skippedCount = computed(
+  () => props.downloads.filter((item) => item.status === 'skipped').length
 )
 
 // El estado llega del backend; si apareciera uno sin traducción (p. ej.
@@ -185,15 +204,23 @@ const skippedCount = computed(() =>
 const statusText = (status) =>
   has('downloads.status.' + status) ? t('downloads.status.' + status) : status
 
-const progress = (item) => Math.max(0, Math.min(100, Number(item.progress || 0)))
+const progress = (item) =>
+  Math.max(0, Math.min(100, Number(item.progress || 0)))
 
 const hasActiveOrQueued = computed(() =>
-  props.downloads.some(item => ['downloading', 'queued', 'pending'].includes(item.status))
+  props.downloads.some((item) =>
+    ['downloading', 'queued', 'pending'].includes(item.status)
+  )
 )
 
 const allActivePaused = computed(() => {
-  const activeItems = props.downloads.filter(item => ['downloading', 'queued', 'pending', 'paused'].includes(item.status))
-  return activeItems.length > 0 && activeItems.every(item => item.status === 'paused')
+  const activeItems = props.downloads.filter((item) =>
+    ['downloading', 'queued', 'pending', 'paused'].includes(item.status)
+  )
+  return (
+    activeItems.length > 0 &&
+    activeItems.every((item) => item.status === 'paused')
+  )
 })
 </script>
 
@@ -218,7 +245,9 @@ const allActivePaused = computed(() => {
           :disabled="loading || !inputUrl.trim()"
           @click="handleStart"
         >
-          <span>{{ loading ? t('downloads.adding') : t('downloads.start') }}</span>
+          <span>{{
+            loading ? t('downloads.adding') : t('downloads.start')
+          }}</span>
           <ArrowUpRight :size="18" />
         </button>
       </div>
@@ -232,7 +261,11 @@ const allActivePaused = computed(() => {
         <div>
           <span class="stat-label">{{ t('downloads.statActive') }}</span>
           <strong>{{ activeDownloads.length }}</strong>
-          <small>{{ t('downloads.statActiveSub', { n: settings.max_concurrent_downloads }) }}</small>
+          <small>{{
+            t('downloads.statActiveSub', {
+              n: settings.max_concurrent_downloads
+            })
+          }}</small>
         </div>
       </div>
       <div class="stat-card">
@@ -276,7 +309,11 @@ const allActivePaused = computed(() => {
               @click="allActivePaused ? emit('resume-all') : emit('pause-all')"
             >
               <component :is="allActivePaused ? Play : Pause" :size="12" />
-              {{ allActivePaused ? t('downloads.resumeAll') : t('downloads.pauseAll') }}
+              {{
+                allActivePaused
+                  ? t('downloads.resumeAll')
+                  : t('downloads.pauseAll')
+              }}
             </button>
             <button
               v-if="activeDownloads.length || pendingDownloads.length"
@@ -292,13 +329,25 @@ const allActivePaused = computed(() => {
                   class="fill"
                   :style="{
                     width: disk.percent + '%',
-                    backgroundColor: disk.status === 'red' ? '#ff4d4d' : '#4dff4d'
+                    backgroundColor:
+                      disk.status === 'red' ? '#ff4d4d' : '#4dff4d'
                   }"
                 ></div>
               </div>
-              <small>{{ t('downloads.diskLabel', { total: disk.total_str, free: disk.projected_free_str }) }}</small>
+              <small>{{
+                t('downloads.diskLabel', {
+                  total: disk.total_str,
+                  free: disk.projected_free_str
+                })
+              }}</small>
             </div>
-            <span class="count-pill">{{ t('downloads.tasksPill', { n: activeDownloads.length + pendingDownloads.length }) }}</span>
+            <AppPill>
+              {{
+                t('downloads.tasksPill', {
+                  n: activeDownloads.length + pendingDownloads.length
+                })
+              }}
+            </AppPill>
           </div>
         </div>
 
@@ -321,9 +370,18 @@ const allActivePaused = computed(() => {
             <strong :title="item.file_name">{{ item.file_name }}</strong>
             <!-- El ETA solo se pinta mientras descarga de verdad: en pausa o en
                  cola la última estimación ya no vale para nada. -->
-            <span>{{ item.current_str }} / {{ item.total_str }} · {{ item.speed }}<template v-if="item.status === 'downloading' && item.eta"> · {{ t('downloads.etaPrefix') }} <b class="eta">{{ item.eta }}</b></template></span>
+            <span
+              >{{ item.current_str }} / {{ item.total_str }} · {{ item.speed
+              }}<template v-if="item.status === 'downloading' && item.eta">
+                · {{ t('downloads.etaPrefix') }}
+                <b class="eta">{{ item.eta }}</b></template
+              ></span
+            >
             <div class="progress-track">
-              <div class="progress-fill" :style="{ width: `${progress(item)}%` }"></div>
+              <div
+                class="progress-fill"
+                :style="{ width: `${progress(item)}%` }"
+              ></div>
             </div>
           </div>
           <div class="row-side">
@@ -359,23 +417,23 @@ const allActivePaused = computed(() => {
           <h2>{{ t('downloads.historyTitle') }}</h2>
         </div>
         <div class="header-actions">
-          <span class="count-pill">{{ t('downloads.historyTotal', { n: historyDownloads.length }) }}</span>
+          <AppPill>
+            {{ t('downloads.historyTotal', { n: historyDownloads.length }) }}
+          </AppPill>
         </div>
       </div>
       <div v-if="!recentDownloads.length" class="empty-small">
         {{ t('downloads.historyEmpty') }}
       </div>
-      <div
-        v-for="item in recentDownloads"
-        :key="item.id"
-        class="recent-row"
-      >
+      <div v-for="item in recentDownloads" :key="item.id" class="recent-row">
         <span class="recent-icon" :class="item.status">
           {{ item.status === 'completed' ? '✓' : '•' }}
         </span>
         <strong>{{ item.file_name }}</strong>
         <span class="recent-size">{{ item.total_str }}</span>
-        <span class="badge" :class="item.status">{{ statusText(item.status) }}</span>
+        <span class="badge" :class="item.status">{{
+          statusText(item.status)
+        }}</span>
         <button
           v-if="item.status === 'completed'"
           class="open-button"
@@ -397,7 +455,11 @@ const allActivePaused = computed(() => {
           <RotateCcw :size="14" />
         </button>
         <button
-          v-if="['completed', 'failed', 'cancelled', 'skipped'].includes(item.status)"
+          v-if="
+            ['completed', 'failed', 'cancelled', 'skipped'].includes(
+              item.status
+            )
+          "
           class="delete-button"
           type="button"
           :title="t('downloads.deleteEntry')"
@@ -450,7 +512,12 @@ const allActivePaused = computed(() => {
 
         <div class="pager-side">
           <span v-if="totalPaginas > 1" class="pager-info">
-            {{ t('downloads.pageOf', { page: paginaHistorial, total: totalPaginas }) }}
+            {{
+              t('downloads.pageOf', {
+                page: paginaHistorial,
+                total: totalPaginas
+              })
+            }}
           </span>
           <select
             v-model="tamanoPagina"
@@ -458,7 +525,11 @@ const allActivePaused = computed(() => {
             :title="t('downloads.perPageLabel')"
             :aria-label="t('downloads.perPageLabel')"
           >
-            <option v-for="tamano in TAMANOS_PAGINA" :key="tamano" :value="tamano">
+            <option
+              v-for="tamano in TAMANOS_PAGINA"
+              :key="tamano"
+              :value="tamano"
+            >
               {{ t('downloads.perPage', { n: tamano }) }}
             </option>
           </select>
