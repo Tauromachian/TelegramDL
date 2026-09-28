@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   Settings2, Zap, Trash2, Save, Copy, Eye, EyeOff, RefreshCw, Download, Upload,
   ChevronRight, ArrowDownToLine, Image as Palette, KeyRound, HardDrive, Languages
@@ -37,6 +37,14 @@ const props = defineProps({
     default: () => {}
   }
 })
+
+// Copia local de settings para evitar mutar las props
+const localSettings = ref({ ...props.settings })
+
+// Sincronizar cambios de props.settings con localSettings
+watch(() => props.settings, (newSettings) => {
+  localSettings.value = { ...newSettings }
+}, { deep: true })
 
 const emit = defineEmits([
   'save-settings',
@@ -272,10 +280,10 @@ const onImportFile = async (event) => {
                 <!-- Concurrencia y Workers -->
                 <div class="settings-group">
                   <label class="setting-label">
-                    {{ t('settings.concurrent') }} <output>{{ settings.max_concurrent_downloads }}</output>
+                    {{ t('settings.concurrent') }} <output>{{ localSettings.max_concurrent_downloads }}</output>
                   </label>
                   <input
-                    v-model.number="settings.max_concurrent_downloads"
+                    v-model.number="localSettings.max_concurrent_downloads"
                     type="range"
                     min="1"
                     max="32"
@@ -289,17 +297,17 @@ const onImportFile = async (event) => {
                       <small>{{ t('settings.chunksSub') }}</small>
                     </div>
                     <label class="switch">
-                      <input v-model="settings.parallel_chunks" type="checkbox" />
+                      <input v-model="localSettings.parallel_chunks" type="checkbox" />
                       <span></span>
                     </label>
                   </div>
 
                   <label class="setting-label compact">
-                    {{ t('settings.workers') }} <output>{{ settings.chunk_workers }}</output>
+                    {{ t('settings.workers') }} <output>{{ localSettings.chunk_workers }}</output>
                   </label>
                   <input
-                    v-model.number="settings.chunk_workers"
-                    :disabled="!settings.parallel_chunks"
+                    v-model.number="localSettings.chunk_workers"
+                    :disabled="!localSettings.parallel_chunks"
                     type="range"
                     min="1"
                     max="8"
@@ -314,12 +322,12 @@ const onImportFile = async (event) => {
                     <label class="setting-label compact">{{ t('settings.speedLimit') }}</label>
                     <div class="speed-row">
                       <input
-                        v-model.number="settings.speed_limit.value"
+                        v-model.number="localSettings.speed_limit.value"
                         type="number"
                         min="0"
                         step="0.5"
                       />
-                      <select v-model="settings.speed_limit.unit">
+                      <select v-model="localSettings.speed_limit.unit">
                         <option>KB</option>
                         <option>MB</option>
                         <option>GB</option>
@@ -329,7 +337,7 @@ const onImportFile = async (event) => {
                     <small>{{ t('settings.speedHint') }}</small>
                   </div>
 
-                  <FolderPicker v-model="settings.download_folder" />
+                  <FolderPicker v-model="localSettings.download_folder" />
 
                   <div class="setting-line">
                     <div>
@@ -337,7 +345,7 @@ const onImportFile = async (event) => {
                       <small>{{ t('settings.organizeByChatSub') }}</small>
                     </div>
                     <label class="switch">
-                      <input v-model="settings.organize_by_chat" type="checkbox" />
+                      <input v-model="localSettings.organize_by_chat" type="checkbox" />
                       <span></span>
                     </label>
                   </div>
@@ -379,10 +387,10 @@ const onImportFile = async (event) => {
                         :key="id"
                         type="button"
                         class="color-dot"
-                        :class="{ active: settings.color_id === id }"
+                        :class="{ active: localSettings.color_id === id }"
                         :style="{ background: themeMap[id]?.gradient || '#38a7ff' }"
                         :title="t('settings.colorN', { n: id })"
-                        @click="settings.color_id = id"
+                        @click="localSettings.color_id = id"
                       ></button>
                     </div>
                     <div class="color-row">
@@ -391,12 +399,12 @@ const onImportFile = async (event) => {
                         :key="id"
                         type="button"
                         class="color-dot gradient-dot"
-                        :class="{ active: settings.color_id === id }"
+                        :class="{ active: localSettings.color_id === id }"
                         :style="{
                           background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
                         }"
                         :title="t('settings.gradientN', { n: id })"
-                        @click="settings.color_id = id"
+                        @click="localSettings.color_id = id"
                       ></button>
                     </div>
                   </div>
@@ -412,9 +420,9 @@ const onImportFile = async (event) => {
                       :key="'tema-' + id"
                       type="button"
                       class="tema-chip"
-                      :class="{ active: settings.color_id === id }"
+                      :class="{ active: localSettings.color_id === id }"
                       :title="themeMap[id]?.name || t('settings.themeN', { n: id })"
-                      @click="settings.color_id = id"
+                      @click="localSettings.color_id = id"
                     >
                       <span class="tema-muestra" :style="{ background: themeMap[id]?.gradient }"></span>
                       <span class="tema-nombre">{{ themeMap[id]?.name || t('settings.themeN', { n: id }) }}</span>
@@ -438,10 +446,10 @@ const onImportFile = async (event) => {
                         :key="'loader-' + id"
                         type="button"
                         class="color-dot"
-                        :class="{ active: settings.loader_color_id === id }"
+                        :class="{ active: localSettings.loader_color_id === id }"
                         :style="{ background: themeMap[id]?.gradient || '#38a7ff' }"
                         :title="t('settings.colorLoaderN', { n: id })"
-                        @click="settings.loader_color_id = id"
+                        @click="localSettings.loader_color_id = id"
                       ></button>
                     </div>
                     <div class="color-row">
@@ -450,12 +458,12 @@ const onImportFile = async (event) => {
                         :key="'loader-grad-' + id"
                         type="button"
                         class="color-dot gradient-dot"
-                        :class="{ active: settings.loader_color_id === id }"
+                        :class="{ active: localSettings.loader_color_id === id }"
                         :style="{
                           background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
                         }"
                         :title="t('settings.gradientLoaderN', { n: id })"
-                        @click="settings.loader_color_id = id"
+                        @click="localSettings.loader_color_id = id"
                       ></button>
                     </div>
                   </div>
@@ -471,10 +479,10 @@ const onImportFile = async (event) => {
                         :key="'loader-tema-' + id"
                         type="button"
                         class="color-dot tema-dot"
-                        :class="{ active: settings.loader_color_id === id }"
+                        :class="{ active: localSettings.loader_color_id === id }"
                         :style="{ background: themeMap[id]?.gradient }"
                         :title="themeMap[id]?.name || t('settings.themeN', { n: id })"
-                        @click="settings.loader_color_id = id"
+                        @click="localSettings.loader_color_id = id"
                       ></button>
                     </div>
                   </div>
@@ -517,7 +525,7 @@ const onImportFile = async (event) => {
                     class="tema-chip idioma-chip"
                     :class="{ active: locale === lang.id }"
                     :aria-pressed="locale === lang.id"
-                    @click="settings.language = lang.id"
+                    @click="localSettings.language = lang.id"
                   >
                     <span class="tema-nombre">{{ lang.label }}</span>
                   </button>
@@ -628,7 +636,7 @@ const onImportFile = async (event) => {
       :disabled="saving"
       :title="saving ? t('settings.saving') : t('settings.saveNow')"
       :aria-label="t('settings.saveNow')"
-      @click="emit('save-settings')"
+      @click="emit('save-settings', localSettings.value)"
     >
       <Save :size="19" />
     </button>
