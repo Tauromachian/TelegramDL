@@ -11,7 +11,8 @@ package downloader
 
 import (
 	"context"
-	"fmt"
+
+	"tgdown/pkg/i18n"
 	"sync"
 	"time"
 
@@ -161,8 +162,8 @@ func (c clienteBloques) UploadGetFile(ctx context.Context, request *tg.UploadGet
 		// panel que una descarga lenta es Telegram frenándonos y no un problema
 		// del programa.
 		logbus.Warn(logbus.CatDownloads,
-			fmt.Sprintf("Telegram pide esperar %s antes de seguir", espera),
-			fmt.Sprintf("Bloque en el byte %d · intento %d de %d · se para toda la descarga hasta que pase",
+			i18n.T("downloads.floodWait", espera),
+			i18n.T("downloads.floodWaitDetail",
 				request.Offset, intento+1, intentosPorFlood))
 
 		// El segundo extra es margen para no volver justo en el borde y que nos

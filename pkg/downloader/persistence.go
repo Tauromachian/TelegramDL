@@ -6,6 +6,7 @@ package downloader
 import (
 	"log"
 
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/storage"
 )
 
@@ -13,7 +14,7 @@ func (e *Engine) persistenceLoop() {
 	for item := range e.persistCh {
 		if e.storage != nil {
 			if err := e.storage.SaveDownload(item); err != nil {
-				log.Printf("[DOWNLOADER] error guardando estado de descarga en BD: %v", err)
+				log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))
 			}
 		}
 		e.persistWG.Done()
@@ -70,7 +71,7 @@ func (e *Engine) persistSeenChunks(itemID string) {
 
 	if len(chunks) > 0 {
 		if err := e.storage.AddChunks(itemID, chunks); err != nil {
-			log.Printf("[DOWNLOADER] error guardando chunks en BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveChunksError", err))
 		}
 	}
 }

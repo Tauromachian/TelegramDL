@@ -18,6 +18,7 @@ import (
 	tdDownloader "github.com/gotd/td/telegram/downloader"
 	"github.com/gotd/td/tg"
 
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/config"
 	"tgdown/pkg/logbus"
 	"tgdown/pkg/storage"
@@ -74,8 +75,8 @@ func (e *Engine) resolveItemMetadata(itemID string) {
 		// entonces darse cuenta de lo mismo.
 		if errors.Is(err, errMensajeInexistente) {
 			logbus.Warn(logbus.CatDownloads,
-				fmt.Sprintf("El mensaje %d no existe en Telegram", datos.MessageID),
-				fmt.Sprintf("Chat: %s · Se quita de la lista (borrado o nunca existió)",
+				i18n.T("downloads.msgMissing", datos.MessageID),
+				i18n.T("downloads.msgMissingDetail",
 					e.chatLabel(datos.ChatID)))
 			e.discardDownload(itemID)
 		}
@@ -115,7 +116,7 @@ func (e *Engine) resolveItemMetadata(itemID string) {
 
 	if e.storage != nil {
 		if err := e.storage.SaveDownload(cp); err != nil {
-			log.Printf("[DOWNLOADER] error guardando estado de descarga en BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))
 		}
 	}
 	e.notifyState(cp)
@@ -142,13 +143,13 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	}
 
 	if err := e.clientMgr.WaitReady(ctx); err != nil {
-		log.Printf("[DOWNLOAD ERROR] Cliente de Telegram no listo para item %s: %v", itemID, err)
+		log.Printf("[DOWNLOAD ERROR] %s", i18n.T("downloads.clientNotReadyErr", itemID, err))
 		return fmt.Errorf("cliente de Telegram no listo: %w", err)
 	}
 
 	rawClient := e.clientMgr.RawClient()
 	if rawClient == nil {
-		log.Printf("[DOWNLOAD ERROR] Cliente de Telegram no listo para item %s", itemID)
+		log.Printf("[DOWNLOAD ERROR] %s", i18n.T("downloads.clientNotReady", itemID))
 		return errors.New("cliente de Telegram no listo")
 	}
 
@@ -171,25 +172,25 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	if cachedMsg != nil {
 		msg = cachedMsg
 		logbus.Debug(logbus.CatDownloads,
-			fmt.Sprintf("Reutilizando el mensaje ya descargado de Telegram para la tarea %s", itemID), "")
+			i18n.T("downloads.reuseMsg", itemID), "")
 	} else {
-		log.Printf("[DOWNLOAD] Obteniendo mensaje %d del chat %d en Telegram...", datos.MessageID, datos.ChatID)
+		log.Printf("[DOWNLOAD] %s", i18n.T("downloads.fetchingMsg", datos.MessageID, datos.ChatID))
 		var err error
 		msg, err = e.fetchMessage(ctx, datos.ChatID, int(datos.MessageID))
 		if err != nil {
-			log.Printf("[DOWNLOAD ERROR] Error al obtener mensaje %d: %v", datos.MessageID, err)
+			log.Printf("[DOWNLOAD ERROR] %s", i18n.T("downloads.fetchMsgError", datos.MessageID, err))
 			return fmt.Errorf("error al obtener mensaje: %w", err)
 		}
 	}
 
 	mediaInfo := ExtractMediaInfo(msg)
 	if mediaInfo == nil {
-		log.Printf("[DOWNLOAD ERROR] El mensaje %d no contiene multimedia descargable", datos.MessageID)
+		log.Printf("[DOWNLOAD ERROR] %s", i18n.T("downloads.noMedia", datos.MessageID))
 		return errors.New("el mensaje no contiene multimedia descargable")
 	}
 
 	logbus.Debug(logbus.CatDownloads,
-		fmt.Sprintf("Multimedia extraída: %s (%s, %d bytes)", mediaInfo.FileName, mediaInfo.Kind, mediaInfo.FileSize), "")
+		i18n.T("downloads.mediaExtracted", mediaInfo.FileName, mediaInfo.Kind, mediaInfo.FileSize), "")
 
 	e.mu.Lock()
 	currentFileName := datos.FileName
@@ -223,7 +224,7 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 		e.mu.Unlock()
 		if e.storage != nil {
 			if err := e.storage.SaveDownload(cp); err != nil {
-				log.Printf("[DOWNLOADER] error guardando estado de descarga en BD: %v", err)
+				log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))
 			}
 		}
 		e.notifyState(cp)
@@ -255,7 +256,7 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 
 	if e.storage != nil {
 		if err := e.storage.SaveDownload(cp); err != nil {
-			log.Printf("[DOWNLOADER] error guardando estado de descarga en BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))
 		}
 	}
 	e.notifyState(cp)
@@ -281,7 +282,7 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 		resumeChunks = make(map[int64]struct{})
 		if e.storage != nil {
 			if err := e.storage.DeleteChunks(itemID); err != nil {
-				log.Printf("[DOWNLOADER] error eliminando chunks de BD: %v", err)
+				log.Printf("[DOWNLOADER] %s", i18n.T("downloader.deleteChunksError", err))
 			}
 		}
 	}
@@ -291,7 +292,7 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 		resumeChunks = make(map[int64]struct{})
 		if e.storage != nil {
 			if err := e.storage.DeleteChunks(itemID); err != nil {
-				log.Printf("[DOWNLOADER] error eliminando chunks de BD: %v", err)
+				log.Printf("[DOWNLOADER] %s", i18n.T("downloader.deleteChunksError", err))
 			}
 		}
 	}
@@ -351,8 +352,8 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	cliente := envolverCliente(clienteDatos)
 
 	logbus.Debug(logbus.CatDownloads,
-		fmt.Sprintf("Descargando %s con %d workers sobre %d conexiones", finalName, threads, telegram.ConexionesDescarga),
-		fmt.Sprintf("Bloques de %d KB · %d ya descargados", downloadPartSize/1024, len(resumeChunks)))
+		i18n.T("downloads.downloadingWorkers", finalName, threads, telegram.ConexionesDescarga),
+		i18n.T("downloads.blocksDetail", downloadPartSize/1024, len(resumeChunks)))
 
 	writer := &progressWriterAt{
 		file:   tempFile,
@@ -379,8 +380,8 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 		// problema nuestro. Una pausa o cancelación no se avisa: no es un fallo.
 		if !errors.Is(err, context.Canceled) {
 			logbus.Warn(logbus.CatDownloads,
-				fmt.Sprintf("Telegram cortó la descarga de %s", finalName),
-				fmt.Sprintf("Motivo: %v", err))
+				i18n.T("downloads.telegramCut", finalName),
+				i18n.T("downloads.telegramCutReason", err))
 		}
 		return err
 	}
@@ -413,7 +414,7 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 
 	if e.storage != nil {
 		if err := e.storage.DeleteChunks(itemID); err != nil {
-			log.Printf("[DOWNLOAD] Advertencia: no se pudieron limpiar los fragmentos de %s: %v", itemID, err)
+			log.Printf("[DOWNLOAD] %s", i18n.T("downloads.cleanChunksWarn", itemID, err))
 		}
 	}
 	return nil
@@ -440,12 +441,12 @@ func (e *Engine) fetchMessage(ctx context.Context, chatID int64, msgID int) (*tg
 		if isChannel {
 			accessHash, found := e.clientMgr.GetChannelAccessHash(channelID)
 			if !found {
-				log.Printf("[DOWNLOAD FETCH] Canal %d sin accessHash en caché. Consultando dialogs...", channelID)
+				log.Printf("[DOWNLOAD FETCH] %s", i18n.T("fetch.noAccessHashCache", channelID))
 				_ = e.clientMgr.FetchDialogs(ctx)
 				accessHash, found = e.clientMgr.GetChannelAccessHash(channelID)
 			}
 			if !found {
-				log.Printf("[DOWNLOAD FETCH] Canal %d sigue sin accessHash. Consultando ChannelsGetChannels...", channelID)
+				log.Printf("[DOWNLOAD FETCH] %s", i18n.T("fetch.noAccessHashChannels", channelID))
 				if chatsRes, err := raw.ChannelsGetChannels(ctx, []tg.InputChannelClass{
 					&tg.InputChannel{ChannelID: channelID, AccessHash: 0},
 				}); err == nil {
@@ -455,14 +456,14 @@ func (e *Engine) fetchMessage(ctx context.Context, chatID int64, msgID int) (*tg
 								accessHash = ch.AccessHash
 								found = true
 								e.clientMgr.SetChannelAccessHash(channelID, accessHash)
-								log.Printf("[DOWNLOAD FETCH] Canal %d resuelto exitosamente: AccessHash=%d", channelID, accessHash)
+								log.Printf("[DOWNLOAD FETCH] %s", i18n.T("fetch.resolved", channelID, accessHash))
 								break
 							}
 						}
 					}
 				}
 			}
-			log.Printf("[DOWNLOAD FETCH] Consultando ChannelsGetMessages (Canal: %d, AccessHash: %d, MsgID: %d, Found: %v)...", channelID, accessHash, msgID, found)
+			log.Printf("[DOWNLOAD FETCH] %s", i18n.T("fetch.getChannelMessages", channelID, accessHash, msgID, found))
 
 			req := &tg.ChannelsGetMessagesRequest{
 				Channel: &tg.InputChannel{
@@ -476,7 +477,7 @@ func (e *Engine) fetchMessage(ctx context.Context, chatID int64, msgID int) (*tg
 
 			res, err := raw.ChannelsGetMessages(ctx, req)
 			if err != nil {
-				log.Printf("[DOWNLOAD FETCH ERROR] ChannelsGetMessages falló para canal %d mensaje %d: %v", channelID, msgID, err)
+				log.Printf("[DOWNLOAD FETCH ERROR] %s", i18n.T("fetch.channelMsgsError", channelID, msgID, err))
 				return nil, fmt.Errorf("ChannelsGetMessages error: %w", err)
 			}
 
@@ -489,13 +490,13 @@ func (e *Engine) fetchMessage(ctx context.Context, chatID int64, msgID int) (*tg
 				messages = m.Messages
 			}
 		} else {
-			log.Printf("[DOWNLOAD FETCH] Consultando chat básico %d para mensaje %d...", chatID, msgID)
+			log.Printf("[DOWNLOAD FETCH] %s", i18n.T("fetch.basicChat", chatID, msgID))
 			// Chat grupal básico
 			res, err := raw.MessagesGetMessages(ctx, []tg.InputMessageClass{
 				&tg.InputMessageID{ID: msgID},
 			})
 			if err != nil {
-				log.Printf("[DOWNLOAD FETCH ERROR] MessagesGetMessages falló para chat %d mensaje %d: %v", chatID, msgID, err)
+				log.Printf("[DOWNLOAD FETCH ERROR] %s", i18n.T("fetch.basicChatError", chatID, msgID, err))
 				return nil, fmt.Errorf("MessagesGetMessages error: %w", err)
 			}
 
@@ -509,13 +510,13 @@ func (e *Engine) fetchMessage(ctx context.Context, chatID int64, msgID int) (*tg
 			}
 		}
 	} else {
-		log.Printf("[DOWNLOAD FETCH] Consultando chat privado/usuario %d para mensaje %d...", chatID, msgID)
+		log.Printf("[DOWNLOAD FETCH] %s", i18n.T("fetch.privateChat", chatID, msgID))
 		// Usuario / Chat privado (chatID > 0)
 		res, err := raw.MessagesGetMessages(ctx, []tg.InputMessageClass{
 			&tg.InputMessageID{ID: msgID},
 		})
 		if err != nil {
-			log.Printf("[DOWNLOAD FETCH ERROR] MessagesGetMessages falló para usuario %d mensaje %d: %v", chatID, msgID, err)
+			log.Printf("[DOWNLOAD FETCH ERROR] %s", i18n.T("fetch.privateChatError", chatID, msgID, err))
 			return nil, fmt.Errorf("MessagesGetMessages error: %w", err)
 		}
 

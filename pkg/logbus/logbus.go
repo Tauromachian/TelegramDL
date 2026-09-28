@@ -23,6 +23,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"tgdown/pkg/i18n"
 )
 
 // Niveles de severidad. El panel los usa para colorear y filtrar.
@@ -398,10 +400,13 @@ var (
 	stdLogPrefix = regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?\s+`)
 	tagPrefix    = regexp.MustCompile(`^\[([^\]]{1,40})\]\s*`)
 
-	errorWords = regexp.MustCompile(`(?i)(error|falló|fallo|no se pudo|inválid|imposible|pánico|panic|rechazad)`)
-	warnWords  = regexp.MustCompile(`(?i)(advertencia|aviso|omitiendo|reintent|pausand|sin accesshash|sin sesión|no existe|no contiene)`)
-	okWords    = regexp.MustCompile(`(?i)(exitosa|establecida|completad|resuelto|actualizada|guardada)`)
-	debugWords = regexp.MustCompile(`(?i)(solicitando slot|usando mensaje cacheado|obteniendo mensaje|consultando)`)
+	// Las palabras de clasificación van en los dos idiomas del registro: lo que
+	// la propia aplicación escribe ya llega traducido, y las librerías de
+	// terceros (gotd, wails) siempre escriben en inglés.
+	errorWords = regexp.MustCompile(`(?i)(error|falló|fallo|no se pudo|inválid|imposible|pánico|panic|rechazad|failed|failure|could not|cannot|unable|invalid|rejected|denied)`)
+	warnWords  = regexp.MustCompile(`(?i)(advertencia|aviso|omitiendo|reintent|pausand|sin accesshash|sin sesión|no existe|no contiene|skipping|retr|paus|wait|missing|not found)`)
+	okWords    = regexp.MustCompile(`(?i)(exitosa|establecida|completad|resuelto|actualizada|guardada|successful|established|completed|saved|resolved|updated)`)
+	debugWords = regexp.MustCompile(`(?i)(solicitando slot|usando mensaje cacheado|obteniendo mensaje|consultando|fetching|querying|requesting|reusing)`)
 )
 
 // classifyRaw convierte una línea suelta de log.Printf en nivel + categoría +
@@ -490,5 +495,5 @@ func CloseFile()                                      { std.CloseFile() }
 // Clear vacía el registro y deja constancia de ello.
 func Clear() {
 	std.Clear()
-	std.Emit(LevelInfo, CatSystem, "Registro limpiado", "")
+	std.Emit(LevelInfo, CatSystem, i18n.T("system.logCleared"), "")
 }

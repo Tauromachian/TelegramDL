@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/listener"
 	"tgdown/pkg/logbus"
 	"tgdown/pkg/storage"
@@ -61,8 +62,8 @@ func (a *App) attachLogWatchers() {
 			mu.Unlock()
 
 			logbus.Info(logbus.CatListener,
-				fmt.Sprintf("Nuevo archivo detectado: %s", describeListenerItem(item)),
-				fmt.Sprintf("Chat: %s · Mensaje: %d · Pendiente de descargar",
+				i18n.T("listener.newFile", describeListenerItem(item)),
+				i18n.T("listener.newFileDetail",
 					a.chatLabel(item.ChatID, item.ChatName), item.MessageID),
 			)
 		})
@@ -99,75 +100,80 @@ func (a *App) chatLabel(chatID int64, hints ...string) string {
 // no llenar el registro.
 func (a *App) logDownloadStatus(item storage.DownloadItem, previous string) {
 	name := describeDownload(item)
-	origin := "manual"
+	origin := i18n.T("downloads.originManual")
 	if item.Source == "listener" {
-		origin = "escucha"
+		origin = i18n.T("downloads.originListener")
 	}
-	context := fmt.Sprintf("Chat: %s · Mensaje: %d · Origen: %s",
+	context := i18n.T("downloads.context",
 		a.chatLabel(item.ChatID), item.MessageID, origin)
 
 	switch item.Status {
 	case "queued":
 		if previous == "" {
-			logbus.Debug(logbus.CatDownloads, "En cola: "+name, context)
+			logbus.Debug(logbus.CatDownloads, i18n.T("downloads.queued", name), context)
 		} else {
-			logbus.Debug(logbus.CatDownloads, "De vuelta en cola: "+name, context)
+			logbus.Debug(logbus.CatDownloads, i18n.T("downloads.requeued", name), context)
 		}
 	case "downloading":
 		detail := context
 		if item.TotalStr != "" {
-			detail = fmt.Sprintf("%s · Tamaño: %s", context, item.TotalStr)
+			detail = i18n.T("downloads.contextSize", context, item.TotalStr)
 		}
-		logbus.Info(logbus.CatDownloads, "Descarga iniciada: "+name, detail)
+		logbus.Info(logbus.CatDownloads, i18n.T("downloads.started", name), detail)
 	case "completed":
 		detail := context
 		if item.FilePath != "" {
-			detail = fmt.Sprintf("%s · Guardado en: %s", context, item.FilePath)
+			detail = i18n.T("downloads.contextSaved", context, item.FilePath)
 		}
-		logbus.Success(logbus.CatDownloads, "Descarga completada: "+name, detail)
+		logbus.Success(logbus.CatDownloads, i18n.T("downloads.completed", name), detail)
 	case "failed":
 		reason := strings.TrimSpace(item.Error)
 		if reason == "" {
-			reason = "motivo desconocido"
+			reason = i18n.T("downloads.unknownReason")
 		}
 		logbus.Error(logbus.CatDownloads,
-			fmt.Sprintf("Falló la descarga de %s: %s", name, explainError(reason)),
-			fmt.Sprintf("Detalle técnico: %s · %s", reason, context),
+			i18n.T("downloads.failed", name, explainError(reason)),
+			i18n.T("downloads.failedDetail", reason, context),
 		)
 	case "paused":
-		logbus.Warn(logbus.CatDownloads, "Descarga pausada: "+name, context)
+		logbus.Warn(logbus.CatDownloads, i18n.T("downloads.paused", name), context)
 	case "cancelled":
-		logbus.Warn(logbus.CatDownloads, "Descarga cancelada: "+name, context)
+		logbus.Warn(logbus.CatDownloads, i18n.T("downloads.cancelled", name), context)
 	case "duplicate":
 		logbus.Warn(logbus.CatDownloads,
-			"Omitido por duplicado: "+name,
-			"Ya existe un archivo idéntico en la carpeta de descargas · "+context)
+			i18n.T("downloads.duplicate", name),
+			i18n.T("downloads.duplicateDetail", context))
 	}
 }
 
 // explainError traduce los fallos más habituales a una explicación corta y
 // entendible, dejando el texto original en el detalle de la entrada.
+//
+// La detección mira el texto crudo del motor, que llega en inglés desde
+// Telegram (flood, timeout, file_reference) o en español de errores propios
+// antiguos (espacio, conexión, interrumpida); la salida va en el idioma del
+// registro.
 func explainError(raw string) string {
 	lower := strings.ToLower(raw)
 	switch {
 	case strings.Contains(lower, "no space") || strings.Contains(lower, "espacio"):
-		return "no queda espacio suficiente en el disco"
-	case strings.Contains(lower, "mensaje no encontrado"):
-		return "el mensaje ya no existe en Telegram (borrado o sin acceso)"
+		return i18n.T("downloads.errNoSpace")
+	case strings.Contains(lower, "mensaje no encontrado") || strings.Contains(lower, "message not found"):
+		return i18n.T("downloads.errMsgGone")
 	case strings.Contains(lower, "flood") || strings.Contains(lower, "too many requests"):
-		return "Telegram está limitando las peticiones (FLOOD_WAIT); hay que esperar"
+		return i18n.T("downloads.errFlood")
 	case strings.Contains(lower, "auth") || strings.Contains(lower, "unauthorized") || strings.Contains(lower, "sesión"):
-		return "la sesión de Telegram no es válida; vuelve a iniciar sesión"
+		return i18n.T("downloads.errAuth")
 	case strings.Contains(lower, "timeout") || strings.Contains(lower, "deadline"):
-		return "se agotó el tiempo de espera de la conexión"
+		return i18n.T("downloads.errTimeout")
 	case strings.Contains(lower, "connection") || strings.Contains(lower, "conexión") || strings.Contains(lower, "eof"):
-		return "se perdió la conexión con Telegram"
+		return i18n.T("downloads.errConnLost")
 	case strings.Contains(lower, "permission") || strings.Contains(lower, "denied") || strings.Contains(lower, "permiso"):
-		return "sin permisos para escribir en la carpeta de descargas"
+		return i18n.T("downloads.errPerm")
 	case strings.Contains(lower, "file_reference"):
-		return "la referencia del archivo caducó; hay que reintentar"
+		return i18n.T("downloads.errFileRef")
 	case strings.Contains(lower, "interrumpida"):
-		return "la descarga se interrumpió de forma inesperada"
+		return i18n.T("downloads.errInterrupted")
 	default:
 		return raw
 	}
@@ -178,7 +184,7 @@ func describeDownload(item storage.DownloadItem) string {
 		return name
 	}
 	if item.MessageID != 0 {
-		return fmt.Sprintf("mensaje %d", item.MessageID)
+		return i18n.T("downloads.messageN", item.MessageID)
 	}
 	return item.ID
 }
@@ -186,7 +192,7 @@ func describeDownload(item storage.DownloadItem) string {
 func describeListenerItem(item listener.ListenerItem) string {
 	name := strings.TrimSpace(item.FileName)
 	if name == "" {
-		name = fmt.Sprintf("mensaje %d", item.MessageID)
+		name = i18n.T("downloads.messageN", item.MessageID)
 	}
 	if item.TotalStr != "" {
 		return fmt.Sprintf("%s (%s)", name, item.TotalStr)

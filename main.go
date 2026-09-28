@@ -16,6 +16,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
 	"tgdown/pkg/config"
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/updater"
 )
 
@@ -23,6 +24,10 @@ import (
 var assets embed.FS
 
 func main() {
+	// Antes que nada, el registro y la consola hablan el idioma del sistema:
+	// el elegido en Ajustes se cargará de la base de datos en NewApp y lo pisará.
+	i18n.SetLanguage(i18n.DetectSystemLanguage())
+
 	if len(os.Args) > 1 {
 		setupConsole()
 	}
@@ -57,10 +62,10 @@ func hasArgument(target string) bool {
 
 func printUsage() {
 	fmt.Println("TelegramDL")
-	fmt.Println("Uso:")
-	fmt.Println("  TelegramDL.exe              Abrir la interfaz de escritorio")
-	fmt.Println("  TelegramDL.exe --server     Ejecutar el servidor sin abrir ventana")
-	fmt.Println("  TelegramDL.exe --update     Buscar e instalar la última actualización")
+	fmt.Println(i18n.T("cli.usageHeader"))
+	fmt.Println(i18n.T("cli.usageDesktop"))
+	fmt.Println(i18n.T("cli.usageServer"))
+	fmt.Println(i18n.T("cli.usageUpdate"))
 }
 
 // waitInstanceLock reintenta unos segundos antes de rendirse: tras una
@@ -90,8 +95,7 @@ func runDesktopMode() {
 		// NewApp solo devuelve nil cuando no consigue abrir ninguna base de
 		// datos. Abierta con doble clic no hay consola donde leer el motivo, así
 		// que el aviso tiene que ser una ventana del sistema.
-		mostrarAviso("TelegramDL no pudo abrir su base de datos en " + config.DataDir +
-			".\n\nComprueba que la carpeta existe y que tienes permiso de escritura en ella.")
+		mostrarAviso(i18n.T("cli.dbOpenAviso", config.DataDir))
 		return
 	}
 
@@ -142,23 +146,23 @@ func runDesktopMode() {
 func runServerMode() int {
 	release, ok := waitInstanceLock(8 * time.Second)
 	if !ok {
-		fmt.Fprintln(os.Stderr, "Error: ya hay una instancia de TelegramDL en ejecución.")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.alreadyRunning"))
 		return 1
 	}
 	defer release()
 
 	app := NewApp(assets)
 	if app == nil {
-		fmt.Fprintf(os.Stderr, "Error: no se pudo abrir la base de datos de TelegramDL en %s.\n", config.DataDir)
+		fmt.Fprintf(os.Stderr, i18n.T("cli.dbOpenError"), config.DataDir)
 		return 1
 	}
 	if app.server == nil {
-		fmt.Fprintln(os.Stderr, "Error: no se pudo inicializar el servidor")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.serverInitError"))
 		return 1
 	}
 
-	fmt.Printf("Servidor iniciado en http://%s:%d\n", config.GetServerHost(), config.GetServerPort())
-	fmt.Println("Modo servidor activo. Presiona Ctrl+C para detenerlo.")
+	fmt.Printf(i18n.T("cli.serverStarted"), config.GetServerHost(), config.GetServerPort())
+	fmt.Println(i18n.T("cli.serverModeNote"))
 
 	sigCh := make(chan os.Signal, 2)
 	signal.Notify(sigCh, os.Interrupt)
@@ -168,12 +172,12 @@ func runServerMode() int {
 
 	// Esperar la señal
 	sig := <-sigCh
-	fmt.Printf("\n[SISTEMA] Cerrando TelegramDL (Señal: %v)...\n", sig)
+	fmt.Printf("\n%s\n", i18n.T("cli.closing", sig))
 
 	// Watchdog de seguridad: no más de 5 segundos para cerrar
 	go func() {
 		time.Sleep(5 * time.Second)
-		fmt.Println("[ALERTA] Forzando cierre inmediato.")
+		fmt.Println(i18n.T("cli.forceClose"))
 		os.Exit(1)
 	}()
 
@@ -181,7 +185,7 @@ func runServerMode() int {
 	defer cancel()
 	app.shutdown(shutdownCtx)
 
-	fmt.Println("[SISTEMA] TelegramDL detenido. Ya puedes cerrar la consola o seguir usándola.")
+	fmt.Println(i18n.T("cli.stopped"))
 	_ = os.Stdout.Sync()
 	os.Exit(0)
 	return 0
@@ -191,17 +195,17 @@ func runUpdateMode() int {
 	appUpdater := updater.NewAppUpdater()
 	release, asset, err := appUpdater.CheckForUpdate()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error al comprobar actualizaciones: %v\n", err)
+		fmt.Fprintf(os.Stderr, i18n.T("cli.checkError"), err)
 		return 1
 	}
 	if release == nil || asset == nil {
-		fmt.Printf("La aplicación ya está actualizada (v%s).\n", config.AppVersion)
+		fmt.Printf(i18n.T("cli.alreadyUpdated"), config.AppVersion)
 		return 0
 	}
 
-	fmt.Printf("Actualizando de v%s a %s con %s...\n", config.AppVersion, release.TagName, asset.Name)
+	fmt.Printf(i18n.T("cli.updating"), config.AppVersion, release.TagName, asset.Name)
 	if err := appUpdater.InstallUpdate(release); err != nil {
-		fmt.Fprintf(os.Stderr, "Error al iniciar la actualización: %v\n", err)
+		fmt.Fprintf(os.Stderr, i18n.T("cli.installError"), err)
 		return 1
 	}
 
@@ -214,7 +218,7 @@ func runUpdateMode() int {
 				return 1
 			}
 			if progress.Status != "" {
-				fmt.Printf("Estado: %s (%d%%)\n", progress.Status, progress.Percentage)
+				fmt.Printf(i18n.T("cli.progressState"), progress.Status, progress.Percentage)
 			}
 			lastStatus = progress.Status
 		}

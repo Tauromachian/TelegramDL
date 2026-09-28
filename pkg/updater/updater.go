@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"tgdown/pkg/config"
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/logbus"
 )
 
@@ -158,12 +159,12 @@ func (u *AppUpdater) CleanOldVersion() {
 
 	for _, target := range targets {
 		if _, err := os.Stat(target); err == nil {
-			log.Printf("[UPDATER] Detectado archivo de versión antigua: %s. Eliminando...", target)
+			log.Printf("[UPDATER] %s", i18n.T("updater.oldFileFound", target))
 			// En Windows, intentamos eliminarlo. os.Remove funciona incluso con atributo oculto.
 			if err := os.Remove(target); err != nil {
-				log.Printf("[UPDATER] No se pudo eliminar la versión antigua %s: %v", target, err)
+				log.Printf("[UPDATER] %s", i18n.T("updater.oldFileError", target, err))
 			} else {
-				log.Printf("[UPDATER] Versión antigua eliminada: %s", target)
+				log.Printf("[UPDATER] %s", i18n.T("updater.oldFileRemoved", target))
 			}
 		}
 	}
@@ -285,9 +286,8 @@ func (u *AppUpdater) anotarLimiteDeCuota(resp *http.Response) bool {
 	u.mu.Unlock()
 
 	logbus.Warn(logbus.CatUpdater,
-		"GitHub limitó las comprobaciones de actualización",
-		fmt.Sprintf("Se alcanzó el máximo de peticiones por hora; no se volverá a preguntar hasta dentro de %s",
-			espera.Round(time.Second)))
+		i18n.T("updater.rateLimited"),
+		i18n.T("updater.rateLimitedDetail", espera.Round(time.Second)))
 	return true
 }
 
@@ -296,7 +296,7 @@ func (u *AppUpdater) anotarLimiteDeCuota(resp *http.Response) bool {
 func (u *AppUpdater) consultarUltimaRelease(ctx context.Context) (*releaseGitHub, error) {
 	slug := strings.Trim(strings.TrimSpace(u.repoURL), "/")
 	if slug == "" || !strings.Contains(slug, "/") {
-		return nil, fmt.Errorf("repositorio mal configurado: %q", u.repoURL)
+		return nil, fmt.Errorf(i18n.T("updater.repoMisconfigured"), u.repoURL)
 	}
 
 	peticion, err := http.NewRequestWithContext(ctx, http.MethodGet,
@@ -323,16 +323,16 @@ func (u *AppUpdater) consultarUltimaRelease(ctx context.Context) (*releaseGitHub
 		if u.anotarLimiteDeCuota(resp) {
 			return nil, errCuotaAgotada
 		}
-		return nil, fmt.Errorf("GitHub rechazó la consulta (código %d)", resp.StatusCode)
+		return nil, fmt.Errorf(i18n.T("updater.githubRejected"), resp.StatusCode)
 	default:
-		return nil, fmt.Errorf("GitHub respondió con el código %d", resp.StatusCode)
+		return nil, fmt.Errorf(i18n.T("updater.githubResponseCode"), resp.StatusCode)
 	}
 
 	// Una respuesta legítima son unos pocos kilobytes; el límite evita que una
 	// respuesta enorme agote la memoria.
 	var rel releaseGitHub
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&rel); err != nil {
-		return nil, fmt.Errorf("no se pudo leer la respuesta de GitHub: %w", err)
+		return nil, fmt.Errorf(i18n.T("updater.githubReadError"), err)
 	}
 	return &rel, nil
 }
@@ -509,14 +509,13 @@ func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 	// tiempo que él mismo indicó en vez de seguir insistiendo (y llenando el
 	// registro) cada pocos minutos.
 	if !pausaHasta.IsZero() && time.Now().Before(pausaHasta) {
-		logbus.Debug(logbus.CatUpdater, "Comprobación de actualizaciones en pausa",
-			fmt.Sprintf("GitHub limitó las peticiones; se reintentará en %s",
-				time.Until(pausaHasta).Round(time.Second)))
+		logbus.Debug(logbus.CatUpdater, i18n.T("updater.checkPaused"),
+			i18n.T("updater.checkPausedDetail", time.Until(pausaHasta).Round(time.Second)))
 		return nil, nil, nil
 	}
 
-	u.routineLog(first, fmt.Sprintf("Comprobando actualizaciones de %s", u.repoURL),
-		fmt.Sprintf("Versión instalada: v%s", u.currentVersion))
+	u.routineLog(first, i18n.T("updater.checking", u.repoURL),
+		i18n.T("updater.checkingDetail", u.currentVersion))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -526,27 +525,27 @@ func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 		// El aviso de cuota agotada ya lo dio anotarLimiteDeCuota; repetirlo
 		// aquí solo duplicaría la línea en el registro.
 		if !errors.Is(err, errCuotaAgotada) {
-			u.checkErrorLog(first, "No se pudo consultar la última versión publicada", err)
+			u.checkErrorLog(first, i18n.T("updater.checkError"), err)
 		}
 		return nil, nil, err
 	}
 	if rel == nil || rel.Draft || strings.TrimSpace(rel.TagName) == "" {
-		u.routineLog(first, "Todavía no hay ninguna versión publicada", "")
+		u.routineLog(first, i18n.T("updater.noReleases"), "")
 		return nil, nil, nil
 	}
 
 	asset := assetParaEsteSistema(rel.Assets)
 	if asset == nil {
-		u.routineLog(first, "No se encontró ningún archivo compatible con este sistema",
-			fmt.Sprintf("Versión publicada: %s (%d archivos)", rel.TagName, len(rel.Assets)))
+		u.routineLog(first, i18n.T("updater.noAsset"),
+			i18n.T("updater.noAssetDetail", rel.TagName, len(rel.Assets)))
 		return nil, nil, nil
 	}
 
-	u.routineLog(first, fmt.Sprintf("Última versión publicada: %s", rel.TagName),
-		"Archivo: "+asset.Name)
+	u.routineLog(first, i18n.T("updater.latestRelease", rel.TagName),
+		i18n.T("updater.latestReleaseDetail", asset.Name))
 
 	if compararVersiones(rel.TagName, u.currentVersion) <= 0 {
-		u.routineLog(first, fmt.Sprintf("TelegramDL está al día (v%s)", u.currentVersion), "")
+		u.routineLog(first, i18n.T("updater.upToDate", u.currentVersion), "")
 		return nil, nil, nil
 	}
 
@@ -559,11 +558,11 @@ func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 
 	if alreadyAnnounced {
 		logbus.Debug(logbus.CatUpdater,
-			fmt.Sprintf("Sigue disponible la versión %s", rel.TagName), "")
+			i18n.T("updater.stillAvailable", rel.TagName), "")
 	} else {
 		logbus.Success(logbus.CatUpdater,
-			fmt.Sprintf("¡Nueva versión disponible: %s!", rel.TagName),
-			fmt.Sprintf("Tienes la v%s · Puedes actualizar desde Ajustes", u.currentVersion))
+			i18n.T("updater.newVersion", rel.TagName),
+			i18n.T("updater.newVersionDetail", u.currentVersion))
 	}
 
 	info := &ReleaseInfo{
@@ -581,7 +580,7 @@ func (u *AppUpdater) CheckForUpdate() (*ReleaseInfo, *ReleaseAsset, error) {
 
 func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 	if rel == nil || strings.TrimSpace(rel.asset.DownloadURL) == "" {
-		return fmt.Errorf("información de actualización no válida")
+		return fmt.Errorf(i18n.T("updater.updateInfoInvalid"))
 	}
 	asset := rel.asset
 
@@ -590,7 +589,7 @@ func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 
 		tempDir, err := os.MkdirTemp("", "tgdown_update")
 		if err != nil {
-			u.setProgress("error: no se pudo crear directorio temporal", 0, 0, 0)
+			u.setProgress("error: "+i18n.T("updater.tempDirError"), 0, 0, 0)
 			return
 		}
 		defer os.RemoveAll(tempDir)
@@ -611,7 +610,7 @@ func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 		u.setProgress("verifying", 0, 0, 100)
 		if err := verifyChecksum(archivePath, asset.DownloadURL, asset.Name); err != nil {
 			u.setProgress("error: "+err.Error(), 0, 0, 0)
-			logbus.Error(logbus.CatUpdater, "Actualización rechazada por no superar la verificación", err.Error())
+			logbus.Error(logbus.CatUpdater, i18n.T("updater.verifyRejected"), err.Error())
 			return
 		}
 
@@ -623,7 +622,7 @@ func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 		if handled, errPlat := u.installPlatform(archivePath, tempDir); handled {
 			if errPlat != nil {
 				u.setProgress("error: "+errPlat.Error(), 0, 0, 0)
-				logbus.Error(logbus.CatUpdater, "No se pudo aplicar la actualización", errPlat.Error())
+				logbus.Error(logbus.CatUpdater, i18n.T("updater.applyError"), errPlat.Error())
 			}
 			return
 		}
@@ -660,18 +659,18 @@ func (u *AppUpdater) InstallUpdate(rel *ReleaseInfo) error {
 		u.setProgress("finishing", 0, 0, 100)
 		exePath, err := os.Executable()
 		if err != nil {
-			u.setProgress("error: no se pudo obtener ruta del ejecutable", 0, 0, 0)
+			u.setProgress("error: "+i18n.T("updater.exePathError"), 0, 0, 0)
 			return
 		}
 
-		log.Printf("[UPDATER] Aplicando actualización sobre: %s", exePath)
+		log.Printf("[UPDATER] %s", i18n.T("updater.applying", exePath))
 		if err := aplicarBinario(newBinaryPath, exePath); err != nil {
 			u.setProgress("error: fallo al aplicar actualización: "+err.Error(), 0, 0, 0)
-			logbus.Error(logbus.CatUpdater, "No se pudo aplicar la actualización", err.Error())
+			logbus.Error(logbus.CatUpdater, i18n.T("updater.applyError"), err.Error())
 			return
 		}
 
-		logbus.Success(logbus.CatUpdater, "Actualización aplicada", exePath)
+		logbus.Success(logbus.CatUpdater, i18n.T("updater.applied"), exePath)
 		u.setProgress("finishing", 0, 0, 100)
 		time.Sleep(2 * time.Second)
 
@@ -703,7 +702,7 @@ func aplicarBinario(origen, destino string) error {
 
 	entrada, err := os.Open(origen)
 	if err != nil {
-		return fmt.Errorf("no se pudo leer la nueva versión: %w", err)
+		return fmt.Errorf(i18n.T("updater.readNewVersionError"), err)
 	}
 	defer entrada.Close()
 
@@ -712,8 +711,7 @@ func aplicarBinario(origen, destino string) error {
 	// nombre sea atómico.
 	temporal, err := os.CreateTemp(filepath.Dir(destino), ".tgdown-nuevo-*")
 	if err != nil {
-		return fmt.Errorf("no se pudo escribir en %s; comprueba que tienes permiso en esa carpeta: %w",
-			filepath.Dir(destino), err)
+		return fmt.Errorf(i18n.T("updater.writeError"), filepath.Dir(destino), err)
 	}
 	rutaTemporal := temporal.Name()
 	limpiarTemporal := true
@@ -725,39 +723,37 @@ func aplicarBinario(origen, destino string) error {
 
 	if _, err := io.Copy(temporal, entrada); err != nil {
 		_ = temporal.Close()
-		return fmt.Errorf("no se pudo copiar la nueva versión: %w", err)
+		return fmt.Errorf(i18n.T("updater.copyError"), err)
 	}
 	// Sin esto, un corte de corriente justo después del cambio de nombre podría
 	// dejar en su sitio un ejecutable a medio escribir.
 	_ = temporal.Sync()
 	if err := temporal.Close(); err != nil {
-		return fmt.Errorf("no se pudo cerrar la nueva versión: %w", err)
+		return fmt.Errorf(i18n.T("updater.closeError"), err)
 	}
 	if err := os.Chmod(rutaTemporal, permisos); err != nil {
-		return fmt.Errorf("no se pudieron ajustar los permisos de la nueva versión: %w", err)
+		return fmt.Errorf(i18n.T("updater.chmodError"), err)
 	}
 
 	antiguo := destino + ".old"
 	_ = os.Remove(antiguo)
 	if err := os.Rename(destino, antiguo); err != nil {
-		return fmt.Errorf("no se pudo apartar la versión actual (%s); comprueba que tienes permiso de escritura en esa carpeta: %w",
-			destino, err)
+		return fmt.Errorf(i18n.T("updater.moveOldError"), destino, err)
 	}
 
 	if err := os.Rename(rutaTemporal, destino); err != nil {
 		// Deshacer.
 		if errVuelta := os.Rename(antiguo, destino); errVuelta != nil {
-			return fmt.Errorf("la actualización falló (%v) y además no se pudo restaurar la versión anterior; "+
-				"el ejecutable de siempre está en %s y basta con quitarle el «.old»: %w", err, antiguo, errVuelta)
+			return fmt.Errorf(i18n.T("updater.rollbackFailed"), err, antiguo, errVuelta)
 		}
-		return fmt.Errorf("no se pudo poner la nueva versión en su sitio: %w", err)
+		return fmt.Errorf(i18n.T("updater.putNewError"), err)
 	}
 	limpiarTemporal = false
 
 	// En Windows el archivo apartado sigue en uso mientras este proceso viva, así
 	// que no poder borrarlo ahora es lo normal y no es un fallo.
 	if err := os.Remove(antiguo); err != nil {
-		log.Printf("[UPDATER] La versión anterior se eliminará en el próximo arranque: %v", err)
+		log.Printf("[UPDATER] %s", i18n.T("updater.cleanupNextBoot", err))
 	}
 	return nil
 }
@@ -786,7 +782,7 @@ func (u *AppUpdater) downloadWithProgress(descarga, dest string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("GitHub devolvió código %d", resp.StatusCode)
+		return fmt.Errorf(i18n.T("updater.githubStatusCode"), resp.StatusCode)
 	}
 
 	out, err := os.Create(dest)
@@ -818,7 +814,7 @@ func (u *AppUpdater) downloadWithProgress(descarga, dest string) error {
 		}
 		if err != nil {
 			if ctx.Err() != nil {
-				return fmt.Errorf("la descarga se quedó sin respuesta durante %s", esperaSinDatos)
+				return fmt.Errorf(i18n.T("updater.downloadTimeout"), esperaSinDatos)
 			}
 			return err
 		}
@@ -827,7 +823,7 @@ func (u *AppUpdater) downloadWithProgress(descarga, dest string) error {
 	// Si el servidor anunció un tamaño y llegó otra cosa, el archivo está
 	// incompleto: mejor decirlo aquí que fallar luego al verificar la firma.
 	if total > 0 && downloaded != total {
-		return fmt.Errorf("la descarga quedó incompleta (%d de %d bytes)", downloaded, total)
+		return fmt.Errorf(i18n.T("updater.downloadIncomplete"), downloaded, total)
 	}
 	return nil
 }
@@ -885,10 +881,10 @@ func (u *AppUpdater) restartApp(exePath string) {
 	// En lugar de os.Executable() que podría devolver la ruta del archivo .old en Windows
 	cmd := exec.Command(exePath, os.Args[1:]...)
 
-	log.Printf("[UPDATER] Lanzando nueva versión: %s", exePath)
+	log.Printf("[UPDATER] %s", i18n.T("updater.relaunching", exePath))
 	err := cmd.Start()
 	if err != nil {
-		log.Printf("[UPDATER] Error crítico al reiniciar aplicación: %v", err)
+		log.Printf("[UPDATER] %s", i18n.T("updater.relaunchError", err))
 	}
 
 	os.Exit(0)
@@ -948,14 +944,14 @@ func verifyChecksum(archivePath, assetURL, assetName string) error {
 
 	real, err := sha256DeArchivo(archivePath)
 	if err != nil {
-		return fmt.Errorf("no se pudo calcular la firma del archivo descargado: %w", err)
+		return fmt.Errorf(i18n.T("updater.signatureError"), err)
 	}
 
 	if !strings.EqualFold(real, esperado) {
-		return fmt.Errorf("la actualización descargada no coincide con la publicada (esperado %s, obtenido %s)", esperado, real)
+		return fmt.Errorf(i18n.T("updater.signatureMismatch"), esperado, real)
 	}
 
-	logbus.Info(logbus.CatUpdater, "Integridad de la actualización verificada", assetName)
+	logbus.Info(logbus.CatUpdater, i18n.T("updater.verified"), assetName)
 	return nil
 }
 
@@ -989,13 +985,12 @@ func descargarChecksum(assetURL, assetName string) (string, error) {
 
 	resp, err := clienteAPI.Do(peticion)
 	if err != nil {
-		return "", fmt.Errorf("no se pudo descargar %s: %w", checksumsFileName, err)
+		return "", fmt.Errorf(i18n.T("updater.checksumDownloadError"), checksumsFileName, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("esta versión no publica %s, así que no se puede comprobar que la descarga sea legítima (código %d)",
-			checksumsFileName, resp.StatusCode)
+		return "", fmt.Errorf(i18n.T("updater.checksumNotPublished"), checksumsFileName, resp.StatusCode)
 	}
 
 	// Un checksums.txt legítimo son unos pocos cientos de bytes; el límite evita
@@ -1013,10 +1008,10 @@ func descargarChecksum(assetURL, assetName string) (string, error) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("no se pudo leer %s: %w", checksumsFileName, err)
+		return "", fmt.Errorf(i18n.T("updater.checksumReadError"), checksumsFileName, err)
 	}
 
-	return "", fmt.Errorf("%s no incluye una entrada para %s", checksumsFileName, assetName)
+	return "", fmt.Errorf(i18n.T("updater.checksumMissingEntry"), checksumsFileName, assetName)
 }
 
 // urlDelChecksum cambia el nombre del archivo al final de la URL del asset por
@@ -1024,11 +1019,11 @@ func descargarChecksum(assetURL, assetName string) (string, error) {
 func urlDelChecksum(assetURL string) (string, error) {
 	u, err := url.Parse(assetURL)
 	if err != nil {
-		return "", fmt.Errorf("URL de descarga no válida: %w", err)
+		return "", fmt.Errorf(i18n.T("updater.invalidDownloadURL"), err)
 	}
 	i := strings.LastIndex(u.Path, "/")
 	if i < 0 {
-		return "", fmt.Errorf("URL de descarga no válida: %s", assetURL)
+		return "", fmt.Errorf(i18n.T("updater.invalidDownloadURLText"), assetURL)
 	}
 	u.Path = u.Path[:i+1] + checksumsFileName
 	u.RawQuery = ""

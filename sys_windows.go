@@ -6,6 +6,8 @@ import (
 	"os"
 	"syscall"
 	"unsafe"
+
+	"tgdown/pkg/i18n"
 )
 
 func setupConsole() {
@@ -51,7 +53,7 @@ func tryAcquireInstanceLock() (func(), bool) {
 
 // notifyAlreadyRunning avisa al usuario cuando intenta abrir una segunda instancia.
 func notifyAlreadyRunning() {
-	mostrarAviso("TelegramDL ya se está ejecutando. Revisa la ventana abierta o la bandeja del sistema.")
+	mostrarAviso(i18n.T("cli.alreadyRunning"))
 }
 
 // mostrarAviso enseña un mensaje sin depender de que exista la ventana de la

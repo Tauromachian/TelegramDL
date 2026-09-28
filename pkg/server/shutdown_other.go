@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+
+	"tgdown/pkg/i18n"
 )
 
 func shutdownSystem() error {
@@ -28,5 +30,5 @@ func shutdownSystem() error {
 	if _, err := exec.LookPath("shutdown"); err == nil {
 		return exec.Command("shutdown", "-h", "now").Start()
 	}
-	return fmt.Errorf("no se encontró ninguna herramienta de apagado (systemctl/shutdown)")
+	return fmt.Errorf(i18n.T("server.shutdownToolNotFound"))
 }

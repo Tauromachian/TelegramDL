@@ -14,7 +14,8 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"tgdown/pkg/config"
+"tgdown/pkg/config"
+	"tgdown/pkg/i18n"
 )
 
 type DownloadItem struct {
@@ -393,7 +394,7 @@ func (s *Storage) MigrateLegacyEnv() {
 			return
 		}
 		if err := s.setConfigKey(key, value); err != nil {
-			log.Printf("[STORAGE] No se pudo migrar %s desde el .env: %v", key, err)
+			log.Printf("[STORAGE] %s", i18n.T("storage.envMigrateError", key, err))
 			return
 		}
 		migradas = append(migradas, key)
@@ -412,7 +413,7 @@ func (s *Storage) MigrateLegacyEnv() {
 	s.mu.Unlock()
 
 	if len(migradas) > 0 {
-		log.Printf("[STORAGE] Configuración migrada del .env a la base de datos: %s", strings.Join(migradas, ", "))
+		log.Printf("[STORAGE] %s", i18n.T("storage.envMigrated", strings.Join(migradas, ", ")))
 	}
 	config.ArchiveLegacyEnv()
 }

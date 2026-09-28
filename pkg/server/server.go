@@ -22,6 +22,7 @@ import (
 
 	"tgdown/pkg/config"
 	"tgdown/pkg/downloader"
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/listener"
 	"tgdown/pkg/logbus"
 	"tgdown/pkg/storage"
@@ -471,7 +472,7 @@ func (s *Server) loadOrCreateToken() string {
 	}
 	if s.storage != nil {
 		if err := s.storage.SaveAPIToken(tok); err != nil {
-			log.Printf("[SERVER] error guardando token de API en BD: %v", err)
+			log.Printf("[SERVER] %s", i18n.T("server.saveTokenError", err))
 		}
 	}
 	return tok
@@ -499,7 +500,7 @@ func (s *Server) RegenerateToken() string {
 	s.mu.Unlock()
 	if s.storage != nil {
 		if err := s.storage.SaveAPIToken(tok); err != nil {
-			log.Printf("[SERVER] error guardando token de API en BD: %v", err)
+			log.Printf("[SERVER] %s", i18n.T("server.saveTokenError", err))
 		}
 	}
 	return tok
@@ -509,7 +510,7 @@ func (s *Server) jsonResponse(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Printf("[SERVER] error codificando respuesta JSON: %v", err)
+		log.Printf("[SERVER] %s", i18n.T("server.jsonError", err))
 	}
 }
 
@@ -895,13 +896,13 @@ func (s *Server) handleAuthCredentials(w http.ResponseWriter, r *http.Request) {
 	// la base de datos: si esto falla no queda ningún otro sitio de donde
 	// recuperarlas, así que ahora sí se corta aquí.
 	if err := s.storage.SaveCredentials(body.APIID, body.APIHash); err != nil {
-		log.Printf("[SERVER] error guardando credenciales en BD: %v", err)
+		log.Printf("[SERVER] %s", i18n.T("server.saveCredsError", err))
 		s.errorResponse(w, http.StatusInternalServerError, "Error guardando credenciales")
 		return
 	}
 
 	if err := s.clientMgr.InitClient(body.APIID, body.APIHash); err != nil {
-		log.Printf("[SERVER] error inicializando cliente Telegram: %v", err)
+		log.Printf("[SERVER] %s", i18n.T("server.tgInitError", err))
 		s.errorResponse(w, http.StatusInternalServerError, "Error inicializando cliente Telegram")
 		return
 	}
@@ -964,12 +965,12 @@ func (s *Server) handleAuthVerifyCode(w http.ResponseWriter, r *http.Request) {
 
 	status, err := s.clientMgr.VerifyCode(r.Context(), phone, code, body.PhoneCodeHash)
 	if err != nil {
-		logbus.Error(logbus.CatTelegram, "Código de verificación rechazado", err.Error())
+		logbus.Error(logbus.CatTelegram, i18n.T("telegram.codeRejected"), err.Error())
 		s.errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if status == "ok" {
-		logbus.Success(logbus.CatTelegram, "Sesión de Telegram iniciada", "")
+		logbus.Success(logbus.CatTelegram, i18n.T("telegram.sessionStarted"), "")
 	}
 
 	st := s.clientMgr.GetAuthStatus(r.Context())
@@ -996,11 +997,11 @@ func (s *Server) handleAuthVerify2FA(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.clientMgr.Verify2FA(r.Context(), body.Password); err != nil {
-		logbus.Error(logbus.CatTelegram, "Contraseña de dos pasos rechazada", err.Error())
+		logbus.Error(logbus.CatTelegram, i18n.T("telegram.tfaRejected"), err.Error())
 		s.errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	logbus.Success(logbus.CatTelegram, "Sesión de Telegram iniciada (verificación en dos pasos)", "")
+	logbus.Success(logbus.CatTelegram, i18n.T("telegram.sessionStarted2FA"), "")
 
 	s.jsonResponse(w, http.StatusOK, s.clientMgr.GetAuthStatus(r.Context()))
 }
@@ -1110,8 +1111,8 @@ func (s *Server) handleSendTokenToTelegram(w http.ResponseWriter, r *http.Reques
 
 		seconds := int(wait.Seconds()) + 1
 		logbus.Warn(logbus.CatServer,
-			"Petición de envío del token a Telegram rechazada por exceso de intentos",
-			fmt.Sprintf("Origen: %s · Faltan %d s", origin, seconds))
+			i18n.T("server.tokenSendLimited"),
+			i18n.T("server.tokenSendLimitedDetail", origin, seconds))
 
 		w.Header().Set("Retry-After", strconv.Itoa(seconds))
 		s.jsonResponse(w, http.StatusTooManyRequests, map[string]any{
@@ -1145,14 +1146,14 @@ func (s *Server) handleSendTokenToTelegram(w http.ResponseWriter, r *http.Reques
 		delete(s.tokenSendPorIP, origin)
 		s.mu.Unlock()
 
-		logbus.Error(logbus.CatServer, "No se pudo enviar el token a Telegram", err.Error())
+		logbus.Error(logbus.CatServer, i18n.T("server.tokenSendError"), err.Error())
 		s.errorResponse(w, http.StatusBadGateway, fmt.Sprintf("No se pudo enviar el token a Telegram: %s", err.Error()))
 		return
 	}
 
 	logbus.Success(logbus.CatServer,
-		"Token de acceso enviado a los Mensajes guardados de Telegram",
-		fmt.Sprintf("Pedido desde %s", origin))
+		i18n.T("server.tokenSent"),
+		i18n.T("server.tokenSentDetail", origin))
 
 	s.jsonResponse(w, http.StatusOK, map[string]any{
 		"status":      "ok",
@@ -1175,7 +1176,7 @@ func (s *Server) handleRegenerateToken(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 	_ = s.clientMgr.Logout(r.Context())
-	logbus.Warn(logbus.CatTelegram, "Sesión de Telegram cerrada", "")
+	logbus.Warn(logbus.CatTelegram, i18n.T("telegram.loggedOut"), "")
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -1418,7 +1419,7 @@ func (s *Server) handleDeleteDownload(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleClearHistory(w http.ResponseWriter, r *http.Request) {
 	removed, _ := s.downloader.ClearHistory()
-	logbus.Info(logbus.CatDownloads, fmt.Sprintf("Historial de descargas limpiado (%d entradas)", removed), "")
+	logbus.Info(logbus.CatDownloads, i18n.T("downloads.historyCleared", removed), "")
 	s.jsonResponse(w, http.StatusOK, map[string]any{"status": "ok", "removed": removed})
 }
 
@@ -1494,7 +1495,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			// archivos en la carpeta de Inicio o sobre la sesión de Telegram no
 			// es una preferencia, es una vía de ataque.
 			if err := config.ValidateDownloadFolder(sVal); err != nil {
-				logbus.Warn(logbus.CatServer, "Carpeta de descargas rechazada", sVal+": "+err.Error())
+				logbus.Warn(logbus.CatServer, i18n.T("server.folderRejected"), sVal+": "+err.Error())
 			} else {
 				cfg.DownloadFolder = sVal
 			}
@@ -1567,13 +1568,20 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	s.config = cfg
 	s.mu.Unlock()
 
+	// El idioma del registro se aplica antes de registrar el cambio, así la
+	// línea "Ajustes guardados · Idioma: es → en" ya sale en el idioma recién
+	// elegido, que es en el que el usuario está leyendo.
+	if cfg.Language != previousCfg.Language {
+		i18n.SetLanguage(cfg.Language)
+	}
+
 	if shutdownCancelled {
-		logbus.Info(logbus.CatSystem, "Apagado automático cancelado", "El interruptor «Apagar al terminar» se desactivó")
+		logbus.Info(logbus.CatSystem, i18n.T("system.shutdownCancelled"), i18n.T("system.shutdownCancelledSwitch"))
 	}
 
 	logConfigChanges(previousCfg, cfg)
 	if err := s.storage.SaveConfig(cfg); err != nil {
-		log.Printf("[SERVER] error guardando configuración en BD: %v", err)
+		log.Printf("[SERVER] %s", i18n.T("common.saveConfigError", err))
 	}
 	s.downloader.UpdateConfig(cfg)
 	s.listener.UpdateConfig(cfg)
@@ -1621,7 +1629,7 @@ func (s *Server) handleSpeedLimit(w http.ResponseWriter, r *http.Request) {
 
 	logConfigChanges(previousCfg, cfg)
 	if err := s.storage.SaveConfig(cfg); err != nil {
-		log.Printf("[SERVER] error guardando configuración en BD: %v", err)
+		log.Printf("[SERVER] %s", i18n.T("common.saveConfigError", err))
 	}
 	s.downloader.UpdateConfig(cfg)
 	s.broadcastState()
@@ -1736,9 +1744,9 @@ func (s *Server) handleListenerSettings(w http.ResponseWriter, r *http.Request) 
 
 	logListenerConfigChanges(previousCfg, cfg)
 	logbus.Debug(logbus.CatListener,
-		fmt.Sprintf("Configuración de escucha guardada: activa=%v, %d chats", cfg.ListenerEnabled, len(cfg.ListenerChats)), "")
+		i18n.T("listener.configSavedDebug", cfg.ListenerEnabled, len(cfg.ListenerChats)), "")
 	if err := s.storage.SaveConfig(cfg); err != nil {
-		log.Printf("[SERVER] error guardando configuración en BD: %v", err)
+		log.Printf("[SERVER] %s", i18n.T("common.saveConfigError", err))
 	}
 	s.downloader.UpdateConfig(cfg)
 	s.listener.UpdateConfig(cfg)
@@ -1782,7 +1790,7 @@ func (s *Server) handleListenerDownload(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleListenerClear(w http.ResponseWriter, r *http.Request) {
 	removed := len(s.listener.GetItems())
 	s.listener.ClearItems()
-	logbus.Warn(logbus.CatListener, fmt.Sprintf("Bandeja de escucha vaciada (%d elementos)", removed), "")
+	logbus.Warn(logbus.CatListener, i18n.T("listener.trayCleared", removed), "")
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -2213,12 +2221,12 @@ func (s *Server) handleInstallUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.updater.InstallUpdate(rel); err != nil {
-		logbus.Error(logbus.CatUpdater, "No se pudo iniciar la actualización", err.Error())
+		logbus.Error(logbus.CatUpdater, i18n.T("updater.installStartError"), err.Error())
 		s.errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	logbus.Info(logbus.CatUpdater, fmt.Sprintf("Instalando actualización %s", rel.TagName),
-		fmt.Sprintf("Versión actual: v%s", config.AppVersion))
+	logbus.Info(logbus.CatUpdater, i18n.T("updater.installing", rel.TagName),
+		i18n.T("updater.installingDetail", config.AppVersion))
 
 	s.jsonResponse(w, http.StatusOK, map[string]string{
 		"status":  "ok",
@@ -2278,7 +2286,7 @@ func (s *Server) watchShutdownWhenDone(item storage.DownloadItem) {
 		}
 		s.mu.Unlock()
 		if cancelled {
-			logbus.Info(logbus.CatSystem, "Apagado automático cancelado", "La cola de descargas volvió a tener actividad")
+			logbus.Info(logbus.CatSystem, i18n.T("system.shutdownCancelled"), i18n.T("system.shutdownCancelledActivity"))
 		}
 	case "completed", "failed", "cancelled", "skipped":
 		s.maybeScheduleShutdown()
@@ -2321,8 +2329,8 @@ func (s *Server) maybeScheduleShutdown() {
 	s.mu.Unlock()
 
 	logbus.Warn(logbus.CatSystem,
-		fmt.Sprintf("Cola de descargas terminada: el equipo se apagará en %d segundos", int(shutdownDelay.Seconds())),
-		"Desactiva el interruptor «Apagar al terminar» para cancelarlo")
+		i18n.T("system.shutdownScheduled", int(shutdownDelay.Seconds())),
+		i18n.T("system.shutdownScheduledHint"))
 	s.triggerBroadcast()
 }
 
@@ -2347,8 +2355,8 @@ func (s *Server) executeScheduledShutdown() {
 		}
 	}
 
-	logbus.Warn(logbus.CatSystem, "Apagando el equipo", "La cola de descargas terminó con el apagado automático armado")
+	logbus.Warn(logbus.CatSystem, i18n.T("system.shuttingDown"), i18n.T("system.shuttingDownDetail"))
 	if err := shutdownSystem(); err != nil {
-		logbus.Error(logbus.CatSystem, "No se pudo apagar el equipo", err.Error())
+		logbus.Error(logbus.CatSystem, i18n.T("system.shutdownError"), err.Error())
 	}
 }

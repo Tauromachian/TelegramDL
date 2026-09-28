@@ -16,6 +16,7 @@ import (
 	"github.com/gotd/td/tg"
 
 	"tgdown/pkg/config"
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/downloader"
 	"tgdown/pkg/logbus"
 	"tgdown/pkg/storage"
@@ -184,7 +185,7 @@ func (le *ListenerEngine) UpdateConfig(cfg config.Config) {
 	// El detalle de qué cambió lo registra el servidor (logListenerConfigChanges)
 	// con una línea por chat; volcar aquí el mapa entero solo llenaba el registro.
 	logbus.Debug(logbus.CatListener,
-		fmt.Sprintf("Configuración de escucha aplicada: activa=%v, %d chats vigilados",
+		i18n.T("listener.configApplied",
 			le.config.ListenerEnabled, len(le.chatMap)), "")
 }
 
@@ -349,7 +350,7 @@ func (le *ListenerEngine) carpetaDeChat(chatCfg config.ListenerChat) string {
 	if cambiado && le.storage != nil {
 		go func() {
 			if err := le.storage.SaveConfig(cfg); err != nil {
-				log.Printf("[LISTENER] error guardando la carpeta del chat en BD: %v", err)
+				log.Printf("[LISTENER] %s", i18n.T("listener.saveFolderError", err))
 			}
 		}()
 	}
@@ -457,7 +458,7 @@ func (le *ListenerEngine) prepararCarpeta(sub string, chatCfg config.ListenerCha
 
 	ruta := filepath.Join(base, sub)
 	if err := os.MkdirAll(ruta, 0o755); err != nil {
-		log.Printf("[LISTENER] no se pudo crear la carpeta %s: %v", ruta, err)
+		log.Printf("[LISTENER] %s", i18n.T("listener.mkdirError", ruta, err))
 		return
 	}
 
@@ -467,7 +468,7 @@ func (le *ListenerEngine) prepararCarpeta(sub string, chatCfg config.ListenerCha
 	}
 	contenido := downloader.TextoCarpetaChat(chatCfg.GroupName(), chatCfg.ID, chatCfg.TopicLabel())
 	if err := os.WriteFile(aviso, []byte(contenido), 0o644); err != nil {
-		log.Printf("[LISTENER] no se pudo escribir %s: %v", aviso, err)
+		log.Printf("[LISTENER] %s", i18n.T("listener.writeFileError", aviso, err))
 	}
 }
 
@@ -503,7 +504,7 @@ func (le *ListenerEngine) rememberChatName(peerID, rawChannelID int64, name stri
 	if updated && le.storage != nil {
 		go func() {
 			if err := le.storage.SaveConfig(cfg); err != nil {
-				log.Printf("[LISTENER] error guardando configuración en BD: %v", err)
+				log.Printf("[LISTENER] %s", i18n.T("common.saveConfigError", err))
 			}
 		}()
 	}
@@ -571,7 +572,7 @@ func (le *ListenerEngine) rememberTopicName(chatID, topicID int64, name string) 
 
 	if updated && le.storage != nil {
 		if err := le.storage.SaveConfig(cfg); err != nil {
-			log.Printf("[LISTENER] error guardando configuración en BD: %v", err)
+			log.Printf("[LISTENER] %s", i18n.T("common.saveConfigError", err))
 		}
 	}
 }
@@ -699,8 +700,8 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 	}
 	if !allowed {
 		logbus.Debug(logbus.CatListener,
-			fmt.Sprintf("Archivo omitido por filtros: %s", mediaInfo.FileName),
-			fmt.Sprintf("Chat: %s · Mensaje: %d · Tipo: %s desactivado", chatName, msg.ID, mediaInfo.Kind))
+			i18n.T("listener.filteredOut", mediaInfo.FileName),
+			i18n.T("listener.filteredOutDetail", chatName, msg.ID, mediaInfo.Kind))
 		return nil
 	}
 
@@ -739,7 +740,7 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 		dlItem.Status = "queued"
 		if le.storage != nil {
 			if err := le.storage.SaveDownload(dlItem); err != nil {
-				log.Printf("[LISTENER] error guardando estado de descarga en BD: %v", err)
+				log.Printf("[LISTENER] %s", i18n.T("downloader.saveStateError", err))
 			}
 		}
 		if le.engine != nil {
@@ -748,7 +749,7 @@ func (le *ListenerEngine) HandleMessage(ctx context.Context, entities tg.Entitie
 	} else {
 		if le.storage != nil {
 			if err := le.storage.SaveDownload(dlItem); err != nil {
-				log.Printf("[LISTENER] error guardando estado de descarga en BD: %v", err)
+				log.Printf("[LISTENER] %s", i18n.T("downloader.saveStateError", err))
 			}
 		}
 		item := &ListenerItem{
@@ -790,7 +791,7 @@ func (le *ListenerEngine) DownloadItem(itemID string) error {
 
 		le.mu.Unlock()
 
-		log.Printf("[LISTENER] Descargando desde la bandeja con el nombre: '%s'", item.FileName)
+		log.Printf("[LISTENER] %s", i18n.T("listener.downloadFromTray", item.FileName))
 
 		go le.prepararCarpeta(item.SubFolder, config.ListenerChat{
 			ID:        item.ChatID,
@@ -819,7 +820,7 @@ func (le *ListenerEngine) DownloadItem(itemID string) error {
 
 		if le.storage != nil {
 			if err := le.storage.SaveDownload(dlItem); err != nil {
-				log.Printf("[LISTENER] error guardando estado de descarga en BD: %v", err)
+				log.Printf("[LISTENER] %s", i18n.T("downloader.saveStateError", err))
 			}
 		}
 		if le.engine != nil {
@@ -835,10 +836,10 @@ func (le *ListenerEngine) DownloadItem(itemID string) error {
 			if dl, exists := saved[itemID]; exists {
 				// Usar el nombre de archivo que ya está en la base de datos
 				// (puede haber sido actualizado por UpdateItemFileName)
-				log.Printf("[LISTENER] Descargando desde la bandeja con el nombre: '%s'", dl.FileName)
+				log.Printf("[LISTENER] %s", i18n.T("listener.downloadFromTray", dl.FileName))
 				dl.Status = "queued"
 				if err := le.storage.SaveDownload(dl); err != nil {
-					log.Printf("[LISTENER] error guardando estado de descarga en BD: %v", err)
+					log.Printf("[LISTENER] %s", i18n.T("downloader.saveStateError", err))
 				}
 				if le.engine != nil {
 					le.engine.QueueItem(dl)
@@ -861,10 +862,10 @@ func (le *ListenerEngine) RemoveItem(itemID string) {
 
 	if le.storage != nil {
 		if err := le.storage.DeleteDownload(itemID); err != nil {
-			log.Printf("[LISTENER] error eliminando descarga de BD: %v", err)
+			log.Printf("[LISTENER] %s", i18n.T("downloader.deleteDownloadError", err))
 		}
 		if err := le.storage.DeleteChunks(itemID); err != nil {
-			log.Printf("[LISTENER] error eliminando chunks de BD: %v", err)
+			log.Printf("[LISTENER] %s", i18n.T("downloader.deleteChunksError", err))
 		}
 	}
 	if le.engine != nil {
@@ -881,9 +882,9 @@ func (le *ListenerEngine) UpdateItemFileName(itemID string, newFileName string) 
 	item, ok := le.items[itemID]
 	if !ok {
 		le.mu.Unlock()
-		return fmt.Errorf("item no encontrado: %s", itemID)
+		return fmt.Errorf(i18n.T("listener.itemNotFound"), itemID)
 	}
-	log.Printf("[LISTENER] Nombre cambiado: '%s' -> '%s'", item.FileName, newFileName)
+	log.Printf("[LISTENER] %s", i18n.T("listener.nameChanged", item.FileName, newFileName))
 	item.FileName = newFileName
 	cp := *item
 	le.mu.Unlock()
@@ -891,7 +892,7 @@ func (le *ListenerEngine) UpdateItemFileName(itemID string, newFileName string) 
 	// Actualizar en storage
 	if le.storage != nil {
 		if err := le.storage.UpdateDownloadFileName(itemID, newFileName); err != nil {
-			return fmt.Errorf("error actualizando nombre en BD: %w", err)
+			return fmt.Errorf(i18n.T("listener.updateNameError"), err)
 		}
 	}
 
@@ -911,10 +912,10 @@ func (le *ListenerEngine) ClearItems() {
 	for _, id := range ids {
 		if le.storage != nil {
 			if err := le.storage.DeleteDownload(id); err != nil {
-				log.Printf("[LISTENER] error eliminando descarga de BD: %v", err)
+				log.Printf("[LISTENER] %s", i18n.T("downloader.deleteDownloadError", err))
 			}
 			if err := le.storage.DeleteChunks(id); err != nil {
-				log.Printf("[LISTENER] error eliminando chunks de BD: %v", err)
+				log.Printf("[LISTENER] %s", i18n.T("downloader.deleteChunksError", err))
 			}
 		}
 		if le.engine != nil {
@@ -1127,7 +1128,7 @@ func (le *ListenerEngine) inputPeer(ctx context.Context, chatID int64) (tg.Input
 
 	channelID, err := strconv.ParseInt(s[4:], 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("ID de canal inválido: %s", s)
+		return nil, fmt.Errorf(i18n.T("listener.invalidChannelID"), s)
 	}
 	accessHash, found := le.clientMgr.GetChannelAccessHash(channelID)
 	if !found {
@@ -1166,7 +1167,7 @@ func (le *ListenerEngine) ResolveTopics(ctx context.Context, chatID int64) ([]Fo
 		Limit: maxForumTopics,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("no se pudieron obtener los temas: %w", err)
+		return nil, fmt.Errorf(i18n.T("listener.getTopicsError"), err)
 	}
 
 	topics := make([]ForumTopicInfo, 0, len(res.Topics))
@@ -1210,7 +1211,7 @@ func (le *ListenerEngine) ResolveTopicName(ctx context.Context, chatID, topicID 
 		Topics: []int{int(topicID)},
 	})
 	if err != nil {
-		return "", fmt.Errorf("no se pudo obtener el tema %d: %w", topicID, err)
+		return "", fmt.Errorf(i18n.T("listener.getTopicError"), topicID, err)
 	}
 
 	for _, t := range res.Topics {
@@ -1218,5 +1219,5 @@ func (le *ListenerEngine) ResolveTopicName(ctx context.Context, chatID, topicID 
 			return strings.TrimSpace(topic.Title), nil
 		}
 	}
-	return "", fmt.Errorf("el tema %d no existe en este grupo", topicID)
+	return "", fmt.Errorf(i18n.T("listener.topicNotExist"), topicID)
 }

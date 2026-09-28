@@ -13,6 +13,7 @@ import (
 
 	"tgdown/pkg/config"
 	"tgdown/pkg/downloader"
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/listener"
 	"tgdown/pkg/logbus"
 	"tgdown/pkg/server"
@@ -42,18 +43,18 @@ func NewApp(assets fs.FS) *App {
 	// panel y en ~/.tgdown/logs/tgdown.log.
 	logFileErr := logbus.Init(config.DataDir)
 	logbus.Attach()
-	logbus.Success(logbus.CatSystem, fmt.Sprintf("TelegramDL v%s iniciado", config.AppVersion), "")
+	logbus.Success(logbus.CatSystem, i18n.T("system.appStarted", config.AppVersion), "")
 	if logFileErr != nil {
-		logbus.Warn(logbus.CatSystem, "No se pudo abrir el archivo de registro en disco", logFileErr.Error())
+		logbus.Warn(logbus.CatSystem, i18n.T("system.logFileError"), logFileErr.Error())
 	} else if path := logbus.FilePath(); path != "" {
-		logbus.Info(logbus.CatSystem, "Registro en disco activo", path)
+		logbus.Info(logbus.CatSystem, i18n.T("system.logFileActive"), path)
 	}
 
 	// 1. Usar base de datos SQLite original de Python (tgdown.sqlite3)
 	dbPath := filepath.Join(config.DataDir, "tgdown.sqlite3")
 	st, err := storage.NewStorage(dbPath)
 	if err != nil {
-		logbus.Warn(logbus.CatSystem, "No se pudo abrir la base de datos principal", err.Error())
+		logbus.Warn(logbus.CatSystem, i18n.T("system.dbOpenError"), err.Error())
 		// Fallback si no se puede abrir tgdown.sqlite3
 		dbPath = filepath.Join(config.DataDir, "tgdown.db")
 		var errRespaldo error
@@ -63,7 +64,7 @@ func NewApp(assets fs.FS) *App {
 			// un puntero nil y la aplicación reventaba en la línea siguiente sin
 			// decir por qué. Sin base de datos no hay nada que arrancar.
 			logbus.Error(logbus.CatSystem,
-				"No se pudo abrir ninguna base de datos; TelegramDL no puede arrancar",
+				i18n.T("system.dbOpenFatal"),
 				errRespaldo.Error())
 			return nil
 		}
@@ -82,6 +83,14 @@ func NewApp(assets fs.FS) *App {
 	cfg, err := st.LoadConfig(config.DefaultConfig(), filepath.Join(config.BaseDir, "config.json"))
 	if err != nil {
 		cfg = config.DefaultConfig()
+	}
+
+	// El idioma del registro manda lo que el usuario eligió en Ajustes. Hasta
+	// que se cargó esta línea, los mensajes salían en el idioma detectado del
+	// sistema (fijado en main), que es lo único disponible antes de abrir la
+	// base de datos.
+	if cfg.Language != "" {
+		i18n.SetLanguage(cfg.Language)
 	}
 
 	cm := telegram.NewClientManager()
@@ -123,10 +132,10 @@ func NewApp(assets fs.FS) *App {
 	// Iniciar servidor HTTP/WS INMEDIATAMENTE en el puerto configurado (default 8000)
 	port := config.GetServerPort()
 	if err := srv.Start(port); err != nil {
-		fmt.Fprintf(os.Stderr, "Error al iniciar servidor en puerto %d: %v\n", port, err)
-		logbus.Error(logbus.CatServer, fmt.Sprintf("No se pudo iniciar el servidor en el puerto %d", port), err.Error())
+		fmt.Fprintf(os.Stderr, i18n.T("server.startError")+": %v\n", port, err)
+		logbus.Error(logbus.CatServer, i18n.T("server.startError", port), err.Error())
 	} else {
-		logbus.Success(logbus.CatServer, fmt.Sprintf("Servidor escuchando en %s:%d", config.GetServerHost(), port), "")
+		logbus.Success(logbus.CatServer, i18n.T("server.listening", config.GetServerHost(), port), "")
 	}
 
 	// Cargar credenciales desde la base de datos (con fallback a .env) e inicializar cliente
@@ -134,7 +143,7 @@ func NewApp(assets fs.FS) *App {
 	if apiID != "" && apiHash != "" {
 		_ = cm.InitClient(apiID, apiHash)
 	} else {
-		logbus.Warn(logbus.CatTelegram, "Sin credenciales de Telegram configuradas", "Introduce API_ID y API_HASH en Ajustes para poder descargar")
+		logbus.Warn(logbus.CatTelegram, i18n.T("telegram.noCredentials"), i18n.T("telegram.noCredentialsHint"))
 	}
 
 	return app
@@ -173,7 +182,7 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(ctx context.Context) {
-	logbus.Info(logbus.CatSystem, "Cerrando TelegramDL...", "")
+	logbus.Info(logbus.CatSystem, i18n.T("system.closing"), "")
 	if a.clientMgr != nil {
 		a.clientMgr.Stop()
 	}

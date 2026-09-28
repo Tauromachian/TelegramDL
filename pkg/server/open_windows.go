@@ -30,6 +30,8 @@ import (
 	"strings"
 	"syscall"
 	"unsafe"
+
+	"tgdown/pkg/i18n"
 )
 
 var (
@@ -57,7 +59,7 @@ func abrirEnElSistema(target string) {
 	if err := shellExecute("open", target, filepath.Dir(target)); err == nil {
 		return
 	} else {
-		log.Printf("[SERVER] ShellExecuteW no pudo abrir %s: %v", target, err)
+		log.Printf("[SERVER] %s", i18n.T("server.shellOpenError", target, err))
 	}
 
 	// Segundo intento. explorer.exe abre un archivo con su aplicación
@@ -103,7 +105,7 @@ func shellExecute(verbo, archivo, directorio string) error {
 	)
 
 	if ret <= 32 {
-		return fmt.Errorf("código %d (%v)", ret, errLlamada)
+		return fmt.Errorf(i18n.T("server.openErrorCode"), ret, errLlamada)
 	}
 	return nil
 }

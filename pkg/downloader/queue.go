@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"tgdown/pkg/config"
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/logbus"
 	"tgdown/pkg/storage"
 )
@@ -25,7 +26,7 @@ func (e *Engine) enforceConcurrencyLimit() {
 	}
 
 	diff := e.runningJobs - e.config.MaxConcurrentDownloads
-	log.Printf("[ENGINE] Reduciendo concurrencia: deteniendo %d tareas en exceso", diff)
+	log.Printf("[ENGINE] %s", i18n.T("downloader.reduceConcurrency", diff))
 
 	type jobInfo struct {
 		id        string
@@ -44,7 +45,7 @@ func (e *Engine) enforceConcurrencyLimit() {
 	for i := 0; i < diff && i < len(running); i++ {
 		id := running[i].id
 		if cancel, ok := e.cancelFuncs[id]; ok {
-			log.Printf("[ENGINE] Pausando tarea en exceso %s para respetar nuevo límite", id)
+			log.Printf("[ENGINE] %s", i18n.T("downloader.pauseExcess", id))
 			e.cancelledForLimit[id] = true
 			cancel()
 		}
@@ -88,7 +89,7 @@ func (e *Engine) QueueItem(item storage.DownloadItem) string {
 	e.mu.Unlock()
 	if e.storage != nil {
 		if err := e.storage.SaveDownload(item); err != nil {
-			log.Printf("[DOWNLOADER] error guardando estado de descarga en BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))
 		}
 	}
 	e.notifyState(cp)
@@ -129,7 +130,7 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 	go e.resolveItemMetadata(itemID)
 
 	// Adquirir slot de concurrencia respetando el orden de la cola
-	logbus.Debug(logbus.CatDownloads, fmt.Sprintf("Solicitando turno de descarga para la tarea %s", itemID), "")
+	logbus.Debug(logbus.CatDownloads, i18n.T("downloads.requestTurn", itemID), "")
 	e.mu.Lock()
 	// Puede que el resolutor de metadatos ya la haya descartado por ser un ID
 	// que no existe. Se comprueba antes de entrar a esperar, porque dentro del
@@ -177,7 +178,7 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 	// (applog.go), que sí conoce el nombre del archivo y del chat. Aquí solo
 	// queda la traza interna con el ID de la tarea.
 	logbus.Debug(logbus.CatDownloads,
-		fmt.Sprintf("Tarea %s iniciada (chat %d, mensaje %d)", itemID, item.ChatID, item.MessageID), "")
+		i18n.T("downloads.taskStarted", itemID, item.ChatID, item.MessageID), "")
 	cp := *item
 	e.mu.Unlock()
 	e.notifyState(cp)
@@ -219,7 +220,7 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 	}()
 
 	err := e.executeDownloadWithRetry(ctx, itemID)
-	logbus.Debug(logbus.CatDownloads, fmt.Sprintf("Tarea %s finalizada (err=%v)", itemID, err), "")
+	logbus.Debug(logbus.CatDownloads, i18n.T("downloads.taskFinished", itemID, err), "")
 	if errors.Is(err, errMensajeInexistente) {
 		// Caso típico al descargar un rango: algunos IDs del intervalo no
 		// corresponden a ningún mensaje descargable (borrados, inexistentes o
@@ -234,8 +235,8 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 		// Se usa la copia (cp), no el elemento del mapa: aquí ya no tenemos el
 		// mutex y el propio motor puede estar escribiendo en él.
 		logbus.Warn(logbus.CatDownloads,
-			fmt.Sprintf("El mensaje %d no existe en Telegram", cp.MessageID),
-			fmt.Sprintf("Chat: %s · Se descarta de la cola (borrado o nunca existió)",
+			i18n.T("downloads.msgMissing", cp.MessageID),
+			i18n.T("downloads.msgMissingDetail",
 				e.chatLabel(cp.ChatID)))
 		e.discardDownload(itemID)
 		return false
@@ -277,7 +278,7 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 			e.mu.Unlock()
 			if e.storage != nil {
 				if err := e.storage.SaveDownload(cp); err != nil {
-					log.Printf("[DOWNLOADER] error guardando estado de descarga en BD: %v", err)
+					log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))
 				}
 			}
 			e.notifyState(cp)
@@ -298,7 +299,7 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 	e.mu.Unlock()
 	if e.storage != nil {
 		if err := e.storage.SaveDownload(cp); err != nil {
-			log.Printf("[DOWNLOADER] error guardando estado de descarga en BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))
 		}
 	}
 	e.notifyState(cp)

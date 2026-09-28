@@ -9,6 +9,8 @@ export function GetServerInfo():Promise<main.ServerInfo>;
 
 export function Handler():Promise<http.Handler>;
 
+export function PostponeUpdate(arg1:string):Promise<void>;
+
 export function RegenerateLocalToken():Promise<string>;
 
 export function SelectDirectory():Promise<string>;

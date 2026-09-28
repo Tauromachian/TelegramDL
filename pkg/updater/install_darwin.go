@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/logbus"
 )
 
@@ -56,8 +57,7 @@ func (u *AppUpdater) installPlatform(archivePath, tempDir string) (bool, error) 
 	}
 
 	if strings.Contains(currentBundle, appTranslocationMarker) {
-		return true, fmt.Errorf("la aplicación se está ejecutando desde una copia temporal de solo lectura; " +
-			"arrástrala a la carpeta Aplicaciones y vuelve a intentarlo")
+		return true, fmt.Errorf(i18n.T("updater.darwinTranslocation"))
 	}
 
 	// 1. Extraer con ditto en vez de con el unzip de Go. ditto conserva los
@@ -66,7 +66,7 @@ func (u *AppUpdater) installPlatform(archivePath, tempDir string) (bool, error) 
 	//    herramienta con la que se empaqueta al publicar.
 	stage := filepath.Join(tempDir, "stage")
 	if err := os.MkdirAll(stage, 0o755); err != nil {
-		return true, fmt.Errorf("no se pudo preparar la carpeta temporal: %w", err)
+		return true, fmt.Errorf(i18n.T("updater.darwinTempDirError"), err)
 	}
 	if err := extractForMac(archivePath, stage); err != nil {
 		return true, err
@@ -74,7 +74,7 @@ func (u *AppUpdater) installPlatform(archivePath, tempDir string) (bool, error) 
 
 	newBundle := findAppBundle(stage)
 	if newBundle == "" {
-		return true, fmt.Errorf("la descarga no contiene ninguna aplicación .app")
+		return true, fmt.Errorf(i18n.T("updater.darwinNoAppBundle"))
 	}
 
 	// 2. Quitar la marca de cuarentena de la copia recién bajada. Sin esto
@@ -89,8 +89,7 @@ func (u *AppUpdater) installPlatform(archivePath, tempDir string) (bool, error) 
 	backup := currentBundle + ".old"
 	_ = os.RemoveAll(backup)
 	if err := os.Rename(currentBundle, backup); err != nil {
-		return true, fmt.Errorf("no se pudo reemplazar %s; comprueba que tienes permiso de escritura en esa carpeta: %w",
-			currentBundle, err)
+		return true, fmt.Errorf(i18n.T("updater.darwinReplaceError"), currentBundle, err)
 	}
 
 	// 4. Poner el nuevo en el sitio del viejo.
@@ -98,19 +97,18 @@ func (u *AppUpdater) installPlatform(archivePath, tempDir string) (bool, error) 
 		// Deshacer: el usuario se queda como estaba, no sin aplicación.
 		_ = os.RemoveAll(currentBundle)
 		if rollbackErr := os.Rename(backup, currentBundle); rollbackErr != nil {
-			return true, fmt.Errorf("la actualización falló (%v) y además no se pudo restaurar la versión anterior; "+
-				"tendrás que reinstalar TelegramDL manualmente: %w", err, rollbackErr)
+			return true, fmt.Errorf(i18n.T("updater.darwinRollbackFailed"), err, rollbackErr)
 		}
-		return true, fmt.Errorf("no se pudo copiar la nueva versión: %w", err)
+		return true, fmt.Errorf(i18n.T("updater.darwinCopyError"), err)
 	}
 
 	// 5. Borrar la copia vieja. Si falla —cosa rara— no se aborta nada: la
 	//    limpieza se reintenta en el siguiente arranque desde cleanPlatform.
 	if err := os.RemoveAll(backup); err != nil {
-		log.Printf("[UPDATER] No se pudo eliminar la versión anterior %s: %v", backup, err)
+		log.Printf("[UPDATER] %s", i18n.T("updater.oldFileError", backup, err))
 	}
 
-	logbus.Success(logbus.CatUpdater, "Actualización aplicada", currentBundle)
+	logbus.Success(logbus.CatUpdater, i18n.T("updater.applied"), currentBundle)
 	u.setProgress("finishing", 0, 0, 100)
 
 	// 6. Relanzar. La nueva instancia se abre con un retraso corto para que
@@ -145,9 +143,9 @@ func (u *AppUpdater) cleanPlatform() {
 	if _, err := os.Stat(backup); err != nil {
 		return
 	}
-	log.Printf("[UPDATER] Detectado bundle de versión antigua: %s. Eliminando...", backup)
+	log.Printf("[UPDATER] %s", i18n.T("updater.oldBundleFound", backup))
 	if err := os.RemoveAll(backup); err != nil {
-		log.Printf("[UPDATER] No se pudo eliminar %s: %v", backup, err)
+		log.Printf("[UPDATER] %s", i18n.T("updater.oldBundleError", backup, err))
 	}
 }
 
@@ -200,13 +198,13 @@ func extractForMac(archivePath, dest string) error {
 	switch {
 	case strings.HasSuffix(lower, ".zip"):
 		if err := runTool("ditto", "-x", "-k", archivePath, dest); err != nil {
-			return fmt.Errorf("no se pudo descomprimir la actualización: %w", err)
+			return fmt.Errorf(i18n.T("updater.darwinExtractError"), err)
 		}
 		return nil
 	case strings.HasSuffix(lower, ".tar.gz"), strings.HasSuffix(lower, ".tgz"):
 		return untarGz(archivePath, dest)
 	default:
-		return fmt.Errorf("formato no soportado para macOS: %s", filepath.Base(archivePath))
+		return fmt.Errorf(i18n.T("updater.darwinUnsupportedFormat"), filepath.Base(archivePath))
 	}
 }
 
@@ -231,9 +229,9 @@ func relaunchBundle(bundle string) {
 	cmd := exec.Command("/bin/sh", "-c", script)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
-	log.Printf("[UPDATER] Relanzando: %s", bundle)
+	log.Printf("[UPDATER] %s", i18n.T("updater.relaunching", bundle))
 	if err := cmd.Start(); err != nil {
-		log.Printf("[UPDATER] No se pudo relanzar la aplicación: %v", err)
+		log.Printf("[UPDATER] %s", i18n.T("updater.relaunchError", err))
 	}
 }
 

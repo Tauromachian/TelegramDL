@@ -9,6 +9,8 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	"tgdown/pkg/i18n"
 )
 
 func (e *Engine) executeDownloadWithRetry(ctx context.Context, itemID string) error {
@@ -21,7 +23,7 @@ func (e *Engine) executeDownloadWithRetry(ctx context.Context, itemID string) er
 		}
 
 		backoff := time.Duration(1<<(attempt-1)) * time.Second
-		log.Printf("[DOWNLOAD] Reintentando item %s en %s (%d/%d): %v", itemID, backoff, attempt, maxAttempts-1, err)
+		log.Printf("[DOWNLOAD] %s", i18n.T("downloads.retrying", itemID, backoff, attempt, maxAttempts-1, err))
 		timer := time.NewTimer(backoff)
 		select {
 		case <-timer.C:

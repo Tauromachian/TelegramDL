@@ -23,6 +23,7 @@ import (
 	"github.com/gotd/td/tg"
 
 	"tgdown/pkg/config"
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/storage"
 	"tgdown/pkg/telegram"
 )
@@ -369,10 +370,10 @@ func (e *Engine) DeleteDownload(id string, deleteFile bool) error {
 		e.mu.Unlock()
 		if e.storage != nil {
 			if err := e.storage.DeleteDownload(id); err != nil {
-				log.Printf("[DOWNLOADER] error eliminando descarga de BD: %v", err)
+				log.Printf("[DOWNLOADER] %s", i18n.T("downloader.deleteDownloadError", err))
 			}
 			if err := e.storage.DeleteChunks(id); err != nil {
-				log.Printf("[DOWNLOADER] error eliminando chunks de BD: %v", err)
+				log.Printf("[DOWNLOADER] %s", i18n.T("downloader.deleteChunksError", err))
 			}
 		}
 		return nil
@@ -404,10 +405,10 @@ func (e *Engine) DeleteDownload(id string, deleteFile bool) error {
 
 	if e.storage != nil {
 		if err := e.storage.DeleteDownload(id); err != nil {
-			log.Printf("[DOWNLOADER] error eliminando descarga de BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.deleteDownloadError", err))
 		}
 		if err := e.storage.DeleteChunks(id); err != nil {
-			log.Printf("[DOWNLOADER] error eliminando chunks de BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.deleteChunksError", err))
 		}
 	}
 
@@ -416,7 +417,7 @@ func (e *Engine) DeleteDownload(id string, deleteFile bool) error {
 			_ = os.Remove(filePath)
 			_ = os.Remove(filePath + ".temp")
 		} else {
-			log.Printf("[ENGINE] Entrada %s eliminada sin borrar %s: el archivo pertenece a otra descarga", id, filePath)
+			log.Printf("[ENGINE] %s", i18n.T("downloader.entryKeptFile", id, filePath))
 		}
 	}
 
@@ -461,10 +462,10 @@ func (e *Engine) discardDownload(id string) {
 
 	if e.storage != nil {
 		if err := e.storage.DeleteDownload(id); err != nil {
-			log.Printf("[DOWNLOADER] error eliminando descarga de BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.deleteDownloadError", err))
 		}
 		if err := e.storage.DeleteChunks(id); err != nil {
-			log.Printf("[DOWNLOADER] error eliminando chunks de BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.deleteChunksError", err))
 		}
 	}
 }
@@ -493,7 +494,7 @@ func (e *Engine) CancelDownload(id string) error {
 	e.persistSeenChunks(id)
 	if e.storage != nil {
 		if err := e.storage.SaveDownload(cp); err != nil {
-			log.Printf("[DOWNLOADER] error guardando estado de descarga en BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))
 		}
 	}
 	e.notifyState(cp)
@@ -543,7 +544,7 @@ func (e *Engine) PauseDownload(id string) error {
 	e.persistSeenChunks(id)
 	if e.storage != nil {
 		if err := e.storage.SaveDownload(cp); err != nil {
-			log.Printf("[DOWNLOADER] error guardando estado de descarga en BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))
 		}
 	}
 	e.notifyState(cp)
@@ -602,7 +603,7 @@ func (e *Engine) ResumeDownload(ctx context.Context, id string) error {
 	e.mu.Unlock()
 	if e.storage != nil {
 		if err := e.storage.SaveDownload(cp); err != nil {
-			log.Printf("[DOWNLOADER] error guardando estado de descarga en BD: %v", err)
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))
 		}
 	}
 	e.notifyState(cp)

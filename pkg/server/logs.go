@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"tgdown/pkg/config"
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/logbus"
 )
 
@@ -84,38 +85,42 @@ func logConfigChanges(before, after config.Config) {
 	changes := make([]string, 0, 8)
 
 	if before.MaxConcurrentDownloads != after.MaxConcurrentDownloads {
-		changes = append(changes, fmt.Sprintf("Descargas simultáneas: %d → %d",
+		changes = append(changes, i18n.T("settings.changeConcurrent",
 			before.MaxConcurrentDownloads, after.MaxConcurrentDownloads))
 	}
 	if before.ParallelChunks != after.ParallelChunks {
-		changes = append(changes, fmt.Sprintf("Descarga por fragmentos: %s → %s",
+		changes = append(changes, i18n.T("settings.changeChunks",
 			onOff(before.ParallelChunks), onOff(after.ParallelChunks)))
 	}
 	if before.ChunkWorkers != after.ChunkWorkers {
-		changes = append(changes, fmt.Sprintf("Hilos por archivo: %d → %d",
+		changes = append(changes, i18n.T("settings.changeWorkers",
 			before.ChunkWorkers, after.ChunkWorkers))
 	}
 	if before.DownloadFolder != after.DownloadFolder {
-		changes = append(changes, fmt.Sprintf("Carpeta de descargas: %s → %s",
+		changes = append(changes, i18n.T("settings.changeFolder",
 			before.DownloadFolder, after.DownloadFolder))
 	}
 	if before.OrganizeByChat != after.OrganizeByChat {
-		changes = append(changes, fmt.Sprintf("Carpeta por chat en la escucha: %s → %s",
+		changes = append(changes, i18n.T("settings.changeOrganize",
 			onOff(before.OrganizeByChat), onOff(after.OrganizeByChat)))
 	}
 	if before.SpeedLimit != after.SpeedLimit {
-		changes = append(changes, fmt.Sprintf("Límite de velocidad: %s → %s",
+		changes = append(changes, i18n.T("settings.changeSpeed",
 			describeSpeedLimit(before.SpeedLimit), describeSpeedLimit(after.SpeedLimit)))
 	}
 	if !sameIntPtr(before.ColorID, after.ColorID) {
-		changes = append(changes, "Tema de color cambiado")
+		changes = append(changes, i18n.T("settings.changeColor"))
 	}
 	if !sameIntPtr(before.LoaderColorID, after.LoaderColorID) {
-		changes = append(changes, "Color del indicador de carga cambiado")
+		changes = append(changes, i18n.T("settings.changeLoaderColor"))
+	}
+	if before.Language != after.Language {
+		changes = append(changes, i18n.T("settings.changeLanguage",
+			langLabel(before.Language), langLabel(after.Language)))
 	}
 
 	if len(changes) > 0 {
-		logbus.Info(logbus.CatSettings, "Ajustes guardados", strings.Join(changes, " · "))
+		logbus.Info(logbus.CatSettings, i18n.T("settings.saved"), strings.Join(changes, " · "))
 	}
 
 	logListenerConfigChanges(before, after)
@@ -126,9 +131,9 @@ func logConfigChanges(before, after config.Config) {
 func logListenerConfigChanges(before, after config.Config) {
 	if before.ListenerEnabled != after.ListenerEnabled {
 		if after.ListenerEnabled {
-			logbus.Success(logbus.CatListener, "Escucha activada", "")
+			logbus.Success(logbus.CatListener, i18n.T("listener.enabled"), "")
 		} else {
-			logbus.Warn(logbus.CatListener, "Escucha pausada", "")
+			logbus.Warn(logbus.CatListener, i18n.T("listener.disabled"), "")
 		}
 	}
 
@@ -148,30 +153,30 @@ func logListenerConfigChanges(before, after config.Config) {
 		previous, existed := oldChats[chat.Key()]
 		if !existed {
 			logbus.Success(logbus.CatListener,
-				fmt.Sprintf("Chat añadido a la escucha: %s", describeChat(chat)),
-				fmt.Sprintf("Descarga automática: %s · Filtros: %s",
+				i18n.T("listener.chatAdded", describeChat(chat)),
+				i18n.T("listener.chatAddedDetail",
 					onOff(chat.AutoDownload), describeFilters(chat)))
 			continue
 		}
 
 		details := make([]string, 0, 3)
 		if previous.AutoDownload != chat.AutoDownload {
-			details = append(details, fmt.Sprintf("Descarga automática: %s → %s",
+			details = append(details, i18n.T("listener.changeAuto",
 				onOff(previous.AutoDownload), onOff(chat.AutoDownload)))
 		}
 		if describeFilters(previous) != describeFilters(chat) {
-			details = append(details, fmt.Sprintf("Filtros: %s → %s",
+			details = append(details, i18n.T("listener.changeFilters",
 				describeFilters(previous), describeFilters(chat)))
 		}
 		if previous.Name != chat.Name && strings.TrimSpace(chat.Name) != "" {
-			details = append(details, fmt.Sprintf("Nombre: %s → %s", previous.Name, chat.Name))
+			details = append(details, i18n.T("listener.changeName", previous.Name, chat.Name))
 		}
 		if previous.TopicName != chat.TopicName && strings.TrimSpace(chat.TopicName) != "" {
-			details = append(details, fmt.Sprintf("Tema: %s", chat.TopicName))
+			details = append(details, i18n.T("listener.changeTopic", chat.TopicName))
 		}
 		if len(details) > 0 {
 			logbus.Info(logbus.CatListener,
-				fmt.Sprintf("Chat actualizado: %s", describeChat(chat)),
+				i18n.T("listener.chatUpdated", describeChat(chat)),
 				strings.Join(details, " · "))
 		}
 	}
@@ -192,7 +197,7 @@ func logListenerConfigChanges(before, after config.Config) {
 	})
 	for _, chat := range removed {
 		logbus.Warn(logbus.CatListener,
-			fmt.Sprintf("Chat eliminado de la escucha: %s", describeChat(chat)), "")
+			i18n.T("listener.chatRemoved", describeChat(chat)), "")
 	}
 }
 
@@ -208,7 +213,7 @@ func describeChat(chat config.ListenerChat) string {
 		return strconv.FormatInt(chat.ID, 10)
 	}
 	if topic := chat.TopicLabel(); topic != "" {
-		return fmt.Sprintf("%s · %s (%d, tema %d)", topic, name, chat.ID, chat.Topic())
+		return i18n.T("listener.chatDescTopic", topic, name, chat.ID, chat.Topic())
 	}
 	return fmt.Sprintf("%s (%d)", name, chat.ID)
 }
@@ -216,38 +221,52 @@ func describeChat(chat config.ListenerChat) string {
 func describeFilters(chat config.ListenerChat) string {
 	active := make([]string, 0, 5)
 	if chat.FPhotos {
-		active = append(active, "fotos")
+		active = append(active, i18n.T("listener.fPhotos"))
 	}
 	if chat.FVideos {
-		active = append(active, "vídeos")
+		active = append(active, i18n.T("listener.fVideos"))
 	}
 	if chat.FAudios {
-		active = append(active, "audios")
+		active = append(active, i18n.T("listener.fAudios"))
 	}
 	if chat.FDocs {
-		active = append(active, "documentos")
+		active = append(active, i18n.T("listener.fDocs"))
 	}
 	if chat.FStickers {
-		active = append(active, "stickers")
+		active = append(active, i18n.T("listener.fStickers"))
 	}
 	if len(active) == 0 {
-		return "ninguno"
+		return i18n.T("listener.fNone")
 	}
 	return strings.Join(active, ", ")
 }
 
 func describeSpeedLimit(limit config.SpeedLimit) string {
 	if limit.Value <= 0 {
-		return "sin límite"
+		return i18n.T("settings.speedUnlimited")
 	}
 	return fmt.Sprintf("%g %s/s", limit.Value, limit.Unit)
 }
 
 func onOff(v bool) string {
 	if v {
-		return "activada"
+		return i18n.T("settings.on")
 	}
-	return "desactivada"
+	return i18n.T("settings.off")
+}
+
+// langLabel da un nombre legible al código de idioma en el registro ("es →
+// en" se lee mejor como "Español → English"). El vacío (aún sin elegir) queda
+// como el propio código para que se note que no había valor.
+func langLabel(code string) string {
+	switch code {
+	case "es":
+		return "Español"
+	case "en":
+		return "English"
+	default:
+		return code
+	}
 }
 
 func sameIntPtr(a, b *int) bool {

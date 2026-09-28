@@ -14,6 +14,10 @@ export function Handler() {
   return window['go']['main']['App']['Handler']();
 }
 
+export function PostponeUpdate(arg1) {
+  return window['go']['main']['App']['PostponeUpdate'](arg1);
+}
+
 export function RegenerateLocalToken() {
   return window['go']['main']['App']['RegenerateLocalToken']();
 }

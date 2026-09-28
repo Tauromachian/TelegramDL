@@ -25,6 +25,7 @@ import (
 	"github.com/gotd/td/tg"
 
 	"tgdown/pkg/config"
+	"tgdown/pkg/i18n"
 )
 
 type UserInfo struct {
@@ -121,7 +122,7 @@ func (cm *ClientManager) abrirPoolDescargas() {
 		cm.downloadPoolAviso = true
 		cm.mu.Unlock()
 		if avisar {
-			log.Printf("[TG CLIENT] No se pudo abrir el grupo de conexiones de descarga (se usará la principal): %v", err)
+			log.Printf("[TG CLIENT] %s", i18n.T("telegram.poolError", err))
 		}
 		return
 	}
@@ -132,7 +133,7 @@ func (cm *ClientManager) abrirPoolDescargas() {
 	cm.downloadPoolAviso = false
 	cm.mu.Unlock()
 
-	log.Printf("[TG CLIENT] Grupo de %d conexiones para descargas abierto.", ConexionesDescarga)
+	log.Printf("[TG CLIENT] %s", i18n.T("telegram.poolOpened", ConexionesDescarga))
 }
 
 // cerrarPoolDescargas cierra el grupo al caerse la conexión. Es idempotente.
@@ -145,7 +146,7 @@ func (cm *ClientManager) cerrarPoolDescargas() {
 
 	if pool != nil {
 		if err := pool.Close(); err != nil {
-			log.Printf("[TG CLIENT] Error cerrando el grupo de conexiones de descarga: %v", err)
+			log.Printf("[TG CLIENT] %s", i18n.T("telegram.poolCloseError", err))
 		}
 	}
 }
@@ -515,7 +516,7 @@ func (cm *ClientManager) ResolveUsername(ctx context.Context, username string) (
 		Username: username,
 	})
 	if err != nil {
-		return 0, fmt.Errorf("no se pudo resolver @%s: %w", username, err)
+		return 0, fmt.Errorf(i18n.T("telegram.resolveError"), username, err)
 	}
 
 	cm.mu.Lock()
@@ -605,7 +606,7 @@ func (cm *ClientManager) InitClient(apiIDStr, apiHash string) error {
 
 	id, err := strconv.Atoi(apiIDStr)
 	if err != nil {
-		return fmt.Errorf("API_ID inválido: %w", err)
+		return fmt.Errorf(i18n.T("telegram.invalidAPIID"), err)
 	}
 
 	cm.apiID = id
@@ -708,7 +709,7 @@ func (cm *ClientManager) InitClient(apiIDStr, apiHash string) error {
 		defer cm.runWg.Done()
 		// Sin el API_ID: el registro se comparte en capturas y el identificador
 		// de la aplicación no aporta nada para diagnosticar.
-		log.Printf("[TG CLIENT] Iniciando conexión con Telegram MTProto...")
+		log.Printf("[TG CLIENT] %s", i18n.T("telegram.connecting"))
 		err := client.Run(ctx, func(runCtx context.Context) error {
 			readyOnce.Do(func() {
 				close(readyChan)
@@ -718,7 +719,7 @@ func (cm *ClientManager) InitClient(apiIDStr, apiHash string) error {
 				}()
 			})
 
-			log.Printf("[TG CLIENT] Conexión MTProto establecida exitosamente.")
+			log.Printf("[TG CLIENT] %s", i18n.T("telegram.connected"))
 
 			// Los bloques de archivo salen por su propio grupo de conexiones.
 			// Se abre aquí, con la sesión ya conectada, y se cierra al salir de
@@ -730,13 +731,13 @@ func (cm *ClientManager) InitClient(apiIDStr, apiHash string) error {
 			for {
 				self, err := client.Self(runCtx)
 				if err == nil && self != nil {
-					log.Printf("[TG CLIENT] Sesión activa como: %s %s (@%s, ID: %d). Iniciando gaps manager...", self.FirstName, self.LastName, self.Username, self.ID)
+					log.Printf("[TG CLIENT] %s", i18n.T("telegram.sessionActive", self.FirstName, self.LastName, self.Username, self.ID))
 					return gaps.Run(runCtx, client.API(), self.ID, updates.AuthOptions{
 						IsBot: false,
 					})
 				}
 
-				log.Printf("[TG CLIENT] Cliente conectado pero sin sesión. Esperando autenticación para iniciar escucha...")
+				log.Printf("[TG CLIENT] %s", i18n.T("telegram.waitingAuth"))
 				select {
 				case <-runCtx.Done():
 					return runCtx.Err()
@@ -746,7 +747,7 @@ func (cm *ClientManager) InitClient(apiIDStr, apiHash string) error {
 			}
 		})
 		if err != nil && !errors.Is(err, context.Canceled) {
-			log.Printf("[TG CLIENT ERROR] Falló la ejecución del cliente: %v", err)
+			log.Printf("[TG CLIENT ERROR] %s", i18n.T("telegram.runError", err))
 		}
 	}()
 
@@ -873,13 +874,13 @@ func (cm *ClientManager) SendCode(ctx context.Context, phone string) (string, er
 	}
 
 	if err := cm.WaitReady(ctx); err != nil {
-		return "", fmt.Errorf("error al conectar con Telegram: %w", err)
+		return "", fmt.Errorf(i18n.T("telegram.connectError"), err)
 	}
 
 	phone = strings.TrimSpace(phone)
 	sentCode, err := client.Auth().SendCode(ctx, phone, auth.SendCodeOptions{})
 	if err != nil {
-		return "", fmt.Errorf("error al enviar código: %w", err)
+		return "", fmt.Errorf(i18n.T("telegram.sendCodeError"), err)
 	}
 
 	sc, ok := sentCode.(*tg.AuthSentCode)
@@ -911,7 +912,7 @@ func (cm *ClientManager) VerifyCode(ctx context.Context, phone, code, phoneCodeH
 	}
 
 	if err := cm.WaitReady(ctx); err != nil {
-		return "", fmt.Errorf("error al conectar con Telegram: %w", err)
+		return "", fmt.Errorf(i18n.T("telegram.connectError"), err)
 	}
 
 	_, err := client.Auth().SignIn(ctx, phone, code, phoneCodeHash)
@@ -919,7 +920,7 @@ func (cm *ClientManager) VerifyCode(ctx context.Context, phone, code, phoneCodeH
 		if errors.Is(err, auth.ErrPasswordAuthNeeded) || strings.Contains(strings.ToUpper(err.Error()), "SESSION_PASSWORD_NEEDED") {
 			return "2fa_required", nil
 		}
-		return "", fmt.Errorf("código inválido o expirado: %w", err)
+		return "", fmt.Errorf(i18n.T("telegram.invalidCode"), err)
 	}
 
 	return "ok", nil
@@ -935,12 +936,12 @@ func (cm *ClientManager) Verify2FA(ctx context.Context, password string) error {
 	}
 
 	if err := cm.WaitReady(ctx); err != nil {
-		return fmt.Errorf("error al conectar con Telegram: %w", err)
+		return fmt.Errorf(i18n.T("telegram.connectError"), err)
 	}
 
 	_, err := client.Auth().Password(ctx, password)
 	if err != nil {
-		return fmt.Errorf("contraseña 2FA incorrecta: %w", err)
+		return fmt.Errorf(i18n.T("telegram.invalid2FA"), err)
 	}
 
 	return nil
@@ -959,7 +960,7 @@ func (cm *ClientManager) Verify2FA(ctx context.Context, password string) error {
 func messageRandomID() (int64, error) {
 	var buf [8]byte
 	if _, err := rand.Read(buf[:]); err != nil {
-		return 0, fmt.Errorf("no se pudo generar el identificador del mensaje: %w", err)
+		return 0, fmt.Errorf(i18n.T("telegram.generateIDError"), err)
 	}
 	return int64(binary.LittleEndian.Uint64(buf[:])), nil
 }
@@ -1005,7 +1006,7 @@ func (cm *ClientManager) SendToSavedMessages(ctx context.Context, text string, c
 		return errors.New("Telegram no está configurado")
 	}
 	if err := cm.WaitReady(ctx); err != nil {
-		return fmt.Errorf("no se pudo conectar con Telegram: %w", err)
+		return fmt.Errorf(i18n.T("telegram.connectError"), err)
 	}
 
 	// Sin sesión iniciada la llamada fallaría con un error críptico de MTProto;
@@ -1037,7 +1038,7 @@ func (cm *ClientManager) SendToSavedMessages(ctx context.Context, text string, c
 	}
 
 	if _, err := raw.MessagesSendMessage(ctx, req); err != nil {
-		return fmt.Errorf("Telegram rechazó el mensaje: %w", err)
+		return fmt.Errorf(i18n.T("telegram.sendMessageError"), err)
 	}
 	return nil
 }
