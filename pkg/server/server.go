@@ -1729,6 +1729,7 @@ func (s *Server) handleListenerSettings(w http.ResponseWriter, r *http.Request) 
 								FAudios:      true,
 								FDocs:        true,
 								FStickers:    true,
+								NameMode:     "manual",
 							})
 						}
 					}

@@ -621,6 +621,7 @@ func NormalizeConfig(raw Config) Config {
 // de Ajustes reconstruye cada chat campo a campo al importar la escucha), y sin
 // esto un guardado desde allí borraría el reparto en carpetas y los archivos
 // del mismo chat acabarían en dos sitios distintos.
+// También preserva NameMode por el mismo motivo.
 func PreservarCarpetas(previas, nuevas []ListenerChat) []ListenerChat {
 	if len(previas) == 0 || len(nuevas) == 0 {
 		return nuevas
@@ -641,6 +642,9 @@ func PreservarCarpetas(previas, nuevas []ListenerChat) []ListenerChat {
 		}
 		if strings.TrimSpace(nuevas[i].TopicFolder) == "" {
 			nuevas[i].TopicFolder = vieja.TopicFolder
+		}
+		if strings.TrimSpace(nuevas[i].NameMode) == "" {
+			nuevas[i].NameMode = vieja.NameMode
 		}
 	}
 

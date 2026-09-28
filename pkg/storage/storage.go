@@ -171,8 +171,6 @@ func (s *Storage) initSchema() error {
 	cols, err := s.tableColumns("listener_chats")
 	if err == nil {
 		if cols["manual_name_selection"] {
-			// Migrar datos: manual_name_selection = 1 -> 'manual', = 0 -> 'original' (como antes se activaba solo para selección manual)
-			_, _ = s.db.Exec("UPDATE listener_chats SET name_mode = CASE WHEN manual_name_selection = 1 THEN 'manual' ELSE 'original' END")
 			// Eliminar la columna antigua (SQLite no soporta DROP COLUMN en todas las versiones, así que la dejamos)
 		}
 	}
@@ -623,6 +621,7 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 								FAudios:      true,
 								FDocs:        true,
 								FStickers:    true,
+								NameMode:     "manual",
 							})
 						}
 					}

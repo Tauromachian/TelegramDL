@@ -122,7 +122,8 @@ const normalizeChat = (raw) => {
     f_videos: flag(raw.f_videos),
     f_audios: flag(raw.f_audios),
     f_docs: flag(raw.f_docs),
-    f_stickers: flag(raw.f_stickers)
+    f_stickers: flag(raw.f_stickers),
+    name_mode: raw.name_mode || 'manual'
   }
 }
 
