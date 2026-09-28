@@ -657,7 +657,8 @@
    claro no se distingue y el interruptor parece una pastilla lisa. El botón
    pasa al negro del fondo, que además es el recorte que este tema usa en los
    botones. */
-.tema-edge-runner .switch input:checked + span:after {
+.tema-edge-runner .switch input:checked + span:after,
+.tema-edge-runner .chat-name-mode-btn.active .chat-switch-thumb {
   background: var(--user-bg-base);
   box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
 }
@@ -1025,7 +1026,8 @@
    el botón blanco del panel encima de ella desaparece. El botón pasa al verde
    hondo del follaje: es el mismo contraste que hay entre el texto y el fondo
    en el resto del tema. */
-.tema-rainy-garden .switch input:checked + span:after {
+.tema-rainy-garden .switch input:checked + span:after,
+.tema-rainy-garden .chat-name-mode-btn.active .chat-switch-thumb {
   background: var(--rg-musgo-hondo);
   box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
 }
@@ -1936,8 +1938,13 @@ html.tema-osx .stat-icon.gray  { background: rgba(142, 142, 147, .18); color: #a
 
 /* El interruptor de iOS es verde, no del color de acento. */
 html.tema-osx .switch span { background: rgba(120, 120, 128, .32) }
-html.tema-osx .switch input:checked + span { background: var(--osx-verde) }
+html.tema-osx .switch input:checked + span { background: var(--osx-azul) }
 html.tema-osx .switch span:after { background: #ffffff; box-shadow: 0 2px 5px rgba(0, 0, 0, .45) }
+html.tema-osx .switch input:checked + span:after,
+html.tema-osx .chat-name-mode-btn.active .chat-switch-thumb {
+  background: var(--user-bg-base);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+}
 
 html.tema-osx .status-dot,
 html.tema-osx .live-dot {
@@ -2290,7 +2297,8 @@ html.tema-herbal-apothecary .stat-icon.gray  { background: color-mix(in srgb, va
 /* El botón del interruptor, otra vez el mismo caso: el relleno encendido es un
    verde claro y el blanco fijo del panel encima no destaca. Va al verde noche
    del fondo, que es además el color del texto de los botones de este tema. */
-html.tema-herbal-apothecary .switch input:checked + span:after {
+html.tema-herbal-apothecary .switch input:checked + span:after,
+html.tema-herbal-apothecary .chat-name-mode-btn.active .chat-switch-thumb {
   background: var(--user-bg-base);
   box-shadow: 0 1px 3px rgba(0, 0, 0, .45);
 }
