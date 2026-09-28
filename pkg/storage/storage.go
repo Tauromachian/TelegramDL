@@ -536,6 +536,9 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 	if val, ok := kv["organize_by_chat"]; ok {
 		cfg.OrganizeByChat = val == "1" || val == "true"
 	}
+	if val, ok := kv["sound_notification"]; ok {
+		cfg.SoundNotification = val == "1" || val == "true"
+	}
 	// shutdown_when_done no se carga a propósito: el apagado automático es un
 	// ajuste de sesión, siempre arranca desactivado (ver config.Config).
 	if val, ok := kv["download_folder"]; ok && val != "" {
@@ -669,6 +672,7 @@ func (s *Storage) SaveConfig(cfg config.Config) error {
 		"download_folder":          cfg.DownloadFolder,
 		"listener_enabled":         strconv.FormatBool(cfg.ListenerEnabled),
 		"organize_by_chat":         strconv.FormatBool(cfg.OrganizeByChat),
+		"sound_notification":       strconv.FormatBool(cfg.SoundNotification),
 		"speed_value":              fmt.Sprintf("%f", cfg.SpeedLimit.Value),
 		"speed_unit":               cfg.SpeedLimit.Unit,
 		"language":                 cfg.Language,

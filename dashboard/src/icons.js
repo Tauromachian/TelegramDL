@@ -41,6 +41,7 @@ import {
   Menu01Icon,
   Message02Icon,
   MusicNote01Icon,
+  Notification01Icon,
   PauseIcon,
   PowerIcon,
   SmartPhone01Icon,
@@ -84,6 +85,7 @@ export const ArrowDownToLine = icono(Download04Icon) // entrada "Descargas" del 
 export const ArrowLeft = icono(ArrowLeft02Icon) // volver en el explorador de carpetas
 export const ArrowRight = icono(ArrowRight02Icon) // continuar en el asistente de acceso
 export const ArrowUpRight = icono(ArrowUpRight01Icon) // abrir algo fuera de la app
+export const Bell = icono(Notification01Icon) // notificación sonora al terminar descargas
 export const Check = icono(Tick02Icon) // confirmar la carpeta elegida
 export const CheckCircle2 = icono(CheckmarkCircle02Icon) // aviso de operación correcta
 export const ChevronRight = icono(ArrowRight01Icon) // entrar en una carpeta o chat

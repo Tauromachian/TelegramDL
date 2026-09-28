@@ -29,6 +29,7 @@ import { useUpdater } from './composables/useUpdater'
 import {
   ArrowDownToLine,
   ArrowUpRight,
+  Bell,
   CheckCircle2,
   LogOut,
   Menu,
@@ -113,6 +114,7 @@ const settings = reactive({
   loader_color_id: 5,
   download_folder: '',
   organize_by_chat: true,
+  sound_notification: true,
   shutdown_when_done: false,
   language: ''
 })
@@ -225,10 +227,20 @@ const parseSpeed = (speedStr) => {
 
 const syncSettings = async (nextSettings) => {
   syncingSettings = true
-  Object.assign(settings, nextSettings)
+  // Si el usuario está cambiando manualmente el sonido, no sobrescribirlo
+  if (userChangingSound) {
+    // eslint-disable-next-line no-unused-vars
+    const { sound_notification, ...rest } = nextSettings
+    Object.assign(settings, rest)
+  } else {
+    Object.assign(settings, nextSettings)
+  }
   await nextTick()
   syncingSettings = false
 }
+
+// Bandera para evitar que syncSettings sobrescriba cambios manuales del usuario
+let userChangingSound = false
 
 const showMessage = (txt, isError = false) => {
   if (isError) {
@@ -694,7 +706,7 @@ const maybeNotifyQueueFinished = (currentDownloads) => {
   trackedQueueIds.clear()
   queueNotificationArmed = false
 
-  if (successful) {
+  if (successful && settings.sound_notification) {
     new Audio(`${import.meta.env.BASE_URL}notification.wav`)
       .play()
       .catch((e) => console.log('Audio blocked', e))
@@ -1140,6 +1152,44 @@ onUnmounted(() => {
               <Settings2 :size="16" /> {{ t('nav.settings') }}
             </button>
           </nav>
+
+          <div
+            class="sidebar-shutdown"
+            :class="{
+              armed: settings.sound_notification
+            }"
+          >
+            <div class="shutdown-row">
+              <div class="shutdown-info">
+                <Bell :size="15" />
+                <div class="shutdown-text">
+                  <span class="shutdown-label">{{ t('sidebar.soundLabel') }}</span>
+                </div>
+              </div>
+              <label
+                class="switch"
+                :title="
+                  settings.sound_notification
+                    ? t('sidebar.soundTipEnabled')
+                    : t('sidebar.soundTipDisabled')
+                "
+              >
+                <input
+                  type="checkbox"
+                  :checked="settings.sound_notification"
+                  @change="(e) => {
+                    userChangingSound = true
+                    settings.sound_notification = e.target.checked
+                    setTimeout(() => { userChangingSound = false }, 1000)
+                  }"
+                />
+                <span></span>
+              </label>
+            </div>
+            <small class="shutdown-sub">
+              {{ settings.sound_notification ? t('sidebar.soundEnabled') : t('sidebar.soundDisabled') }}
+            </small>
+          </div>
 
           <div
             class="sidebar-shutdown"

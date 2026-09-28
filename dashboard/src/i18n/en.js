@@ -23,6 +23,11 @@ export default {
 
   sidebar: {
     tagline: 'Personal download center',
+    soundLabel: 'Notification',
+    soundTipEnabled: 'Disable sound when downloads finish',
+    soundTipDisabled: 'Enable sound when downloads finish',
+    soundEnabled: 'Enabled',
+    soundDisabled: 'Disabled',
     shutdownLabel: 'Power off when done',
     shutdownTipArmed: 'Cancel the automatic shutdown',
     shutdownTipIdle: 'Power off the PC when the download queue finishes',

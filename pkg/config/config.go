@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	AppVersion = "2.5.4"
+	AppVersion = "2.5.5"
 	GithubRepo = "infinityxgame/tgdown"
 
 	// DefaultBindHost es la dirección en la que escucha el panel cuando el
@@ -165,8 +165,12 @@ type Config struct {
 	// cada arranque de la aplicación lo encuentra desactivado y hay que armarlo
 	// a propósito; si se guardara, un apagado pedido ayer podría ejecutarse
 	// mañana en un momento en que el usuario no lo quiere.
-	ShutdownWhenDone bool           `json:"shutdown_when_done"`
-	ColorID          *int           `json:"color_id"`
+	ShutdownWhenDone   bool           `json:"shutdown_when_done"`
+	// SoundNotification controla si suena un sonido al terminar una descarga.
+	// A diferencia de ShutdownWhenDone, esta configuración sí se persiste y
+	// por defecto está activada.
+	SoundNotification  bool           `json:"sound_notification"`
+	ColorID            *int           `json:"color_id"`
 	LoaderColorID    *int           `json:"loader_color_id"`
 	SpeedLimit       SpeedLimit     `json:"speed_limit"`
 	ListenerEnabled  bool           `json:"listener_enabled"`
@@ -435,6 +439,7 @@ func DefaultConfig() Config {
 		ChunkWorkers:           6,
 		DownloadFolder:         GetDefaultDownloadFolder(),
 		OrganizeByChat:         true,
+		SoundNotification:      true,
 		ColorID:                nil,
 		LoaderColorID:          nil,
 		SpeedLimit: SpeedLimit{

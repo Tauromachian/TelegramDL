@@ -24,6 +24,11 @@ export default {
 
   sidebar: {
     tagline: 'Centro de descargas personal',
+    soundLabel: 'Notificación',
+    soundTipEnabled: 'Desactivar sonido al terminar descargas',
+    soundTipDisabled: 'Activar sonido al terminar descargas',
+    soundEnabled: 'Activado',
+    soundDisabled: 'Desactivado',
     shutdownLabel: 'Apagar al terminar',
     shutdownTipArmed: 'Cancelar el apagado automático',
     shutdownTipIdle: 'Apagar el PC cuando termine la cola de descargas',
