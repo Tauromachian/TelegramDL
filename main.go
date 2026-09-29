@@ -20,7 +20,7 @@ import (
 	"tgdown/pkg/updater"
 )
 
-//go:embed all:dashboard/dist
+//go:embed dashboard/dist
 var assets embed.FS
 
 func main() {
