@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	AppVersion = "2.5.6"
+	AppVersion = "2.5.7"
 	GithubRepo = "infinityxgame/tgdown"
 
 	// DefaultBindHost es la dirección en la que escucha el panel cuando el
@@ -64,12 +64,12 @@ type ListenerChat struct {
 	// de descargas. Se calcula la primera vez que llega un archivo y se guarda:
 	// así, si el canal se renombra, sus archivos siguen cayendo todos juntos.
 	// TopicFolder es lo mismo para el tema, y cuelga de Folder.
-	Folder              string `json:"folder,omitempty"`
-	TopicFolder         string `json:"topic_folder,omitempty"`
+	Folder      string `json:"folder,omitempty"`
+	TopicFolder string `json:"topic_folder,omitempty"`
 	// NameMode indica cómo se selecciona el nombre del archivo: "manual" (elige
 	// archivo por archivo), "original" (usa siempre el nombre original) o
 	// "caption" (usa siempre el caption). Por defecto es "manual".
-	NameMode            string `json:"name_mode,omitempty"`
+	NameMode string `json:"name_mode,omitempty"`
 }
 
 // CarpetaRelativa es la ruta, relativa a la carpeta de descargas, donde van los
@@ -158,24 +158,24 @@ type Config struct {
 	DownloadFolder         string `json:"download_folder"`
 	// OrganizeByChat reparte lo que baja la escucha en una subcarpeta por chat.
 	// Apagado, todo cae en la carpeta de descargas, como antes.
-	OrganizeByChat   bool           `json:"organize_by_chat"`
+	OrganizeByChat bool `json:"organize_by_chat"`
 	// ShutdownWhenDone es el interruptor «Apagar al terminar»: con él armado, al
 	// quedarse la cola de descargas vacía el servidor espera unos segundos y
 	// apaga el equipo. Es un ajuste de sesión: no se persiste en SQLite, así que
 	// cada arranque de la aplicación lo encuentra desactivado y hay que armarlo
 	// a propósito; si se guardara, un apagado pedido ayer podría ejecutarse
 	// mañana en un momento en que el usuario no lo quiere.
-	ShutdownWhenDone   bool           `json:"shutdown_when_done"`
+	ShutdownWhenDone bool `json:"shutdown_when_done"`
 	// SoundNotification controla si suena un sonido al terminar una descarga.
 	// A diferencia de ShutdownWhenDone, esta configuración sí se persiste y
 	// por defecto está activada.
-	SoundNotification  bool           `json:"sound_notification"`
-	ColorID            *int           `json:"color_id"`
-	LoaderColorID    *int           `json:"loader_color_id"`
-	SpeedLimit       SpeedLimit     `json:"speed_limit"`
-	ListenerEnabled  bool           `json:"listener_enabled"`
-	ListenerChats    []ListenerChat `json:"listener_chats"`
-	ListenerChatIDs  []int64        `json:"listener_chat_ids"`
+	SoundNotification bool           `json:"sound_notification"`
+	ColorID           *int           `json:"color_id"`
+	LoaderColorID     *int           `json:"loader_color_id"`
+	SpeedLimit        SpeedLimit     `json:"speed_limit"`
+	ListenerEnabled   bool           `json:"listener_enabled"`
+	ListenerChats     []ListenerChat `json:"listener_chats"`
+	ListenerChatIDs   []int64        `json:"listener_chat_ids"`
 	// Language es el idioma del panel ("es" o "en"). Vacío significa que el
 	// usuario todavía no ha elegido ninguno: el panel detecta entonces el
 	// idioma del sistema la primera vez y guarda aquí el resultado.
