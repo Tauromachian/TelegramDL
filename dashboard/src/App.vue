@@ -226,6 +226,7 @@ const parseSpeed = (speedStr) => {
 }
 
 const syncSettings = async (nextSettings) => {
+  if (!nextSettings) return
   syncingSettings = true
   // Si el usuario está cambiando manualmente el sonido, no sobrescribirlo
   if (userChangingSound) {
@@ -234,6 +235,9 @@ const syncSettings = async (nextSettings) => {
     Object.assign(settings, rest)
   } else {
     Object.assign(settings, nextSettings)
+  }
+  if (!settings.speed_limit) {
+    settings.speed_limit = { value: 0, unit: 'MB' }
   }
   await nextTick()
   syncingSettings = false
@@ -397,7 +401,11 @@ const fetchSettings = async () => {
   }
 }
 
-const saveSettings = async () => {
+const saveSettings = async (newSettings) => {
+  if (newSettings && typeof newSettings === 'object') {
+    Object.assign(settings, newSettings)
+  }
+  clearTimeout(saveTimer)
   saving.value = true
   try {
     const data = await api('/api/settings', {
