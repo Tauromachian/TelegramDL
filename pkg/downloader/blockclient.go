@@ -11,13 +11,18 @@ package downloader
 
 import (
 	"context"
-
-	"tgdown/pkg/i18n"
+	"errors"
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tgerr"
 
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/logbus"
 	"tgdown/pkg/telegram"
 )
@@ -109,6 +114,12 @@ func esperarPuertaFlood(ctx context.Context) error {
 	}
 }
 
+type clienteBloquesState struct {
+	mu        sync.RWMutex
+	client    *tg.Client
+	clientMgr *telegram.ClientManager
+}
+
 // clienteBloques es el cliente de Telegram con el control de bloques puesto.
 //
 // Lleva *tg.Client incrustado a propósito: así hereda tal cual todos los
@@ -117,22 +128,72 @@ func esperarPuertaFlood(ctx context.Context) error {
 // sería pedir que se rompa la compilación cada vez que gotd toque su interfaz.
 type clienteBloques struct {
 	*tg.Client
+	state *clienteBloquesState
 }
 
 // envolverCliente prepara el cliente de bloques. Devuelve el original sin
 // envolver si no hay cliente, para no esconder un nil detrás de un struct.
-func envolverCliente(cliente *tg.Client) clienteBloques {
-	return clienteBloques{Client: cliente}
+func envolverCliente(cliente *tg.Client, cm *telegram.ClientManager) clienteBloques {
+	if cliente == nil {
+		return clienteBloques{}
+	}
+	state := &clienteBloquesState{
+		client:    cliente,
+		clientMgr: cm,
+	}
+	return clienteBloques{
+		Client: cliente,
+		state:  state,
+	}
+}
+
+func (c clienteBloques) currentClient() *tg.Client {
+	if c.state != nil {
+		c.state.mu.RLock()
+		defer c.state.mu.RUnlock()
+		if c.state.client != nil {
+			return c.state.client
+		}
+	}
+	return c.Client
+}
+
+func (c clienteBloques) setClient(newClient *tg.Client) {
+	if c.state != nil {
+		c.state.mu.Lock()
+		c.state.client = newClient
+		c.state.mu.Unlock()
+	}
+	c.Client = newClient
+}
+
+func detectarFileMigrate(err error) int {
+	if err == nil {
+		return 0
+	}
+	var rpcErr *tgerr.Error
+	if errors.As(err, &rpcErr) && (rpcErr.Code == 303 || rpcErr.Type == "FILE_MIGRATE") {
+		if rpcErr.Argument > 0 {
+			return rpcErr.Argument
+		}
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "FILE_MIGRATE") {
+		re := regexp.MustCompile(`FILE_MIGRATE(?:_|\s*\()(\d+)`)
+		matches := re.FindStringSubmatch(msg)
+		if len(matches) > 1 {
+			if dc, convErr := strconv.Atoi(matches[1]); convErr == nil && dc > 0 {
+				return dc
+			}
+		}
+	}
+	return 0
 }
 
 // UploadGetFile pide un bloque respetando la pausa global y la ranura, y
-// aguanta el FLOOD_WAIT en vez de dejarlo subir.
-//
-// Que esto viva aquí y no en el worker tiene una consecuencia importante: el
-// downloader de gotd, que se usa en las descargas nuevas y que no sabe nada de
-// FLOOD_WAIT, ahora también queda cubierto. Antes, una pausa de Telegram en una
-// descarga nueva mataba el intento, y la descarga solo continuaba en el
-// reintento, ya por el camino de reanudación.
+// aguanta el FLOOD_WAIT en vez de dejarlo subir. Además, detecta si el archivo
+// reside en otro centro de datos (FILE_MIGRATE) y conmuta la conexión
+// transparentemente al DC adecuado.
 func (c clienteBloques) UploadGetFile(ctx context.Context, request *tg.UploadGetFileRequest) (tg.UploadFileClass, error) {
 	var (
 		respuesta tg.UploadFileClass
@@ -147,11 +208,25 @@ func (c clienteBloques) UploadGetFile(ctx context.Context, request *tg.UploadGet
 			return nil, errRanura
 		}
 
-		respuesta, err = c.Client.UploadGetFile(ctx, request)
+		client := c.currentClient()
+		respuesta, err = client.UploadGetFile(ctx, request)
 		liberarRanura()
 
 		if err == nil {
 			return respuesta, nil
+		}
+
+		if targetDC := detectarFileMigrate(err); targetDC > 0 && c.state != nil && c.state.clientMgr != nil {
+			logbus.Info(logbus.CatDownloads,
+				fmt.Sprintf("Detectada migración a DC %d, reconectando al centro de datos adecuado...", targetDC), "")
+			newClient, dcErr := c.state.clientMgr.DownloadClientForDC(ctx, targetDC)
+			if dcErr == nil && newClient != nil {
+				c.setClient(newClient)
+				intento-- // No penalizar el contador de intentos ante migración de DC
+				continue
+			}
+			logbus.Warn(logbus.CatDownloads,
+				fmt.Sprintf("Error conectando a DC %d: %v", targetDC, dcErr), "")
 		}
 
 		espera, esFlood := esperaPorFlood(err)
@@ -174,4 +249,19 @@ func (c clienteBloques) UploadGetFile(ctx context.Context, request *tg.UploadGet
 	}
 
 	return respuesta, err
+}
+
+func (c clienteBloques) UploadGetFileHashes(ctx context.Context, request *tg.UploadGetFileHashesRequest) ([]tg.FileHash, error) {
+	client := c.currentClient()
+	hashes, err := client.UploadGetFileHashes(ctx, request)
+	if err != nil {
+		if targetDC := detectarFileMigrate(err); targetDC > 0 && c.state != nil && c.state.clientMgr != nil {
+			newClient, dcErr := c.state.clientMgr.DownloadClientForDC(ctx, targetDC)
+			if dcErr == nil && newClient != nil {
+				c.setClient(newClient)
+				return newClient.UploadGetFileHashes(ctx, request)
+			}
+		}
+	}
+	return hashes, err
 }

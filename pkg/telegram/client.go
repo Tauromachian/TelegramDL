@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"database/sql"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -60,6 +61,9 @@ type ClientManager struct {
 	downloadPool         telegram.CloseInvoker
 	downloadClient       *tg.Client
 	downloadPoolAviso    bool
+	primaryDC            int
+	dcPools              map[int]telegram.CloseInvoker
+	dcClients            map[int]*tg.Client
 	sessionPath          string
 	cancelRun            context.CancelFunc
 	runWg                sync.WaitGroup
@@ -142,11 +146,21 @@ func (cm *ClientManager) cerrarPoolDescargas() {
 	pool := cm.downloadPool
 	cm.downloadPool = nil
 	cm.downloadClient = nil
+	dcPools := cm.dcPools
+	cm.dcPools = make(map[int]telegram.CloseInvoker)
+	cm.dcClients = make(map[int]*tg.Client)
 	cm.mu.Unlock()
 
 	if pool != nil {
 		if err := pool.Close(); err != nil {
 			log.Printf("[TG CLIENT] %s", i18n.T("telegram.poolCloseError", err))
+		}
+	}
+	for dcID, p := range dcPools {
+		if p != nil {
+			if err := p.Close(); err != nil {
+				log.Printf("[TG CLIENT] Error cerrando pool DC %d: %v", dcID, err)
+			}
 		}
 	}
 }
@@ -178,6 +192,78 @@ func (cm *ClientManager) DownloadClient() *tg.Client {
 		return cm.downloadClient
 	}
 	return cm.rawClient
+}
+
+// PrimaryDC devuelve el ID del centro de datos principal de la sesión actual.
+func (cm *ClientManager) PrimaryDC() int {
+	cm.mu.RLock()
+	if cm.primaryDC > 0 {
+		dc := cm.primaryDC
+		cm.mu.RUnlock()
+		return dc
+	}
+	cm.mu.RUnlock()
+
+	if data, err := os.ReadFile(cm.sessionPath); err == nil {
+		var sess struct {
+			Data struct {
+				DC int `json:"DC"`
+			} `json:"Data"`
+		}
+		if err := json.Unmarshal(data, &sess); err == nil && sess.Data.DC > 0 {
+			cm.mu.Lock()
+			cm.primaryDC = sess.Data.DC
+			cm.mu.Unlock()
+			return sess.Data.DC
+		}
+	}
+	return 0
+}
+
+// DownloadClientForDC devuelve un cliente configurado para descargar archivos
+// alojados en un centro de datos (DC) específico. Si dc <= 0 o coincide con el
+// DC principal de la sesión, devuelve DownloadClient() normal.
+func (cm *ClientManager) DownloadClientForDC(ctx context.Context, dc int) (*tg.Client, error) {
+	primaryDC := cm.PrimaryDC()
+	if dc <= 0 || (primaryDC > 0 && dc == primaryDC) {
+		return cm.DownloadClient(), nil
+	}
+
+	cm.mu.RLock()
+	dlClient, ok := cm.dcClients[dc]
+	client := cm.client
+	cm.mu.RUnlock()
+
+	if ok && dlClient != nil {
+		return dlClient, nil
+	}
+
+	if client == nil {
+		return nil, errors.New("cliente de Telegram no conectado")
+	}
+
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	if dlClient, ok := cm.dcClients[dc]; ok && dlClient != nil {
+		return dlClient, nil
+	}
+
+	pool, err := client.DC(ctx, dc, int64(ConexionesDescarga))
+	if err != nil {
+		log.Printf("[TG CLIENT] Error abriendo pool para DC %d: %v", dc, err)
+		return nil, fmt.Errorf("error al conectar a DC %d: %w", dc, err)
+	}
+
+	dlClient = tg.NewClient(pool)
+	if cm.dcPools == nil {
+		cm.dcPools = make(map[int]telegram.CloseInvoker)
+		cm.dcClients = make(map[int]*tg.Client)
+	}
+	cm.dcPools[dc] = pool
+	cm.dcClients[dc] = dlClient
+	log.Printf("[TG CLIENT] Pool de descargas para DC %d abierto (%d conexiones)", dc, ConexionesDescarga)
+	return dlClient, nil
 }
 
 func boundedHashSet(m map[int64]int64, id int64, hash int64) {
@@ -251,6 +337,8 @@ func NewClientManager() *ClientManager {
 		channelAccessHashes: make(map[int64]int64),
 		userAccessHashes:    make(map[int64]int64),
 		chatNames:           make(map[int64]string),
+		dcPools:             make(map[int]telegram.CloseInvoker),
+		dcClients:           make(map[int]*tg.Client),
 	}
 	return cm
 }
@@ -776,6 +864,9 @@ func (cm *ClientManager) stopRunning() {
 	cm.downloadClient = nil
 	cm.downloadPoolAviso = false
 	cm.readyChan = nil
+	cm.dcPools = make(map[int]telegram.CloseInvoker)
+	cm.dcClients = make(map[int]*tg.Client)
+	cm.primaryDC = 0
 	cm.mu.Unlock()
 }
 

@@ -26,6 +26,7 @@ type MediaInfo struct {
 	OriginalFileName string // Nombre original del archivo
 	Kind             MediaKind
 	FileSize         int64
+	DCID             int
 }
 
 // invalidPathChars son los caracteres que ningún sistema admite en un nombre de
@@ -319,6 +320,7 @@ func extractDocumentInfo(msg *tg.Message, doc *tg.Document, firstCaptionLine str
 		OriginalFileName: originalFileName,
 		Kind:             kind,
 		FileSize:         doc.Size,
+		DCID:             doc.DCID,
 	}
 }
 
@@ -376,6 +378,7 @@ func extractPhotoInfo(msg *tg.Message, photo *tg.Photo, firstCaptionLine string)
 		OriginalFileName: originalFileName,
 		Kind:             KindPhoto,
 		FileSize:         fileSize,
+		DCID:             photo.DCID,
 	}
 }
 

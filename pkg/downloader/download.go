@@ -346,12 +346,25 @@ func (e *Engine) executeDownload(ctx context.Context, itemID string) error {
 	// (el mensaje, el nombre, el tamaño) siguen yendo por la conexión principal
 	// y así dejan de competir con ellos. El envoltorio es el que limita cuántas
 	// peticiones van en vuelo y el que aguanta las pausas de Telegram, para los
-	// dos caminos de descarga por igual.
-	clienteDatos := e.clientMgr.DownloadClient()
+	var clienteDatos *tg.Client
+	if mediaInfo.DCID > 0 {
+		var errDC error
+		clienteDatos, errDC = e.clientMgr.DownloadClientForDC(ctx, mediaInfo.DCID)
+		if errDC != nil {
+			logbus.Warn(logbus.CatDownloads,
+				fmt.Sprintf("No se pudo conectar a DC %d por adelantado: %v. Usando cliente por defecto.", mediaInfo.DCID, errDC), "")
+		} else {
+			logbus.Debug(logbus.CatDownloads,
+				fmt.Sprintf("Descarga usando conexión dedicada a DC %d", mediaInfo.DCID), "")
+		}
+	}
+	if clienteDatos == nil {
+		clienteDatos = e.clientMgr.DownloadClient()
+	}
 	if clienteDatos == nil {
 		clienteDatos = rawClient
 	}
-	cliente := envolverCliente(clienteDatos)
+	cliente := envolverCliente(clienteDatos, e.clientMgr)
 
 	logbus.Debug(logbus.CatDownloads,
 		i18n.T("downloads.downloadingWorkers", finalName, threads, maxThreads),

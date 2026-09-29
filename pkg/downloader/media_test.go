@@ -1,11 +1,13 @@
 package downloader
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tgerr"
 )
 
 func TestSanitizeFileNameReplacesInvalidChars(t *testing.T) {
@@ -208,5 +210,68 @@ func TestSanitizeFileNameEvitaNombresReservadosDeWindows(t *testing.T) {
 	}
 	if got := SanitizeFileName("CONcierto.mp4"); got != "CONcierto.mp4" {
 		t.Errorf("se alteró un nombre legítimo: %q", got)
+	}
+}
+
+func TestExtractMediaInfoDCID(t *testing.T) {
+	msgDoc := &tg.Message{
+		ID: 42,
+		Media: &tg.MessageMediaDocument{
+			Document: &tg.Document{
+				MimeType: "application/zip",
+				Size:     5000,
+				DCID:     4,
+				Attributes: []tg.DocumentAttributeClass{
+					&tg.DocumentAttributeFilename{FileName: "game.zip.001"},
+				},
+			},
+		},
+	}
+	infoDoc := ExtractMediaInfo(msgDoc)
+	if infoDoc == nil || infoDoc.DCID != 4 {
+		t.Fatalf("se esperaba DCID 4, se obtuvo: %+v", infoDoc)
+	}
+
+	msgPhoto := &tg.Message{
+		ID: 43,
+		Media: &tg.MessageMediaPhoto{
+			Photo: &tg.Photo{
+				ID:   123,
+				DCID: 2,
+				Sizes: []tg.PhotoSizeClass{
+					&tg.PhotoSize{Type: "y", Size: 100},
+				},
+			},
+		},
+	}
+	infoPhoto := ExtractMediaInfo(msgPhoto)
+	if infoPhoto == nil || infoPhoto.DCID != 2 {
+		t.Fatalf("se esperaba DCID 2 para foto, se obtuvo: %+v", infoPhoto)
+	}
+}
+
+func TestDetectarFileMigrate(t *testing.T) {
+	errTg := &tgerr.Error{
+		Code:     303,
+		Type:     "FILE_MIGRATE",
+		Argument: 4,
+	}
+	if dc := detectarFileMigrate(errTg); dc != 4 {
+		t.Fatalf("se esperaba DC 4 desde tgerr, se obtuvo %d", dc)
+	}
+
+	errStr := errors.New("get file: get next chunk: invoke pool: rpcDoRequest: rpc error code 303: FILE_MIGRATE (4)")
+	if dc := detectarFileMigrate(errStr); dc != 4 {
+		t.Fatalf("se esperaba DC 4 desde error formateado, se obtuvo %d", dc)
+	}
+
+	errUnderscore := errors.New("rpc error: FILE_MIGRATE_3")
+	if dc := detectarFileMigrate(errUnderscore); dc != 3 {
+		t.Fatalf("se esperaba DC 3 desde error con guión bajo, se obtuvo %d", dc)
+	}
+
+	errOther := errors.New("connection reset by peer")
+	if dc := detectarFileMigrate(errOther); dc != 0 {
+		t.Fatalf("se esperaba DC 0 para error no relacionado, se obtuvo %d", dc)
 	}
 }
