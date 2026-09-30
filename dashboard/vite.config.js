@@ -27,7 +27,7 @@ try {
     }
   }
 } catch (e) {
-  // Ignorar errores si no existe
+  console.error(e, 'Fail loading .env')
 }
 
 const proxyTarget = `http://${backendHost}:${backendPort}`
