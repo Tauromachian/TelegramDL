@@ -42,12 +42,15 @@ Ejecuta lo siguiente y confirma que todo pasa:
 ```powershell
 go vet ./...
 go test ./...
+npm --prefix dashboard run lint
 npm --prefix dashboard run build
 ```
 
-El CI del repositorio (`.github/workflows/ci.yml`) corre exactamente estos
-mismos pasos en cada push y pull request a `main`; un PR que no los pase no
-se podrá fusionar.
+El CI del repositorio (`.github/workflows/ci.yml`) corre los pasos de Go y
+la compilación del panel en cada push y pull request a `main`; un PR que no
+los pase no se podrá fusionar. El lint del panel (`npm run lint`, sin
+errores) se verifica en local y también debe estar en verde antes de pedir
+revisión.
 
 ## Estilo y convenciones de código
 
@@ -57,8 +60,20 @@ se podrá fusionar.
   deben descartarse en silencio (`_ = err`); regístralos con `log.Printf`
   salvo que exista una razón explícita para ignorarlos (coméntala en el
   código).
-- **Vue/Frontend**: usa la Composition API con `<script setup>`. Extrae la
-  lógica reutilizable fuera de `App.vue`, eligiendo el lugar según si
+- **Vue/Frontend**: usa la Composition API con `<script setup>`. Todo el
+  código del panel pasa obligatoriamente por **ESLint** (linter) y
+  **Prettier** (formato); no se fusiona código con errores de lint:
+  - `npm --prefix dashboard run lint` debe terminar sin errores (los avisos
+    existentes se toleran de momento, pero no añadas nuevos).
+  - `npm --prefix dashboard run format` aplica el formato oficial antes de
+    subir el PR; `npm --prefix dashboard run format:check` lo verifica sin
+    tocar archivos. La configuración vive en `dashboard/eslint.config.mjs`
+    (reglas `vue` recomendadas + `globals.browser`, con bloque aparte de
+    `globals.node` para `vite.config.js`) y `dashboard/prettier.config.js`.
+  - Respeta el flujo de datos unidireccional de Vue: los componentes hijos
+    **no mutan props** (`vue/no-mutating-props`); emiten el cambio (por
+    ejemplo `update:settings`) y es el padre quien aplica el nuevo valor.
+  - Extrae la lógica reutilizable fuera de `App.vue`, eligiendo el lugar según si
   depende o no de la instancia del componente:
   - Si maneja estado reactivo (`ref`, `reactive`, `computed`), ciclo de vida
     (`onMounted`, `watch`, ...) o recursos por instancia (temporizadores,
