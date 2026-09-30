@@ -57,6 +57,11 @@ se podrá fusionar.
   deben descartarse en silencio (`_ = err`); regístralos con `log.Printf`
   salvo que exista una razón explícita para ignorarlos (coméntala en el
   código).
+- **Errores nunca en silencio**: todo bloque `catch` (JS) o manejo de `err`
+  (Go) debe, como mínimo, dejar constancia del error: `console.error` /
+  `showMessage` en el panel, `log.Printf` o `logbus` en el backend. Nada de
+  `catch {}` vacíos ni `_ = err` sin comentario que justifique por qué se
+  ignora; un fallo invisible es imposible de diagnosticar.
 - **Vue/Frontend**: usa la Composition API con `<script setup>`. Extrae la
   lógica reutilizable fuera de `App.vue`, eligiendo el lugar según si
   depende o no de la instancia del componente:
