@@ -32,12 +32,16 @@ export const availableLocales = [
 
 const STORAGE_KEY = 'tgdl_lang'
 
-const isValidLocale = (value) => Object.prototype.hasOwnProperty.call(dictionaries, value)
+const isValidLocale = (value) =>
+  Object.prototype.hasOwnProperty.call(dictionaries, value)
 
 const detectSystemLocale = () => {
-  let raw = ''
+  let raw
   try {
-    raw = (navigator.languages && navigator.languages[0]) || navigator.language || ''
+    raw =
+      (navigator.languages && navigator.languages[0]) ||
+      navigator.language ||
+      ''
   } catch {
     raw = ''
   }
@@ -53,7 +57,9 @@ const readStoredLocale = () => {
 }
 
 const state = reactive({
-  locale: isValidLocale(readStoredLocale()) ? readStoredLocale() : detectSystemLocale()
+  locale: isValidLocale(readStoredLocale())
+    ? readStoredLocale()
+    : detectSystemLocale()
 })
 
 const applyDocumentLang = (locale) => {
@@ -86,7 +92,9 @@ export function t(key, params) {
   if (text === undefined) return key
   if (!params) return text
   return text.replace(/\{(\w+)\}/g, (match, name) =>
-    params[name] !== undefined && params[name] !== null ? String(params[name]) : match
+    params[name] !== undefined && params[name] !== null
+      ? String(params[name])
+      : match
   )
 }
 

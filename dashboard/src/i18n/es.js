@@ -42,12 +42,14 @@ export default {
     controlPanel: 'PANEL DE CONTROL',
     totalSpeed: 'Velocidad total: {speed}',
     speedUnlimited: 'Velocidad de descarga: sin límites',
-    footer: 'TelegramDL · Configuración persistida localmente en SQLite · {host}'
+    footer:
+      'TelegramDL · Configuración persistida localmente en SQLite · {host}'
   },
 
   update: {
     forcedTitle: 'Actualización Obligatoria',
-    forcedText: 'Hay una nueva versión disponible ({version}). Es necesario actualizar para continuar.',
+    forcedText:
+      'Hay una nueva versión disponible ({version}). Es necesario actualizar para continuar.',
     updateNow: 'Actualizar ahora',
     statusDownloading: 'Descargando actualización...',
     statusExtracting: 'Extrayendo archivos...',
@@ -56,7 +58,8 @@ export default {
     doNotClose: 'Por favor, no cierres la aplicación.',
     currentVersion: 'Versión actual: {version}',
     availableTitle: 'Nueva versión disponible',
-    availableText: 'Hay una actualización lista ({version}). Se recomienda actualizar para obtener las mejoras.\n\nIMPORTANTE: No debe haber descargas activas durante el proceso para evitar que se corrompan. Si tienes tareas en curso, pospón la actualización y se aplicará automáticamente la próxima vez que inicies la aplicación.',
+    availableText:
+      'Hay una actualización lista ({version}). Se recomienda actualizar para obtener las mejoras.\n\nIMPORTANTE: No debe haber descargas activas durante el proceso para evitar que se corrompan. Si tienes tareas en curso, pospón la actualización y se aplicará automáticamente la próxima vez que inicies la aplicación.',
     postpone: 'Posponer',
     installError: 'Error al iniciar la actualización: {message}',
     progressError: 'Error: {status}'
@@ -79,7 +82,8 @@ export default {
     inputAria: 'Enlace de Telegram',
     start: 'Iniciar descarga',
     adding: 'Añadiendo…',
-    rangeHint: 'Para rangos de mensajes (ej: .../100-250), el máximo permitido es de 500 mensajes por tarea.',
+    rangeHint:
+      'Para rangos de mensajes (ej: .../100-250), el máximo permitido es de 500 mensajes por tarea.',
     statActive: 'ACTIVAS',
     statActiveSub: 'de {n} permitidas',
     statQueued: 'EN COLA',
@@ -121,13 +125,16 @@ export default {
     allResumed: 'Todas las descargas reanudadas',
     allCancelled: 'Todas las descargas canceladas',
     duplicateTitle: 'Archivo ya descargado',
-    duplicateText: 'El archivo "{name}" ya existe en la carpeta de descargas. ¿Quieres descargarlo nuevamente?',
+    duplicateText:
+      'El archivo "{name}" ya existe en la carpeta de descargas. ¿Quieres descargarlo nuevamente?',
     duplicateConfirm: 'Descargar de nuevo',
     cancelAllTitle: 'Cancelar todo',
-    cancelAllText: '¿Estás seguro de que quieres cancelar todas las descargas activas y en cola?',
+    cancelAllText:
+      '¿Estás seguro de que quieres cancelar todas las descargas activas y en cola?',
     cancelAllConfirm: 'Sí, cancelar todo',
     deleteTitle: 'Borrar archivo',
-    deleteText: '¿Estás seguro de que quieres eliminar "{name}" del servidor? Esta acción no se puede deshacer.',
+    deleteText:
+      '¿Estás seguro de que quieres eliminar "{name}" del servidor? Esta acción no se puede deshacer.',
     deleteConfirm: 'Sí, borrar archivo',
     deletedMsg: 'Archivo borrado'
   },
@@ -141,7 +148,8 @@ export default {
     originsKicker: 'ORÍGENES',
     chatsTitle: 'Chats vigilados',
     chatsPill: '{n} configurados',
-    helper: 'Añade el ID numérico de un grupo, canal o chat privado, o pega un enlace {link}. Si el grupo usa temas podrás escuchar solo uno de ellos en lugar del grupo entero.',
+    helper:
+      'Añade el ID numérico de un grupo, canal o chat privado, o pega un enlace {link}. Si el grupo usa temas podrás escuchar solo uno de ellos en lugar del grupo entero.',
     placeholder: 'Ej. -1001234567890 o https://t.me/c/1234567890/57',
     topicHint: 'Este grupo usa temas. Elige qué quieres escuchar.',
     topicsLoading: 'Cargando temas…',
@@ -195,17 +203,20 @@ export default {
     queuedToast: 'Descarga añadida a la cola',
     discarded: 'Multimedia descartada',
     downloadAllModalTitle: 'Descargar todo',
-    downloadAllModalText: '¿Estás seguro de que quieres añadir {n} archivos a la cola de descarga?',
+    downloadAllModalText:
+      '¿Estás seguro de que quieres añadir {n} archivos a la cola de descarga?',
     downloadAllModalConfirm: 'Sí, descargar todo',
     nonePending: 'No hay elementos pendientes por descargar',
     addedToQueue: '{n} descargas añadidas a la cola',
     clearModalTitle: 'Limpiar lista',
-    clearModalText: '¿Estás seguro de que quieres eliminar todos los elementos detectados? Esta acción no borrará los archivos ya descargados.',
+    clearModalText:
+      '¿Estás seguro de que quieres eliminar todos los elementos detectados? Esta acción no borrará los archivos ya descargados.',
     clearModalConfirm: 'Limpiar lista',
     alreadyEmpty: 'La lista ya está vacía',
     listCleared: 'Lista de escucha limpiada',
     nameUpdated: 'Nombre de archivo actualizado',
-    bulkNoneEligible: 'No hay archivos pendientes aplicables para cambiar nombre',
+    bulkNoneEligible:
+      'No hay archivos pendientes aplicables para cambiar nombre',
     bulkUpdated: '{n} nombres de archivos actualizados a {target}',
     removeChatAria: 'Eliminar chat',
     removeItemAria: 'Eliminar',
@@ -253,7 +264,8 @@ export default {
     newEntry: '{n} entrada nueva',
     newEntries: '{n} entradas nuevas',
     clearModalTitle: 'Limpiar registro',
-    clearModalText: 'Se borrarán las entradas en pantalla. El archivo de registro en disco se conserva.',
+    clearModalText:
+      'Se borrarán las entradas en pantalla. El archivo de registro en disco se conserva.',
     clearModalConfirm: 'Limpiar',
     levelTagError: 'ERROR',
     levelTagWarn: 'AVISO',
@@ -287,7 +299,8 @@ export default {
     speedLimit: 'Límite global de velocidad',
     speedHint: 'Usa 0 para quitar el límite.',
     organizeByChat: 'Carpeta por chat (escucha)',
-    organizeByChatSub: 'Lo que baje de un chat vigilado va a una subcarpeta con su nombre; si el nombre no se puede escribir en disco, se usa su ID.',
+    organizeByChatSub:
+      'Lo que baje de un chat vigilado va a una subcarpeta con su nombre; si el nombre no se puede escribir en disco, se usa su ID.',
     themesTitle: 'Temas y color',
     themesSub: 'Color de acento, temas del panel y color del loader',
     accentTitle: 'Color de Acento y Tema',
@@ -304,10 +317,12 @@ export default {
     resetLoaderColor: 'Restablecer color del loader',
     langTitle: 'Idioma',
     langSub: 'Idioma de la interfaz y del registro',
-    langNote: 'La primera vez se detecta el idioma de tu sistema automáticamente. Tu elección se guarda y se aplica también al registro de actividad.',
+    langNote:
+      'La primera vez se detecta el idioma de tu sistema automáticamente. Tu elección se guarda y se aplica también al registro de actividad.',
     remoteTitle: 'Acceso remoto',
     remoteSub: 'Token para controlar TelegramDL desde otro dispositivo',
-    remoteDesc: 'Con este token puedes controlar TelegramDL desde otro dispositivo (celular, otra PC). No abras este puerto directamente a internet: combínalo con una VPN como {vpn} o un túnel como Cloudflare Tunnel, y pega el token en la pantalla de login remoto.',
+    remoteDesc:
+      'Con este token puedes controlar TelegramDL desde otro dispositivo (celular, otra PC). No abras este puerto directamente a internet: combínalo con una VPN como {vpn} o un túnel como Cloudflare Tunnel, y pega el token en la pantalla de login remoto.',
     show: 'Mostrar',
     hide: 'Ocultar',
     copy: 'Copiar',
@@ -329,30 +344,37 @@ export default {
     importInvalidJson: 'El archivo no es un JSON válido',
     importNoChats: 'El archivo no contiene una lista de chats de escucha',
     importNoValid: 'El archivo no tiene ningún chat válido',
-    listenerImported: 'Escucha importada: {added} nuevos, {updated} actualizados',
+    listenerImported:
+      'Escucha importada: {added} nuevos, {updated} actualizados',
     listenerImportedOne: 'Escucha importada: 1 nuevo, {updated} actualizados',
-    listenerImportedOneUpdated: 'Escucha importada: {added} nuevos, 1 actualizado',
+    listenerImportedOneUpdated:
+      'Escucha importada: {added} nuevos, 1 actualizado',
     listenerImportedOneEach: 'Escucha importada: 1 nuevo, 1 actualizado',
     listenerImportFail: 'No se pudo importar la escucha',
     settingsSaved: 'Configuración guardada',
     logoutTitle: 'Cerrar sesión de Telegram',
-    logoutText: '¿Estás seguro de que deseas cerrar sesión? Tendrás que volver a autenticarte desde la web.',
+    logoutText:
+      '¿Estás seguro de que deseas cerrar sesión? Tendrás que volver a autenticarte desde la web.',
     logoutConfirm: 'Sí, cerrar sesión',
     logoutOk: 'Sesión cerrada con éxito',
     regenTitle: 'Regenerar token de acceso',
-    regenText: 'El token actual dejará de funcionar de inmediato. Cualquier otro dispositivo (celular, otra PC) que lo esté usando para acceso remoto necesitará que le pases el nuevo token.',
+    regenText:
+      'El token actual dejará de funcionar de inmediato. Cualquier otro dispositivo (celular, otra PC) que lo esté usando para acceso remoto necesitará que le pases el nuevo token.',
     regenConfirm: 'Sí, regenerar',
     regenOk: 'Token regenerado',
     clearHistoryTitle: 'Limpiar estadísticas',
-    clearHistoryText: '¿Quieres eliminar del historial todas las descargas completadas, omitidas, fallidas y canceladas? Los archivos del disco no se borrarán.',
+    clearHistoryText:
+      '¿Quieres eliminar del historial todas las descargas completadas, omitidas, fallidas y canceladas? Los archivos del disco no se borrarán.',
     clearHistoryConfirm: 'Sí, limpiar historial',
     historyCleared: '{n} registros eliminados',
     shutdownTitle: 'Apagar el PC al terminar',
-    shutdownText: 'Cuando la cola de descargas termine, el equipo se apagará automáticamente en 15 segundos. Puedes cancelarlo en cualquier momento con este mismo interruptor. El ajuste solo dura esta sesión: al cerrar la aplicación se desactiva solo.',
+    shutdownText:
+      'Cuando la cola de descargas termine, el equipo se apagará automáticamente en 15 segundos. Puedes cancelarlo en cualquier momento con este mismo interruptor. El ajuste solo dura esta sesión: al cerrar la aplicación se desactiva solo.',
     shutdownConfirm: 'Sí, activar',
     spaceTitle: '¡Espacio en disco insuficiente!',
     spaceCriticalTitle: '¡Alerta de Espacio Crítico!',
-    spaceCriticalText: 'Debido a cambios externos en tu disco, ya no hay espacio suficiente para completar las descargas en cola. \n\nNecesitas liberar al menos {needed} o cancelar algunas tareas para evitar errores.'
+    spaceCriticalText:
+      'Debido a cambios externos en tu disco, ya no hay espacio suficiente para completar las descargas en cola. \n\nNecesitas liberar al menos {needed} o cancelar algunas tareas para evitar errores.'
   },
 
   folder: {
@@ -387,10 +409,12 @@ export default {
     phoneText: 'Ingresa tu número de teléfono registrado en Telegram.',
     phoneLabel: 'Número con código de país',
     phonePlaceholder: '+34 600 00 00 00 o +1 555 123 4567',
-    phoneHelp: 'Asegúrate de incluir el prefijo internacional (ej. +34 para España, +52 para México, +1 para EE.UU.).',
+    phoneHelp:
+      'Asegúrate de incluir el prefijo internacional (ej. +34 para España, +52 para México, +1 para EE.UU.).',
     sendCode: 'Enviar Código',
     codeTitle: 'Código de Verificación',
-    codeText: 'Telegram ha enviado un código a tu aplicación o por SMS a {phone}.',
+    codeText:
+      'Telegram ha enviado un código a tu aplicación o por SMS a {phone}.',
     codeLabel: 'Código recibido',
     codePlaceholder: '12345',
     verify: 'Verificar',
@@ -399,13 +423,15 @@ export default {
     tfaLabel: 'Contraseña de 2 Pasos',
     tfaPlaceholder: 'Tu contraseña de Telegram',
     signIn: 'Iniciar Sesión',
-    backNote: '«Atrás» vuelve al paso del teléfono. Telegram ya usó el código anterior, así que se te enviará uno nuevo.',
+    backNote:
+      '«Atrás» vuelve al paso del teléfono. Telegram ya usó el código anterior, así que se te enviará uno nuevo.',
     successTitle: '¡Conexión Exitosa!',
     connectedAs: 'Conectado como',
     successFallback: 'Tu sesión de Telegram está lista y activa.',
     goDashboard: 'Ir al Dashboard',
     errFillBoth: 'Por favor completa tanto el API ID como el API HASH',
-    errPhone: 'Ingresa un número de teléfono válido con código de país (ej. +34600112233)',
+    errPhone:
+      'Ingresa un número de teléfono válido con código de país (ej. +34600112233)',
     errCode: 'Ingresa el código de 5 dígitos recibido en Telegram',
     err2fa: 'Ingresa tu contraseña de verificación en dos pasos',
     errNoResponse: 'El servidor no envió respuesta. Intenta nuevamente.',
@@ -431,9 +457,12 @@ export default {
     hintPre: 'Lo recibirás en tus',
     hintBold: 'Mensajes guardados',
     hintPost: ', donde solo tú puedes leerlo.',
-    sentOk: 'Enviado. Abre Telegram → Mensajes guardados, toca el token para copiarlo y pégalo aquí.',
+    sentOk:
+      'Enviado. Abre Telegram → Mensajes guardados, toca el token para copiarlo y pégalo aquí.',
     sendFail: 'No se pudo enviar el token.',
-    unreachable: 'No se pudo contactar con TelegramDL. Comprueba que el ordenador está encendido y accesible.',
-    invalidToken: 'Token inválido. Verifica que lo copiaste completo desde Ajustes → Acceso remoto.'
+    unreachable:
+      'No se pudo contactar con TelegramDL. Comprueba que el ordenador está encendido y accesible.',
+    invalidToken:
+      'Token inválido. Verifica que lo copiaste completo desde Ajustes → Acceso remoto.'
   }
 }

@@ -46,7 +46,8 @@ export default {
 
   update: {
     forcedTitle: 'Required Update',
-    forcedText: 'A new version is available ({version}). You must update to continue.',
+    forcedText:
+      'A new version is available ({version}). You must update to continue.',
     updateNow: 'Update now',
     statusDownloading: 'Downloading update...',
     statusExtracting: 'Extracting files...',
@@ -55,7 +56,8 @@ export default {
     doNotClose: 'Please, do not close the application.',
     currentVersion: 'Current version: {version}',
     availableTitle: 'New version available',
-    availableText: 'An update is ready ({version}). Updating is recommended to get the improvements.\n\nIMPORTANT: There must be no active downloads during the process to avoid corruption. If you have tasks in progress, postpone the update and it will be applied automatically the next time you start the application.',
+    availableText:
+      'An update is ready ({version}). Updating is recommended to get the improvements.\n\nIMPORTANT: There must be no active downloads during the process to avoid corruption. If you have tasks in progress, postpone the update and it will be applied automatically the next time you start the application.',
     postpone: 'Postpone',
     installError: 'Failed to start the update: {message}',
     progressError: 'Error: {status}'
@@ -78,7 +80,8 @@ export default {
     inputAria: 'Telegram link',
     start: 'Start download',
     adding: 'Adding…',
-    rangeHint: 'For message ranges (e.g.: .../100-250), the maximum allowed is 500 messages per task.',
+    rangeHint:
+      'For message ranges (e.g.: .../100-250), the maximum allowed is 500 messages per task.',
     statActive: 'ACTIVE',
     statActiveSub: 'of {n} allowed',
     statQueued: 'QUEUED',
@@ -120,13 +123,16 @@ export default {
     allResumed: 'All downloads resumed',
     allCancelled: 'All downloads cancelled',
     duplicateTitle: 'File already downloaded',
-    duplicateText: 'The file "{name}" already exists in the downloads folder. Do you want to download it again?',
+    duplicateText:
+      'The file "{name}" already exists in the downloads folder. Do you want to download it again?',
     duplicateConfirm: 'Download again',
     cancelAllTitle: 'Cancel everything',
-    cancelAllText: 'Are you sure you want to cancel all active and queued downloads?',
+    cancelAllText:
+      'Are you sure you want to cancel all active and queued downloads?',
     cancelAllConfirm: 'Yes, cancel everything',
     deleteTitle: 'Delete file',
-    deleteText: 'Are you sure you want to delete "{name}" from the server? This action cannot be undone.',
+    deleteText:
+      'Are you sure you want to delete "{name}" from the server? This action cannot be undone.',
     deleteConfirm: 'Yes, delete file',
     deletedMsg: 'File deleted'
   },
@@ -140,7 +146,8 @@ export default {
     originsKicker: 'SOURCES',
     chatsTitle: 'Watched chats',
     chatsPill: '{n} configured',
-    helper: 'Add the numeric ID of a group, channel or private chat, or paste a {link} link. If the group uses topics you can listen to just one of them instead of the whole group.',
+    helper:
+      'Add the numeric ID of a group, channel or private chat, or paste a {link} link. If the group uses topics you can listen to just one of them instead of the whole group.',
     placeholder: 'E.g. -1001234567890 or https://t.me/c/1234567890/57',
     topicHint: 'This group uses topics. Choose what you want to listen to.',
     topicsLoading: 'Loading topics…',
@@ -194,12 +201,14 @@ export default {
     queuedToast: 'Download added to the queue',
     discarded: 'Media discarded',
     downloadAllModalTitle: 'Download everything',
-    downloadAllModalText: 'Are you sure you want to add {n} files to the download queue?',
+    downloadAllModalText:
+      'Are you sure you want to add {n} files to the download queue?',
     downloadAllModalConfirm: 'Yes, download everything',
     nonePending: 'There are no pending items to download',
     addedToQueue: '{n} downloads added to the queue',
     clearModalTitle: 'Clear list',
-    clearModalText: 'Are you sure you want to remove all detected items? This will not delete files already downloaded.',
+    clearModalText:
+      'Are you sure you want to remove all detected items? This will not delete files already downloaded.',
     clearModalConfirm: 'Clear list',
     alreadyEmpty: 'The list is already empty',
     listCleared: 'Listener list cleared',
@@ -252,7 +261,8 @@ export default {
     newEntry: '{n} new entry',
     newEntries: '{n} new entries',
     clearModalTitle: 'Clear log',
-    clearModalText: 'The on-screen entries will be removed. The log file on disk is kept.',
+    clearModalText:
+      'The on-screen entries will be removed. The log file on disk is kept.',
     clearModalConfirm: 'Clear',
     levelTagError: 'ERROR',
     levelTagWarn: 'WARN',
@@ -286,7 +296,8 @@ export default {
     speedLimit: 'Global speed limit',
     speedHint: 'Use 0 to remove the limit.',
     organizeByChat: 'Folder per chat (listener)',
-    organizeByChatSub: "Whatever comes from a watched chat goes into a subfolder with its name; if the name can't be written to disk, its ID is used.",
+    organizeByChatSub:
+      "Whatever comes from a watched chat goes into a subfolder with its name; if the name can't be written to disk, its ID is used.",
     themesTitle: 'Themes and color',
     themesSub: 'Accent color, panel themes and loader color',
     accentTitle: 'Accent Color and Theme',
@@ -303,10 +314,12 @@ export default {
     resetLoaderColor: 'Reset loader color',
     langTitle: 'Language',
     langSub: 'Interface and activity log language',
-    langNote: 'The first time, your system language is detected automatically. Your choice is saved and also applies to the activity log.',
+    langNote:
+      'The first time, your system language is detected automatically. Your choice is saved and also applies to the activity log.',
     remoteTitle: 'Remote access',
     remoteSub: 'Token to control TelegramDL from another device',
-    remoteDesc: 'With this token you can control TelegramDL from another device (phone, another PC). Do not expose this port directly to the internet: combine it with a VPN like {vpn} or a tunnel like Cloudflare Tunnel, and paste the token on the remote login screen.',
+    remoteDesc:
+      'With this token you can control TelegramDL from another device (phone, another PC). Do not expose this port directly to the internet: combine it with a VPN like {vpn} or a tunnel like Cloudflare Tunnel, and paste the token on the remote login screen.',
     show: 'Show',
     hide: 'Hide',
     copy: 'Copy',
@@ -321,7 +334,8 @@ export default {
     importingListener: 'Importing…',
     clearHistory: 'Clear history',
     saveNow: 'Save now',
-    listenerExportEmpty: 'There are no chats configured in the Listener to export',
+    listenerExportEmpty:
+      'There are no chats configured in the Listener to export',
     listenerExported: 'Listener exported ({n} chats)',
     listenerExportedOne: 'Listener exported (1 chat)',
     listenerExportFail: 'Could not export the listener',
@@ -335,23 +349,28 @@ export default {
     listenerImportFail: 'Could not import the listener',
     settingsSaved: 'Settings saved',
     logoutTitle: 'Log out of Telegram',
-    logoutText: 'Are you sure you want to log out? You will have to authenticate again from the web.',
+    logoutText:
+      'Are you sure you want to log out? You will have to authenticate again from the web.',
     logoutConfirm: 'Yes, log out',
     logoutOk: 'Logged out successfully',
     regenTitle: 'Regenerate access token',
-    regenText: 'The current token will stop working immediately. Any other device (phone, another PC) using it for remote access will need the new token from you.',
+    regenText:
+      'The current token will stop working immediately. Any other device (phone, another PC) using it for remote access will need the new token from you.',
     regenConfirm: 'Yes, regenerate',
     regenOk: 'Token regenerated',
     clearHistoryTitle: 'Clear statistics',
-    clearHistoryText: 'Do you want to remove all completed, skipped, failed and cancelled downloads from the history? Files on disk will not be deleted.',
+    clearHistoryText:
+      'Do you want to remove all completed, skipped, failed and cancelled downloads from the history? Files on disk will not be deleted.',
     clearHistoryConfirm: 'Yes, clear history',
     historyCleared: '{n} records removed',
     shutdownTitle: 'Power off the PC when done',
-    shutdownText: 'When the download queue finishes, the computer will shut down automatically in 15 seconds. You can cancel it at any time with this same switch. The setting only lasts for this session: closing the application turns it off.',
+    shutdownText:
+      'When the download queue finishes, the computer will shut down automatically in 15 seconds. You can cancel it at any time with this same switch. The setting only lasts for this session: closing the application turns it off.',
     shutdownConfirm: 'Yes, enable it',
     spaceTitle: 'Not enough disk space!',
     spaceCriticalTitle: 'Critical Space Alert!',
-    spaceCriticalText: 'Due to external changes to your disk, there is no longer enough space to complete the queued downloads.\n\nYou need to free at least {needed} or cancel some tasks to avoid errors.'
+    spaceCriticalText:
+      'Due to external changes to your disk, there is no longer enough space to complete the queued downloads.\n\nYou need to free at least {needed} or cancel some tasks to avoid errors.'
   },
 
   folder: {
@@ -386,7 +405,8 @@ export default {
     phoneText: 'Enter your phone number registered on Telegram.',
     phoneLabel: 'Number with country code',
     phonePlaceholder: '+34 600 00 00 00 or +1 555 123 4567',
-    phoneHelp: 'Make sure to include the international prefix (e.g. +34 for Spain, +52 for Mexico, +1 for the US).',
+    phoneHelp:
+      'Make sure to include the international prefix (e.g. +34 for Spain, +52 for Mexico, +1 for the US).',
     sendCode: 'Send Code',
     codeTitle: 'Verification Code',
     codeText: 'Telegram has sent a code to your app or by SMS to {phone}.',
@@ -398,13 +418,15 @@ export default {
     tfaLabel: 'Two-Step Password',
     tfaPlaceholder: 'Your Telegram password',
     signIn: 'Sign In',
-    backNote: '"Back" returns to the phone step. Telegram already used the previous code, so a new one will be sent to you.',
+    backNote:
+      '"Back" returns to the phone step. Telegram already used the previous code, so a new one will be sent to you.',
     successTitle: 'Connection Successful!',
     connectedAs: 'Connected as',
     successFallback: 'Your Telegram session is ready and active.',
     goDashboard: 'Go to Dashboard',
     errFillBoth: 'Please fill in both the API ID and the API HASH',
-    errPhone: 'Enter a valid phone number with country code (e.g. +34600112233)',
+    errPhone:
+      'Enter a valid phone number with country code (e.g. +34600112233)',
     errCode: 'Enter the 5-digit code received on Telegram',
     err2fa: 'Enter your two-step verification password',
     errNoResponse: 'The server sent no response. Please try again.',
@@ -417,7 +439,8 @@ export default {
     subtitle: 'This device needs the access token from your TelegramDL',
     bannerA: 'Find it in the desktop app:',
     bannerB: 'Settings → Remote access',
-    bannerC: 'Copy it and paste it here just once; your session will be remembered.',
+    bannerC:
+      'Copy it and paste it here just once; your session will be remembered.',
     tokenLabel: 'Access token',
     tokenPlaceholder: 'Paste the token here',
     showToken: 'Show token',
@@ -430,9 +453,12 @@ export default {
     hintPre: 'You will receive it in your',
     hintBold: 'Saved Messages',
     hintPost: ', where only you can read it.',
-    sentOk: 'Sent. Open Telegram → Saved Messages, tap the token to copy it and paste it here.',
+    sentOk:
+      'Sent. Open Telegram → Saved Messages, tap the token to copy it and paste it here.',
     sendFail: 'Could not send the token.',
-    unreachable: 'Could not reach TelegramDL. Check that the computer is on and accessible.',
-    invalidToken: 'Invalid token. Make sure you copied it in full from Settings → Remote access.'
+    unreachable:
+      'Could not reach TelegramDL. Check that the computer is on and accessible.',
+    invalidToken:
+      'Invalid token. Make sure you copied it in full from Settings → Remote access.'
   }
 }
