@@ -38,7 +38,12 @@ Este archivo define la arquitectura del proyecto `tgdown` y establece las reglas
 - Si es lógica pura sin reactividad (mapas de datos, formato, ayudantes del DOM, `fetch` puros) → módulo simple con exportaciones nombradas en `dashboard/src/utils/`, sin prefijo `use*`.
 - **PROHIBIDO mutar props en componentes hijos** (`vue/no-mutating-props`): emite el cambio (p. ej. `update:settings`) y deja que el padre lo aplique. Ligado a la regla 2: el `settings` de `App.vue` se edita por emisión, nunca por asignación directa en el hijo.
 
-### 7. Fuente Completa de Convenciones
+### 7. Lint y Formato Obligatorios
+- **Go**: código con formato `gofmt`, `go vet ./...` y `go test ./...` en verde antes de dar la tarea por concluida.
+- **Frontend**: `npm --prefix dashboard run lint` debe terminar con **0 errores** (ESLint incluye Prettier como regla `prettier/prettier`: un descuadre de formato es un error de lint). Si falla, corrige con `npm --prefix dashboard run format` y verifica con `format:check`; **PROHIBIDO** dejar errores de lint en archivos que hayas tocado.
+- **No toques `dashboard/wailsjs/` ni `dashboard/dist/`**: son código generado (excluidos del lint); se regeneran con cada build.
+
+### 8. Fuente Completa de Convenciones
 - La guía completa para contribuidores humanos vive en `CONTRIBUTING.md`; estas reglas son el subconjunto de obligado cumplimiento para asistentes de IA.
 
 ---
