@@ -327,13 +327,15 @@ const onImportFile = async (event) => {
                     </output>
                   </label>
                   <input
-                    :model-value="props.settings.max_concurrent_downloads"
+                    :value="props.settings.max_concurrent_downloads"
                     type="range"
                     min="1"
                     max="32"
                     class="range-input"
-                    @update:model-value="
-                      patch({ max_concurrent_downloads: Number($event) })
+                    @input="
+                      patch({
+                        max_concurrent_downloads: Number($event.target.value)
+                      })
                     "
                   />
                   <div class="range-hints"><span>1</span><span>32</span></div>
@@ -360,14 +362,14 @@ const onImportFile = async (event) => {
                     <output>{{ props.settings.chunk_workers }}</output>
                   </label>
                   <input
-                    :model-value="props.settings.chunk_workers"
+                    :value="props.settings.chunk_workers"
                     :disabled="!props.settings.parallel_chunks"
                     type="range"
                     min="1"
                     max="8"
                     class="range-input"
-                    @update:model-value="
-                      patch({ chunk_workers: Number($event) })
+                    @input="
+                      patch({ chunk_workers: Number($event.target.value) })
                     "
                   />
                   <div class="range-hints"><span>1</span><span>8</span></div>
@@ -381,26 +383,26 @@ const onImportFile = async (event) => {
                     </label>
                     <div class="speed-row">
                       <input
-                        :model-value="props.settings.speed_limit.value"
+                        :value="props.settings.speed_limit.value"
                         type="number"
                         min="0"
                         step="0.5"
-                        @update:model-value="
+                        @input="
                           patch({
                             speed_limit: {
                               ...props.settings.speed_limit,
-                              value: Number($event)
+                              value: Number($event.target.value)
                             }
                           })
                         "
                       />
                       <select
-                        :model-value="props.settings.speed_limit.unit"
-                        @update:model-value="
+                        :value="props.settings.speed_limit.unit"
+                        @change="
                           patch({
                             speed_limit: {
                               ...props.settings.speed_limit,
-                              unit: $event
+                              unit: $event.target.value
                             }
                           })
                         "

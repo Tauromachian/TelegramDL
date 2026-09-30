@@ -1330,6 +1330,7 @@ onUnmounted(() => {
             :themeMap="themeMap"
             :api-token="token"
             :notify="showMessage"
+            @update:settings="(partial) => Object.assign(settings, partial)"
             @save-settings="saveSettings"
             @clear-history="clearDownloadHistory"
             @reset-color="resetColor"
