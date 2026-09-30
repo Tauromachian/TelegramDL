@@ -29,6 +29,18 @@ Este archivo define la arquitectura del proyecto `tgdown` y establece las reglas
 - Todas las cadenas visibles para el usuario deben estar registradas en los archivos de traducción (`dashboard/src/i18n/es.js` y `dashboard/src/i18n/en.js`).
 - Utiliza siempre la función `t('clave.subclave')` de `useI18n()`.
 
+### 5. Errores Nunca en Silencio
+- **Todo `catch` (JS) o manejo de `err` (Go) debe, como mínimo, dejar constancia del error**: `console.error` / `showMessage` en el panel, `log.Printf` o `logbus` en el backend.
+- **PROHIBIDO los `catch {}` vacíos y los `_ = err` sin comentario**: un fallo invisible es imposible de diagnosticar. Si hay razón explícita para ignorar un error, coméntala en el código.
+
+### 6. Composables (`use*`) Solo con Estado Reactivo
+- Si maneja estado reactivo (`ref`, `reactive`, `computed`), ciclo de vida (`onMounted`, `watch`, …) o recursos por instancia (temporizadores, sockets, suscripciones) → composable en `dashboard/src/composables/` con prefijo `use*`.
+- Si es lógica pura sin reactividad (mapas de datos, formato, ayudantes del DOM, `fetch` puros) → módulo simple con exportaciones nombradas en `dashboard/src/utils/`, sin prefijo `use*`.
+- **PROHIBIDO mutar props en componentes hijos** (`vue/no-mutating-props`): emite el cambio (p. ej. `update:settings`) y deja que el padre lo aplique. Ligado a la regla 2: el `settings` de `App.vue` se edita por emisión, nunca por asignación directa en el hijo.
+
+### 7. Fuente Completa de Convenciones
+- La guía completa para contribuidores humanos vive en `CONTRIBUTING.md`; estas reglas son el subconjunto de obligado cumplimiento para asistentes de IA.
+
 ---
 
 ## 🛠️ ARQUITECTURA DEL PROYECTO
