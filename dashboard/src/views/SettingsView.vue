@@ -1,8 +1,22 @@
 <script setup>
 import { ref, computed } from 'vue'
 import {
-  Settings2, Zap, Trash2, Save, Copy, Eye, EyeOff, RefreshCw, Download, Upload,
-  ChevronRight, ArrowDownToLine, Image as Palette, KeyRound, HardDrive, Languages
+  Settings2,
+  Zap,
+  Trash2,
+  Save,
+  Copy,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Download,
+  Upload,
+  ChevronRight,
+  ArrowDownToLine,
+  Image as Palette,
+  KeyRound,
+  HardDrive,
+  Languages
 } from '../icons'
 import FolderPicker from '../components/FolderPicker.vue'
 import { useAuthToken } from '../composables/useAuthToken'
@@ -40,11 +54,17 @@ const props = defineProps({
 
 const emit = defineEmits([
   'save-settings',
+  'update:settings',
   'clear-history',
   'reset-color',
   'reset-loader-color',
   'regenerate-token'
 ])
+
+// Los ajustes pertenecen al padre (App.vue): aquí nunca se muta la prop
+// `settings` directamente. Cada control emite el cambio con patch() y el
+// padre lo aplica, lo que dispara su autoguardado como antes.
+const patch = (partial) => emit('update:settings', partial)
 
 // Secciones plegables, en acordeón: solo puede haber una abierta a la vez y al
 // entrar en Ajustes están todas cerradas, así la vista arranca siempre igual y
@@ -66,7 +86,9 @@ const copyLabel = computed(() =>
       ? t('settings.copyFail')
       : t('settings.copy')
 )
-const maskedToken = computed(() => props.apiToken ? '•'.repeat(Math.min(props.apiToken.length, 40)) : '')
+const maskedToken = computed(() =>
+  props.apiToken ? '•'.repeat(Math.min(props.apiToken.length, 40)) : ''
+)
 
 // Los colores 0-15 son los de Telegram Premium (el panel toma el de la cuenta
 // al iniciar sesión). Del 16 en adelante son temas propios del panel, que
@@ -75,7 +97,7 @@ const maskedToken = computed(() => props.apiToken ? '•'.repeat(Math.min(props.
 const temasEspeciales = computed(() =>
   Object.keys(props.themeMap)
     .map(Number)
-    .filter(id => id >= 16)
+    .filter((id) => id >= 16)
     .sort((a, b) => a - b)
 )
 
@@ -87,7 +109,9 @@ const copyToken = async () => {
   } catch {
     copyState.value = 'fail'
   }
-  setTimeout(() => { copyState.value = '' }, 2000)
+  setTimeout(() => {
+    copyState.value = ''
+  }, 2000)
 }
 
 // Exportar / importar la configuración de escucha (los chats del listener con
@@ -105,7 +129,9 @@ const listenerApi = async (options = {}) => {
     headers: { ...(options.headers || {}), ...authHeaders() }
   })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.detail || data.error || t('common.serverError'))
+  if (!response.ok) {
+    throw new Error(data.detail || data.error || t('common.serverError'))
+  }
   return data
 }
 
@@ -113,7 +139,8 @@ const normalizeChat = (raw) => {
   if (!raw || typeof raw !== 'object') return null
   const id = Number(raw.id ?? raw.chat_id)
   if (!Number.isInteger(id) || id === 0) return null
-  const flag = (value) => value === undefined || value === null ? true : !!value
+  const flag = (value) =>
+    value === undefined || value === null ? true : !!value
   return {
     id,
     name: String(raw.name ?? id),
@@ -157,8 +184,16 @@ const exportListener = async () => {
       chats
     }
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-    triggerBlobDownload(JSON.stringify(payload, null, 2), `tgdown-escucha-${stamp}.json`, 'application/json')
-    props.notify(chats.length === 1 ? t('settings.listenerExportedOne') : t('settings.listenerExported', { n: chats.length }))
+    triggerBlobDownload(
+      JSON.stringify(payload, null, 2),
+      `tgdown-escucha-${stamp}.json`,
+      'application/json'
+    )
+    props.notify(
+      chats.length === 1
+        ? t('settings.listenerExportedOne')
+        : t('settings.listenerExported', { n: chats.length })
+    )
   } catch (err) {
     props.notify(err.message || t('settings.listenerExportFail'), true)
   } finally {
@@ -187,7 +222,9 @@ const onImportFile = async (event) => {
       throw new Error(t('settings.importInvalidJson'))
     }
 
-    const rawChats = Array.isArray(parsed) ? parsed : (parsed?.chats || parsed?.listener_chats)
+    const rawChats = Array.isArray(parsed)
+      ? parsed
+      : parsed?.chats || parsed?.listener_chats
     if (!Array.isArray(rawChats)) {
       throw new Error(t('settings.importNoChats'))
     }
@@ -199,7 +236,9 @@ const onImportFile = async (event) => {
 
     const current = await listenerApi()
     const merged = new Map()
-    for (const chat of (current.chats || []).map(normalizeChat).filter(Boolean)) {
+    for (const chat of (current.chats || [])
+      .map(normalizeChat)
+      .filter(Boolean)) {
       merged.set(chat.id, chat)
     }
     let added = 0
@@ -210,7 +249,10 @@ const onImportFile = async (event) => {
       merged.set(chat.id, chat)
     }
 
-    const body = { enabled: !!current.enabled, chats: Array.from(merged.values()) }
+    const body = {
+      enabled: !!current.enabled,
+      chats: Array.from(merged.values())
+    }
     if (typeof parsed?.listener_enabled === 'boolean') {
       body.enabled = parsed.listener_enabled
     }
@@ -244,15 +286,22 @@ const onImportFile = async (event) => {
       <aside class="panel settings-panel-full">
         <div class="panel-heading">
           <div>
-            <span class="eyebrow"><Settings2 :size="12" /> {{ t('settings.kicker') }}</span>
+            <span class="eyebrow">
+              <Settings2 :size="12" /> {{ t('settings.kicker') }}
+            </span>
             <h2>{{ t('settings.title') }}</h2>
           </div>
-          <span class="save-state">{{ saving ? t('settings.saving') : t('settings.autosaved') }}</span>
+          <span class="save-state">
+            {{ saving ? t('settings.saving') : t('settings.autosaved') }}
+          </span>
         </div>
 
         <div class="ajustes-acordeon">
           <!-- 1. Descargas -->
-          <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'descargas' }">
+          <section
+            class="ajuste-bloque"
+            :class="{ abierto: seccionAbierta === 'descargas' }"
+          >
             <button
               type="button"
               class="ajuste-cabecera"
@@ -272,14 +321,20 @@ const onImportFile = async (event) => {
                 <!-- Concurrencia y Workers -->
                 <div class="settings-group">
                   <label class="setting-label">
-                    {{ t('settings.concurrent') }} <output>{{ props.settings.max_concurrent_downloads }}</output>
+                    {{ t('settings.concurrent') }}
+                    <output>
+                      {{ props.settings.max_concurrent_downloads }}
+                    </output>
                   </label>
                   <input
-                    v-model.number="props.settings.max_concurrent_downloads"
+                    :model-value="props.settings.max_concurrent_downloads"
                     type="range"
                     min="1"
                     max="32"
                     class="range-input"
+                    @update:model-value="
+                      patch({ max_concurrent_downloads: Number($event) })
+                    "
                   />
                   <div class="range-hints"><span>1</span><span>32</span></div>
 
@@ -289,21 +344,31 @@ const onImportFile = async (event) => {
                       <small>{{ t('settings.chunksSub') }}</small>
                     </div>
                     <label class="switch">
-                      <input v-model="props.settings.parallel_chunks" type="checkbox" />
+                      <input
+                        :checked="props.settings.parallel_chunks"
+                        type="checkbox"
+                        @change="
+                          patch({ parallel_chunks: $event.target.checked })
+                        "
+                      />
                       <span></span>
                     </label>
                   </div>
 
                   <label class="setting-label compact">
-                    {{ t('settings.workers') }} <output>{{ props.settings.chunk_workers }}</output>
+                    {{ t('settings.workers') }}
+                    <output>{{ props.settings.chunk_workers }}</output>
                   </label>
                   <input
-                    v-model.number="props.settings.chunk_workers"
+                    :model-value="props.settings.chunk_workers"
                     :disabled="!props.settings.parallel_chunks"
                     type="range"
                     min="1"
                     max="8"
                     class="range-input"
+                    @update:model-value="
+                      patch({ chunk_workers: Number($event) })
+                    "
                   />
                   <div class="range-hints"><span>1</span><span>8</span></div>
                 </div>
@@ -311,15 +376,35 @@ const onImportFile = async (event) => {
                 <!-- Velocidad y Directorio -->
                 <div class="settings-group">
                   <div class="speed-setting">
-                    <label class="setting-label compact">{{ t('settings.speedLimit') }}</label>
+                    <label class="setting-label compact">
+                      {{ t('settings.speedLimit') }}
+                    </label>
                     <div class="speed-row">
                       <input
-                        v-model.number="props.settings.speed_limit.value"
+                        :model-value="props.settings.speed_limit.value"
                         type="number"
                         min="0"
                         step="0.5"
+                        @update:model-value="
+                          patch({
+                            speed_limit: {
+                              ...props.settings.speed_limit,
+                              value: Number($event)
+                            }
+                          })
+                        "
                       />
-                      <select v-model="props.settings.speed_limit.unit">
+                      <select
+                        :model-value="props.settings.speed_limit.unit"
+                        @update:model-value="
+                          patch({
+                            speed_limit: {
+                              ...props.settings.speed_limit,
+                              unit: $event
+                            }
+                          })
+                        "
+                      >
                         <option>KB</option>
                         <option>MB</option>
                         <option>GB</option>
@@ -329,7 +414,10 @@ const onImportFile = async (event) => {
                     <small>{{ t('settings.speedHint') }}</small>
                   </div>
 
-                  <FolderPicker v-model="props.settings.download_folder" />
+                  <FolderPicker
+                    :model-value="props.settings.download_folder"
+                    @update:model-value="patch({ download_folder: $event })"
+                  />
 
                   <div class="setting-line">
                     <div>
@@ -337,7 +425,13 @@ const onImportFile = async (event) => {
                       <small>{{ t('settings.organizeByChatSub') }}</small>
                     </div>
                     <label class="switch">
-                      <input v-model="props.settings.organize_by_chat" type="checkbox" />
+                      <input
+                        :checked="props.settings.organize_by_chat"
+                        type="checkbox"
+                        @change="
+                          patch({ organize_by_chat: $event.target.checked })
+                        "
+                      />
                       <span></span>
                     </label>
                   </div>
@@ -347,7 +441,10 @@ const onImportFile = async (event) => {
           </section>
 
           <!-- 2. Temas -->
-          <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'temas' }">
+          <section
+            class="ajuste-bloque"
+            :class="{ abierto: seccionAbierta === 'temas' }"
+          >
             <button
               type="button"
               class="ajuste-cabecera"
@@ -366,12 +463,16 @@ const onImportFile = async (event) => {
               <div class="ajuste-columnas">
                 <!-- Paleta de Color y Tema -->
                 <div class="settings-group color-group">
-                  <span class="setting-label">{{ t('settings.accentTitle') }}</span>
+                  <span class="setting-label">{{
+                    t('settings.accentTitle')
+                  }}</span>
 
                   <!-- Los 0-15 vienen de Telegram Premium; del 16 en adelante son las
                        paletas propias del panel. Van separados con su propio título
                        para que se vea de dónde sale cada grupo. -->
-                  <span class="grupo-color-titulo">{{ t('settings.telegramGroup') }}</span>
+                  <span class="grupo-color-titulo">{{
+                    t('settings.telegramGroup')
+                  }}</span>
                   <div class="color-selector-container">
                     <div class="color-row">
                       <button
@@ -380,9 +481,11 @@ const onImportFile = async (event) => {
                         type="button"
                         class="color-dot"
                         :class="{ active: props.settings.color_id === id }"
-                        :style="{ background: themeMap[id]?.gradient || '#38a7ff' }"
+                        :style="{
+                          background: themeMap[id]?.gradient || '#38a7ff'
+                        }"
                         :title="t('settings.colorN', { n: id })"
-                        @click="props.settings.color_id = id"
+                        @click="patch({ color_id: id })"
                       ></button>
                     </div>
                     <div class="color-row">
@@ -396,7 +499,7 @@ const onImportFile = async (event) => {
                           background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
                         }"
                         :title="t('settings.gradientN', { n: id })"
-                        @click="props.settings.color_id = id"
+                        @click="patch({ color_id: id })"
                       ></button>
                     </div>
                   </div>
@@ -405,7 +508,9 @@ const onImportFile = async (event) => {
                        mismo ajuste (color_id) que los de arriba: elegir uno sustituye
                        al color de la cuenta, y "Restablecer color de la cuenta"
                        vuelve a dejar el de Telegram. -->
-                  <span class="grupo-color-titulo">{{ t('settings.thematicGroup') }}</span>
+                  <span class="grupo-color-titulo">{{
+                    t('settings.thematicGroup')
+                  }}</span>
                   <div class="temas-lista">
                     <button
                       v-for="id in temasEspeciales"
@@ -413,24 +518,39 @@ const onImportFile = async (event) => {
                       type="button"
                       class="tema-chip"
                       :class="{ active: props.settings.color_id === id }"
-                      :title="themeMap[id]?.name || t('settings.themeN', { n: id })"
-                      @click="props.settings.color_id = id"
+                      :title="
+                        themeMap[id]?.name || t('settings.themeN', { n: id })
+                      "
+                      @click="patch({ color_id: id })"
                     >
-                      <span class="tema-muestra" :style="{ background: themeMap[id]?.gradient }"></span>
-                      <span class="tema-nombre">{{ themeMap[id]?.name || t('settings.themeN', { n: id }) }}</span>
+                      <span
+                        class="tema-muestra"
+                        :style="{ background: themeMap[id]?.gradient }"
+                      ></span>
+                      <span class="tema-nombre">{{
+                        themeMap[id]?.name || t('settings.themeN', { n: id })
+                      }}</span>
                     </button>
                   </div>
 
-                  <button type="button" class="reset-button-alt" @click="emit('reset-color')">
+                  <button
+                    type="button"
+                    class="reset-button-alt"
+                    @click="emit('reset-color')"
+                  >
                     <Zap :size="14" /> {{ t('settings.resetAccountColor') }}
                   </button>
                 </div>
 
                 <!-- Color del Loader -->
                 <div class="settings-group color-group">
-                  <span class="setting-label">{{ t('settings.loaderTitle') }}</span>
+                  <span class="setting-label">{{
+                    t('settings.loaderTitle')
+                  }}</span>
 
-                  <span class="grupo-color-titulo">{{ t('settings.telegramGroup') }}</span>
+                  <span class="grupo-color-titulo">{{
+                    t('settings.telegramGroup')
+                  }}</span>
                   <div class="color-selector-container">
                     <div class="color-row">
                       <button
@@ -438,10 +558,14 @@ const onImportFile = async (event) => {
                         :key="'loader-' + id"
                         type="button"
                         class="color-dot"
-                        :class="{ active: props.settings.loader_color_id === id }"
-                        :style="{ background: themeMap[id]?.gradient || '#38a7ff' }"
+                        :class="{
+                          active: props.settings.loader_color_id === id
+                        }"
+                        :style="{
+                          background: themeMap[id]?.gradient || '#38a7ff'
+                        }"
                         :title="t('settings.colorLoaderN', { n: id })"
-                        @click="props.settings.loader_color_id = id"
+                        @click="patch({ loader_color_id: id })"
                       ></button>
                     </div>
                     <div class="color-row">
@@ -450,12 +574,14 @@ const onImportFile = async (event) => {
                         :key="'loader-grad-' + id"
                         type="button"
                         class="color-dot gradient-dot"
-                        :class="{ active: props.settings.loader_color_id === id }"
+                        :class="{
+                          active: props.settings.loader_color_id === id
+                        }"
                         :style="{
                           background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
                         }"
                         :title="t('settings.gradientLoaderN', { n: id })"
-                        @click="props.settings.loader_color_id = id"
+                        @click="patch({ loader_color_id: id })"
                       ></button>
                     </div>
                   </div>
@@ -463,7 +589,9 @@ const onImportFile = async (event) => {
                   <!-- Aquí solo va el círculo con el degradado del tema, sin nombre:
                        del tema especial el loader únicamente toma el color, no el
                        decorado, así que no hay nada más que enseñar. -->
-                  <span class="grupo-color-titulo">{{ t('settings.thematicGroupShort') }}</span>
+                  <span class="grupo-color-titulo">{{
+                    t('settings.thematicGroupShort')
+                  }}</span>
                   <div class="color-selector-container">
                     <div class="color-row">
                       <button
@@ -471,15 +599,23 @@ const onImportFile = async (event) => {
                         :key="'loader-tema-' + id"
                         type="button"
                         class="color-dot tema-dot"
-                        :class="{ active: props.settings.loader_color_id === id }"
+                        :class="{
+                          active: props.settings.loader_color_id === id
+                        }"
                         :style="{ background: themeMap[id]?.gradient }"
-                        :title="themeMap[id]?.name || t('settings.themeN', { n: id })"
-                        @click="props.settings.loader_color_id = id"
+                        :title="
+                          themeMap[id]?.name || t('settings.themeN', { n: id })
+                        "
+                        @click="patch({ loader_color_id: id })"
                       ></button>
                     </div>
                   </div>
 
-                  <button type="button" class="reset-button-alt" @click="emit('reset-loader-color')">
+                  <button
+                    type="button"
+                    class="reset-button-alt"
+                    @click="emit('reset-loader-color')"
+                  >
                     <Zap :size="14" /> {{ t('settings.resetLoaderColor') }}
                   </button>
                 </div>
@@ -488,7 +624,10 @@ const onImportFile = async (event) => {
           </section>
 
           <!-- 3. Idioma -->
-          <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'idioma' }">
+          <section
+            class="ajuste-bloque"
+            :class="{ abierto: seccionAbierta === 'idioma' }"
+          >
             <button
               type="button"
               class="ajuste-cabecera"
@@ -517,7 +656,7 @@ const onImportFile = async (event) => {
                     class="tema-chip idioma-chip"
                     :class="{ active: locale === lang.id }"
                     :aria-pressed="locale === lang.id"
-                    @click="props.settings.language = lang.id"
+                    @click="patch({ language: lang.id })"
                   >
                     <span class="tema-nombre">{{ lang.label }}</span>
                   </button>
@@ -528,7 +667,10 @@ const onImportFile = async (event) => {
           </section>
 
           <!-- 4. Acceso remoto -->
-          <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'remoto' }">
+          <section
+            class="ajuste-bloque"
+            :class="{ abierto: seccionAbierta === 'remoto' }"
+          >
             <button
               type="button"
               class="ajuste-cabecera"
@@ -546,7 +688,14 @@ const onImportFile = async (event) => {
             <div v-show="seccionAbierta === 'remoto'" class="ajuste-cuerpo">
               <div class="settings-group">
                 <small>
-                  {{ remoteDescParts[0] }}<a class="inline-link" href="https://tailscale.com" target="_blank" rel="noopener">Tailscale</a>{{ remoteDescParts[1] }}
+                  {{ remoteDescParts[0]
+                  }}<a
+                    class="inline-link"
+                    href="https://tailscale.com"
+                    target="_blank"
+                    rel="noopener"
+                    >Tailscale</a
+                  >{{ remoteDescParts[1] }}
                 </small>
 
                 <div class="token-row">
@@ -557,14 +706,30 @@ const onImportFile = async (event) => {
                   />
                 </div>
 
-                <div class="settings-actions" style="margin-top: 0; padding: 0; flex-wrap: wrap;">
-                  <button type="button" class="reset-button-alt" @click="showToken = !showToken">
-                    <component :is="showToken ? EyeOff : Eye" :size="14" /> {{ showToken ? t('settings.hide') : t('settings.show') }}
+                <div
+                  class="settings-actions"
+                  style="margin-top: 0; padding: 0; flex-wrap: wrap"
+                >
+                  <button
+                    type="button"
+                    class="reset-button-alt"
+                    @click="showToken = !showToken"
+                  >
+                    <component :is="showToken ? EyeOff : Eye" :size="14" />
+                    {{ showToken ? t('settings.hide') : t('settings.show') }}
                   </button>
-                  <button type="button" class="reset-button-alt" @click="copyToken">
+                  <button
+                    type="button"
+                    class="reset-button-alt"
+                    @click="copyToken"
+                  >
                     <Copy :size="14" /> {{ copyLabel }}
                   </button>
-                  <button type="button" class="reset-button-alt" @click="emit('regenerate-token')">
+                  <button
+                    type="button"
+                    class="reset-button-alt"
+                    @click="emit('regenerate-token')"
+                  >
                     <RefreshCw :size="14" /> {{ t('settings.regenerate') }}
                   </button>
                 </div>
@@ -573,7 +738,10 @@ const onImportFile = async (event) => {
           </section>
 
           <!-- 5. Datos: escucha e historial -->
-          <section class="ajuste-bloque" :class="{ abierto: seccionAbierta === 'datos' }">
+          <section
+            class="ajuste-bloque"
+            :class="{ abierto: seccionAbierta === 'datos' }"
+          >
             <button
               type="button"
               class="ajuste-cabecera"
@@ -591,11 +759,31 @@ const onImportFile = async (event) => {
             <div v-show="seccionAbierta === 'datos'" class="ajuste-cuerpo">
               <div class="settings-group">
                 <div class="settings-actions acciones-datos">
-                  <button type="button" class="reset-button-alt" :disabled="exporting" @click="exportListener">
-                    <Download :size="14" /> {{ exporting ? t('settings.exportingListener') : t('settings.exportListener') }}
+                  <button
+                    type="button"
+                    class="reset-button-alt"
+                    :disabled="exporting"
+                    @click="exportListener"
+                  >
+                    <Download :size="14" />
+                    {{
+                      exporting
+                        ? t('settings.exportingListener')
+                        : t('settings.exportListener')
+                    }}
                   </button>
-                  <button type="button" class="reset-button-alt" :disabled="importing" @click="pickImportFile">
-                    <Upload :size="14" /> {{ importing ? t('settings.importingListener') : t('settings.importListener') }}
+                  <button
+                    type="button"
+                    class="reset-button-alt"
+                    :disabled="importing"
+                    @click="pickImportFile"
+                  >
+                    <Upload :size="14" />
+                    {{
+                      importing
+                        ? t('settings.importingListener')
+                        : t('settings.importListener')
+                    }}
                   </button>
                   <button
                     class="clear-history-button boton-historial"
