@@ -8,8 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write src",
-    "format:check": "prettier --check src"
+    "format": "prettier --write src eslint.config.mjs vite.config.js prettier.config.js",
+    "format:check": "prettier --check src eslint.config.mjs vite.config.js prettier.config.js"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.3.2",
