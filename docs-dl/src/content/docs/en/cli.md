@@ -17,7 +17,7 @@ TelegramDL.exe [options]
 ./TelegramDL [options]
 ```
 
-### Supported Arguments:
+### Supported Arguments
 
 | Argument | Alias | Description |
 | :--- | :--- | :--- |
@@ -31,15 +31,17 @@ TelegramDL.exe [options]
 ## Headless Server Mode (`--server`)
 
 Headless mode is ideal for:
+
 - Home servers or NAS appliances (Synology, TrueNAS, unRAID).
 - Headless Linux virtual machines without a display server (X11/Wayland).
-- Background services intended for remote management via smartphone or web browser through [Remote Access](remote-access.md).
+- Background services intended for remote management via smartphone or web browser through [Remote Access](/TelegramDL/remote-access/).
 
 ```bash
 TelegramDL.exe --server
 ```
 
 When launched in this mode:
+
 1. Acquires the single-instance lock to prevent process conflicts.
 2. Initializes the MTProto session with Telegram.
 3. Launches the HTTP REST and WebSocket listener on the configured host and port (default `0.0.0.0:8000`).
@@ -56,6 +58,7 @@ TelegramDL.exe --update
 ```
 
 The integrated updater (`pkg/updater/updater.go`):
+
 1. Queries the GitHub Releases API for TelegramDL.
 2. Compares your running version with the latest release tag.
 3. Streams the matching OS/architecture binary package.

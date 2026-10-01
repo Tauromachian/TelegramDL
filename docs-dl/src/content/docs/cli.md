@@ -17,7 +17,7 @@ TelegramDL.exe [opciones]
 ./TelegramDL [opciones]
 ```
 
-### Parámetros Disponibles:
+### Parámetros Disponibles
 
 | Parámetro | Alias | Descripción |
 | :--- | :--- | :--- |
@@ -31,15 +31,17 @@ TelegramDL.exe [opciones]
 ## Modo Servidor Headless (`--server`)
 
 El modo servidor es ideal para:
+
 - Servidores domésticos o NAS (Synology, TrueNAS, etc.).
 - Máquinas virtuales Linux o servidores sin entorno gráfico (headless).
-- Despliegues en segundo plano que se controlan exclusivamente desde el teléfono móvil o navegador web mediante [Acceso Remoto](remote-access.md).
+- Despliegues en segundo plano que se controlan exclusivamente desde el teléfono móvil o navegador web mediante [Acceso Remoto](/TelegramDL/remote-access/).
 
 ```bash
 TelegramDL.exe --server
 ```
 
 Al iniciarse en este modo:
+
 1. Adquiere el bloqueo de instancia única para evitar colisiones.
 2. Inicia la conexión MTProto con Telegram.
 3. Arranca el servidor HTTP y WebSocket en la IP y puerto configurados (por defecto `0.0.0.0:8000`).
@@ -56,6 +58,7 @@ TelegramDL.exe --update
 ```
 
 El actualizador integrado (`pkg/updater/updater.go`):
+
 1. Consulta la API pública de releases en GitHub de TelegramDL.
 2. Compara la versión actual con la última versión publicada.
 3. Descarga el binario optimizado correspondiente a tu sistema operativo y arquitectura.
