@@ -43,9 +43,11 @@ Para cada canal o grupo que agregues a la escucha, puedes configurar filtros ind
 ## Modos de Operación
 
 ### 1. Descarga Automática (`AutoDownload = true`)
+
 Cualquier archivo entrante que cumpla con los filtros seleccionados se envía inmediatamente a la cola de descargas activas y comienza a transferirse sin intervención del usuario.
 
 ### 2. Detección Manual (`AutoDownload = false`)
+
 Los archivos se registran en la pestaña **"Multimedia Detectada"** con estado disponible. Podrás revisar la lista con vista previa, tamaño y título, y decidir con un solo clic si deseas descargar elementos específicos o pulsar **"Descargar Todo"**.
 
 ---
@@ -54,24 +56,20 @@ Los archivos se registran en la pestaña **"Multimedia Detectada"** con estado d
 
 TelegramDL permite personalizar el nombre final de los archivos detectados antes de agregarlos a la cola de descargas.
 
-### 1. Conmutador "Nombre" por Chat Vigilado
+### Conmutador "Nombre" por Chat Vigilado
+
 En la sección de **Chats Vigilados**, cada origen cuenta con un interruptor **Nombre**:
-- **Activado**: La aplicación habilita la selección de nombres para todos los archivos detectados que provengan de ese chat.
-- **Desactivado**: Los archivos mantendrán su nombre por defecto sin mostrar controles de renombrado.
 
-### 2. Fuentes de Nombre Disponibles
-- **Caption**: Extrae y aplica el texto explicativo o pie de mensaje adjunto al archivo en Telegram.
-- **Original**: Utiliza el nombre de archivo interno embebido en la estructura del mensaje original.
+- **Activado: Original**: todos los archivos de ese chat en la escucha tomaran el nombre original con el que se subió a telegram.
 
-### 3. Renombrado Individual por Archivo
-En la lista de **Multimedia Detectada**, cada elemento perteneciente a un chat con la opción **Nombre** activa dispone de un botón **Nombre**:
-- Al hacer clic, despliega un menú flotante para elegir entre el nombre de **Caption** o el nombre **Original**.
-- Al seleccionar una opción, el archivo actualiza su nombre de inmediato antes de iniciar la descarga.
+- **Activado: caption**: todos los archivos de ese chat en la escucha tomaran el nombre basado en el caption (`pie de mensaje`), solo tendrá en cuenta la primera línea con un máximo de 50 caractéres.
 
-### 4. Renombrado Masivo (Botón "Nombre" en la Bandeja de Entrada)
-Ubicado en la cabecera de la Bandeja de Entrada, a la izquierda del botón **Todo**:
-- Despliega las opciones **Usar Caption** y **Usar Original**.
-- **Regla de Filtrado**: Al elegir una opción, se renombrarán de forma masiva todos los archivos pendientes en la lista **únicamente si pertenecen a chats que tienen activa la opción "Nombre"**. Los archivos de chats sin esta opción activa no sufren ninguna modificación.
+- **Desactivado**: Debe poner manual si desea el nombre original o el caption en cada archivo de la lista o de forma masiva, por defecto se usa le caption.
+
+  - **Original**: Nombre original del archivo
+  - **Caption**:  caption (`pie de mensaje`) disponible
+
+En la lista de **Multimedia Detectada**, cada elemento perteneciente a un chat con la opción **Nombre** desactivada dispone de un botón **Nombre** para elegir de forma manual el nombre deseado por archivo o si desea que todos de golpe tomen un nombre arriba de la lista hay un botón dedicado con el que todos los archivos pertenecientes a un chat que no tiene la opción de un nombre activa se le puede asignar de forma masiva el nombre original o el caption
 
 ---
 
@@ -80,7 +78,7 @@ Ubicado en la cabecera de la Bandeja de Entrada, a la izquierda del botón **Tod
 TelegramDL incluye soporte para supergrupos con temas organizados:
 
 - Puedes vigilar el **grupo completo** (todos los temas).
-- O puedes seleccionar un **tema específico** (por ejemplo, vigilar solo el tema *"Películas 4K"* e ignorar el resto de temas del grupo).
+- O puedes seleccionar un **tema específico** (por ejemplo, vigilar solo el tema *"Documentos importantes"* e ignorar el resto de temas del grupo).
 - El sistema resuelve los nombres de los temas automáticamente mediante el endpoint `/api/listener/topics`.
 
 ---

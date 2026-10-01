@@ -12,6 +12,7 @@ TelegramDL features an integrated HTTP and WebSocket server (defaulting to port 
 Every REST endpoint (`/api/*`) and WebSocket handshake requires a valid **Access Token**. No unauthorized party on your local network or the internet can view downloads, trigger transfers, or inspect your credentials without this token.
 
 ### Managing the Token
+
 - **Automatic Generation**: Randomly created during initial setup and stored securely in SQLite.
 - **Viewing the Token**: Inspect or copy it anytime under **Settings ➔ Remote Access**.
 - **Instant Revocation**: If your token was compromised, click **"Regenerate token"**. The previous token is immediately invalidated.
@@ -43,12 +44,13 @@ TGDL_PORT=8000
 ```
 
 To connect from your phone or secondary computer:
+
 1. Find your machine's local IP via `ipconfig` (Windows) or `ip a` / `ifconfig` (Linux/macOS) (e.g. `192.168.1.50`).
 2. Open in your phone browser: `http://192.168.1.50:8000`.
 3. Provide your Access Token when prompted.
 
 :::warning
-On public or shared networks (universities, coffee shops, open offices), set `TGDL_BIND_HOST=127.0.0.1` in your `.env` so only localhost can connect.
+If you are connected to a public network (university, office, coffee shop), change `TGDL_BIND_HOST=127.0.0.1` in the `app_config` table within the database so that the port only responds to requests from the local machine.
 :::
 
 ---
@@ -62,6 +64,7 @@ On public or shared networks (universities, coffee shops, open offices), set `TG
 Instead, use one of these secure architectures:
 
 ### Option 1 (Recommended): Tailscale (Mesh VPN)
+
 [Tailscale](https://tailscale.com) forms an encrypted point-to-point mesh network between your devices without port forwarding:
 
 1. Install Tailscale on the host PC and your mobile phone.
@@ -70,7 +73,9 @@ Instead, use one of these secure architectures:
 4. In your phone's browser, visit `http://100.x.y.z:8000` and enter your token.
 
 ### Option 2: Cloudflare Tunnel + Zero Trust Access
+
 For a public URL without client software:
+
 1. Install `cloudflared` on your PC or server.
 2. Configure a tunnel targeting `http://127.0.0.1:8000`.
 3. Enable **Cloudflare Access** on the tunnel, requiring one-time passcode email login prior to accessing the service.

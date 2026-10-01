@@ -12,6 +12,7 @@ TelegramDL incorpora un servidor HTTP y WebSocket interno (por defecto en el pue
 Toda la API REST (`/api/*`) y el flujo WebSocket exigen un **Token de Acceso**. Nadie en tu red local ni en internet puede consultar tus descargas, iniciar transferencias ni acceder a tus credenciales de Telegram sin este token.
 
 ### Gestión del Token
+
 - **Generación Automática**: Se genera aleatoriamente en el primer arranque y se almacena en SQLite.
 - **Visualización**: Puedes verlo y copiarlo en cualquier momento desde **Ajustes ➔ Acceso Remoto**.
 - **Regeneración Instantánea**: Si sospechas que tu token fue comprometido, pulsa **"Regenerar token"** en Ajustes. El token anterior quedará invalidado de inmediato.
@@ -43,12 +44,13 @@ TGDL_PORT=8000
 ```
 
 Para conectarte desde tu móvil o portátil:
+
 1. Averigua la IP local de tu PC ejecutando `ipconfig` (Windows) o `ip a` / `ifconfig` (Linux/Mac) (ejemplo: `192.168.1.50`).
 2. Abre en el navegador del móvil: `http://192.168.1.50:8000`.
 3. Introduce el Token de acceso cuando te lo solicite.
 
 :::warning
-Si estás conectado a una red pública (universidad, oficina, cafetería), cambia `TGDL_BIND_HOST=127.0.0.1` en tu archivo `.env` para que el puerto solo responda a peticiones del propio equipo.
+Si estás conectado a una red pública (universidad, oficina, cafetería), cambia `TGDL_BIND_HOST=127.0.0.1` dentro de la base de datos en la tabla `app_config` para que el puerto solo responda a peticiones del propio equipo.
 :::
 
 ---
@@ -62,6 +64,7 @@ Si estás conectado a una red pública (universidad, oficina, cafetería), cambi
 En su lugar, utiliza uno de los siguientes métodos seguros:
 
 ### Opción 1 (Recomendada): Tailscale (VPN de Malla)
+
 [Tailscale](https://tailscale.com) crea una red privada segura punto a punto entre tus dispositivos sin abrir puertos en el router:
 
 1. Instala Tailscale en el ordenador donde corre TelegramDL y en tu móvil.
@@ -70,7 +73,9 @@ En su lugar, utiliza uno de los siguientes métodos seguros:
 4. Abre desde el navegador del móvil: `http://100.x.y.z:8000` e introduce tu token.
 
 ### Opción 2: Cloudflare Tunnel + Zero Trust Access
+
 Si prefieres una URL pública sin instalar clientes VPN:
+
 1. Instala `cloudflared` en tu servidor o PC.
 2. Crea un túnel apuntando a `http://127.0.0.1:8000`.
 3. Configura una regla de **Cloudflare Access** que obligue a iniciar sesión con tu correo electrónico mediante código de un solo uso antes de llegar a la aplicación.

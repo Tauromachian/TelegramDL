@@ -43,9 +43,11 @@ Each monitored chat or channel can be configured with distinct content filters:
 ## Operating Modes
 
 ### 1. Automatic Download (`AutoDownload = true`)
+
 Any incoming media matching your filter criteria is immediately enqueued into the active download pipeline and starts downloading with no manual interaction.
 
 ### 2. Manual Detection (`AutoDownload = false`)
+
 Files are staged under the **"Detected Media"** tab with status `available`. You can inspect names, thumbnails, and file sizes, and selectively download items or click **"Download All"**.
 
 ---
@@ -54,25 +56,20 @@ Files are staged under the **"Detected Media"** tab with status `available`. You
 
 TelegramDL allows you to customize the final file names of detected media before enqueuing them for download.
 
-### 1. Per-Chat "Nombre" (Name) Switch
+### Per-Chat "Nombre" (Name) Switch
+
 In the **Monitored Chats** list, each chat entry features a **Nombre** toggle switch:
-- **Enabled**: Unlocks manual renaming options for all detected files originating from that chat.
-- **Disabled**: Files retain their default name without displaying renaming controls.
 
-### 2. Available Name Sources
-- **Caption**: Uses the accompanying text caption or message attached to the file in Telegram.
-- **Original**: Uses the internal filename embedded in the Telegram media structure when uploaded.
+- **Activated: Original**: All files from that chat will retain the original name they had when uploaded to Telegram..
 
-### 3. Per-File Renaming
-Under **Detected Media**, any item coming from a chat with the **Nombre** option enabled displays a **Nombre** button next to the Download button:
-- Clicking it opens a dropdown menu to choose between **Caption** or **Original** file names.
-- Selecting an option immediately renames the file prior to downloading.
+- **Activated: caption**: All files from that chat captured during monitoring will be named based on the caption (message caption); only the first line will be used, up to a maximum of 50 characters.
 
-### 4. Bulk Renaming ("Nombre" Button in Inbox Header)
-Located in the header of the Inbox feed, directly to the left of the **"Todo"** (All) button:
-- Offers options to **Use Caption** and **Use Original**.
-- **Filtering Rule**: Selecting an option bulk-renames all pending files across the list **exclusively for files originating from chats with the "Nombre" switch enabled**. Files from chats without this option enabled remain completely untouched.
+- **Disabled**: You must set this manually if you want the original filename or the caption for each file in the list—or apply it in bulk; the caption is used by default.
 
+  - **Original**: Original file name
+  - **Caption**:  caption (`message footer`) available
+
+In the **Detected Media** list, for any item belonging to a chat where the **Name** option is disabled, a **Name** button is available to manually select a desired name for each file. Alternatively, if you wish to apply a name to all such files at once, there is a dedicated button at the top of the list that allows you to batch-assign either the original filename or the caption to all files from a chat that does not have the naming option enabled.
 ---
 
 ## Forum Topics Support
@@ -80,7 +77,7 @@ Located in the header of the Inbox feed, directly to the left of the **"Todo"** 
 TelegramDL natively supports forum supergroups with topics:
 
 - Monitor the **entire group** (all topics).
-- Or pin a **specific topic** (e.g. only watch the *"4K Movies"* topic while ignoring other discussions).
+- Or pin a **specific topic** (e.g. only watch the *"Important documents"* topic while ignoring other discussions).
 - Topic metadata and names are resolved dynamically via the `/api/listener/topics` endpoint.
 
 ---
