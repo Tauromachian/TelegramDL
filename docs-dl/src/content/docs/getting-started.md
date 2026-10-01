@@ -20,7 +20,7 @@ TelegramDL está optimizado para funcionar en múltiples plataformas:
     - **Windows**: Requiere instalar [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2).
     - **Linux**: Requiere WebKitGTK, QT WebEngine o WPE WebKit.
 
-Comando para instalar Wails en caso de que desees compilar la aplicación: 
+#### Comando para instalar Wails en caso de que desees compilar la aplicación: 
 
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
