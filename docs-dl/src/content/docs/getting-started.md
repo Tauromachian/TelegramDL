@@ -15,6 +15,12 @@ TelegramDL está optimizado para funcionar en múltiples plataformas:
 - **Go**: Versión 1.22 o superior (para compilar desde código fuente).
 - **Node.js**: Versión 18 o superior y `npm` (para compilar el panel web).
 - **Wails v2 CLI**: Necesario para el empaquetado de escritorio.
+- **WebView**: Requisitos según el sistema operativo:
+    - **macOS**: Ya incluye su propio WebView nativo.
+    - **Windows**: Requiere instalar [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2).
+    - **Linux**: Requiere WebKitGTK, QT WebEngine o WPE WebKit.
+
+Comando para instalar Wails en caso de que desees compilar la aplicación: 
 
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
@@ -32,31 +38,22 @@ Para conectarte a la red MTProto de Telegram necesitas un **API ID** y un **API 
 4. Copia los valores generados: `App api_id` y `App api_hash`.
 
 :::caution[IMPORTANTE]
-Nunca compartas tu `API ID`, `API HASH`, ni los archivos de sesión generados (`.session`) con terceros.
+Nunca compartas tu `API ID`, `API HASH`, ni los archivos de sesión generados (`tg_session.jsontg_session.json`) con terceros por seguridad propia.
 :::
 
 ---
 
 ## Configuración Inicial
 
-Existen dos formas de introducir tus credenciales:
+### Asistente gráfico en el primer inicio.
 
-### Opción 1: Asistente Gráfico en el Primer Inicio
-Al abrir TelegramDL por primera vez, la interfaz mostrará un asistente interactivo que te solicitará:
+Al abrir TelegramDL por primera vez ya sea por la aplicación nativa o por el navegador mediante el modo `--server` la interfaz mostrará un asistente interactivo que te solicitará:
 1. `API ID` y `API HASH`.
 2. Número de teléfono internacional (ejemplo: `+34600000000`).
 3. Código de verificación (enviado por la app oficial de Telegram o SMS).
 4. Contraseña de verificación en dos pasos (2FA), en caso de tenerla activada.
 
-### Opción 2: Archivo de Configuración `.env`
-Puedes crear un archivo `.env` en la raíz del proyecto para preconfigurar variables de entorno:
-
-```env
-TGDL_API_ID=12345678
-TGDL_API_HASH=abcdef0123456789abcdef0123456789
-TGDL_BIND_HOST=127.0.0.1
-TGDL_PORT=8000
-```
+Al terminar puede comenzar a usar el programa
 
 ---
 

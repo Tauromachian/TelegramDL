@@ -15,6 +15,12 @@ TelegramDL is optimized for cross-platform desktop environments:
 - **Go**: Version 1.22 or higher (to build from source).
 - **Node.js**: Version 18 or higher with `npm` (to build the web dashboard).
 - **Wails v2 CLI**: Required for desktop compilation and packaging.
+- **WebView**: Requirements by operating system:
+    - **macOS**: It already includes its own native WebView..
+    - **Windows**: Requires installation [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2).
+    - **Linux**: Requires WebKitGTK, QT WebEngine o WPE WebKit.
+
+Command to install Wails if you wish to compile the application:
 
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
@@ -32,31 +38,21 @@ To connect to the Telegram MTProto network, you need personal **API ID** and **A
 4. Copy the generated values: `App api_id` and `App api_hash`.
 
 :::caution[IMPORTANT]
-Never share your `API ID`, `API HASH`, or session files (`.session`) with third parties.
+Never share your `API ID`, `API HASH`, or session files (`tg_session-json`) with third parties for one's own safety.
 :::
 
 ---
 
 ## Initial Configuration
 
-Credentials can be supplied in two ways:
-
-### Method 1: Graphical Setup Wizard
-When launching TelegramDL for the first time, an intuitive setup wizard will ask you for:
+### Graphical wizard on first startup
+When opening TelegramDL for the first time—whether via the native application or the browser using `--server` mode—the interface will display an interactive wizard that asks you to...:
 1. `API ID` and `API HASH`.
 2. International phone number format (e.g. `+12025550123`).
 3. Verification code (sent via the official Telegram app or SMS).
 4. Two-Factor Authentication (2FA) password, if enabled on your account.
 
-### Method 2: Local `.env` File
-Create a `.env` file in the root directory to preset configuration:
-
-```env
-TGDL_API_ID=12345678
-TGDL_API_HASH=abcdef0123456789abcdef0123456789
-TGDL_BIND_HOST=127.0.0.1
-TGDL_PORT=8000
-```
+Once finished, you can start using the program.
 
 ---
 
