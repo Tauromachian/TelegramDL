@@ -34,7 +34,7 @@ Headless mode is ideal for:
 
 - Home servers or NAS appliances (Synology, TrueNAS, unRAID).
 - Headless Linux virtual machines without a display server (X11/Wayland).
-- Background services intended for remote management via smartphone or web browser through [Remote Access](/TelegramDL/remote-access/).
+- Background services intended for remote management via smartphone or web browser through [Remote Access](/TelegramDL/en/remote-access/).
 
 ```bash
 TelegramDL.exe --server
