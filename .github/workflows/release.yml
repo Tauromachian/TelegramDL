@@ -245,30 +245,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Send Telegram Notification
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
-        run: |
-          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-            echo "Secrets TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no configurados. Saltando notificación."
-            exit 0
-          fi
+        if: ${{ secrets.TELEGRAM_BOT_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != '' }}
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          thread_id: ${{ secrets.TELEGRAM_TOPIC_ID }}
+          format: html
+          message: |
+            🚀 <b>¡Nueva versión de TGDown publicada!</b>
 
-          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
-
-          TEXT="🚀 <b>¡Nueva versión de TGDown publicada!</b>"$'\n\n'"📦 <b>Versión:</b> <code>${{ github.ref_name }}</code>"$'\n'"🔗 <b>Enlace:</b> <a href=\"${RELEASE_URL}\">${RELEASE_URL}</a>"
-
-          EXTRA_ARGS=()
-          if [ -n "$TELEGRAM_TOPIC_ID" ]; then
-            EXTRA_ARGS+=(--data-urlencode "message_thread_id=${TELEGRAM_TOPIC_ID}")
-          fi
-
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
-            "${EXTRA_ARGS[@]}" \
-            --data-urlencode "parse_mode=HTML" \
-            --data-urlencode "text=${TEXT}"
+            📦 <b>Versión:</b> <code>${{ github.ref_name }}</code>
+            🔗 <b>Enlace:</b> https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
 
       ####################################################################
       # Política de 0 retención: elimina inmediatamente todos los artefactos
