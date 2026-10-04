@@ -4,7 +4,7 @@ TelegramDL es un gestor de descargas de Telegram para escritorio, desarrollado c
 
 > 📖 **Documentación oficial (Español / English)**: [https://infinityxgame.github.io/TelegramDL/](https://infinityxgame.github.io/TelegramDL/)
 
-> 📖 **Documentación oficial (Español / English)**: [TelegramDL Grupo Soporte en Telegram](https://t.me/tgdownrepo)
+> 📖 **Grupo de soporte en Telegram**: [TelegramDL Grupo Soporte en Telegram](https://t.me/tgdownrepo)
 
 ## Características
 
