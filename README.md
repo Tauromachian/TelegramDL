@@ -4,6 +4,8 @@ TelegramDL es un gestor de descargas de Telegram para escritorio, desarrollado c
 
 > 📖 **Documentación oficial (Español / English)**: [https://infinityxgame.github.io/TelegramDL/](https://infinityxgame.github.io/TelegramDL/)
 
+> 📖 **Documentación oficial (Español / English)**: [TelegramDL Grupo Soporte en Telegram](https://t.me/tgdownrepo)
+
 ## Características
 
 - Descarga de documentos, vídeos, audios, fotos y stickers desde enlaces de mensajes de Telegram.
@@ -41,21 +43,20 @@ Para usar Telegram también se necesita un `API ID` y un `API HASH` obtenidos de
 
 ## Configuración
 
-Las credenciales se pueden introducir desde el asistente de autenticación o mediante un archivo `.env` local:
+Al abrir TelegramDL por primera vez ya sea por la aplicación nativa o por el navegador mediante el modo `--server` la interfaz mostrará un asistente interactivo que te solicitará:
+1. `API ID` y `API HASH`.
+2. Número de teléfono internacional (ejemplo: `+34600000000`).
+3. Código de verificación (enviado por la app oficial de Telegram o SMS).
+4. Contraseña de verificación en dos pasos (2FA), en caso de tenerla activada.
 
-```env
-TGDL_API_ID=tu_api_id
-TGDL_API_HASH=tu_api_hash
-TGDL_BIND_HOST=127.0.0.1
-TGDL_PORT=8000
-```
+:::caution[IMPORTANTE]
+Nunca compartas tu `API ID`, `API HASH`, ni los archivos de sesión generados (`tg_session.jsontg_session.json`) con terceros por seguridad propia.
+:::
 
-No se deben subir credenciales, archivos de sesión ni bases de datos al repositorio.
+TelegramDL guarda la configuración, sesiones y base de datos en una ruta dedicada en tu directorio de usuario:
 
-La configuración y el historial se guardan en:
-
-- Windows: `%USERPROFILE%\\.tgdown\\tgdown.sqlite3`
-- Linux/macOS: `~/.tgdown/tgdown.sqlite3`
+- **Windows**: `%USERPROFILE%\.tgdown\tgdown.sqlite3`
+- **Linux / macOS**: `~/.tgdown/tgdown.sqlite3`
 
 ## Desarrollo
 
