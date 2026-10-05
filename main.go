@@ -15,6 +15,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
+	"tgdown/pkg/cli"
 	"tgdown/pkg/config"
 	"tgdown/pkg/i18n"
 	"tgdown/pkg/updater"
@@ -42,6 +43,15 @@ func main() {
 	if hasArgument("--update") {
 		os.Exit(runUpdateMode())
 	}
+	if hasArgument("--download") {
+		url := getArgumentValue("--download")
+		if url == "" {
+			fmt.Println("Error: --download requiere una URL")
+			printUsage()
+			os.Exit(1)
+		}
+		os.Exit(cli.RunCLIMode(url))
+	}
 
 	runDesktopMode()
 }
@@ -60,12 +70,25 @@ func hasArgument(target string) bool {
 	return false
 }
 
+func getArgumentValue(flag string) string {
+	for i, arg := range os.Args {
+		if arg == flag && i+1 < len(os.Args) {
+			return os.Args[i+1]
+		}
+		if strings.HasPrefix(arg, flag+"=") {
+			return strings.TrimPrefix(arg, flag+"=")
+		}
+	}
+	return ""
+}
+
 func printUsage() {
 	fmt.Println("TelegramDL")
 	fmt.Println(i18n.T("cli.usageHeader"))
 	fmt.Println(i18n.T("cli.usageDesktop"))
 	fmt.Println(i18n.T("cli.usageServer"))
 	fmt.Println(i18n.T("cli.usageUpdate"))
+	fmt.Println("  --download <URL>  Descarga desde URL sin abrir interfaz gráfica")
 }
 
 // waitInstanceLock reintenta unos segundos antes de rendirse: tras una
