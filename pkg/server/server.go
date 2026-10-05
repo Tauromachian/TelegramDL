@@ -201,6 +201,7 @@ var publicAPIPaths = map[string]bool{
 	publicAPIPath:         true,
 	tokenSendAPIPath:      true,
 	hasCredentialsAPIPath: true,
+	"/api/ipc/download":   true,
 }
 
 // isPublicAPIPath determina si un endpoint puede responder sin token.
@@ -620,6 +621,9 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// App Exit (Soporta /api/app/exit y /api/exit)
 	mux.HandleFunc("/api/app/exit", s.handleExit)
 	mux.HandleFunc("/api/exit", s.handleExit)
+
+	// IPC endpoint para recibir URLs desde una segunda instancia
+	mux.HandleFunc("/api/ipc/download", s.handleIPCDownload)
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -2258,6 +2262,63 @@ func (s *Server) handleExit(w http.ResponseWriter, r *http.Request) {
 			os.Exit(0)
 		}
 	}()
+}
+
+// handleIPCDownload receives download URLs from a secondary instance.
+// This endpoint is public (no auth) because it's called from the command line
+// when the user tries to open a second instance with a URL argument.
+func (s *Server) handleIPCDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.errorResponse(w, http.StatusMethodNotAllowed, "Método no permitido")
+		return
+	}
+
+	var body struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.URL) == "" {
+		s.errorResponse(w, http.StatusUnprocessableEntity, "URL requerida")
+		return
+	}
+
+	parsed, err := downloader.ParseURL(body.URL)
+	if err != nil {
+		s.errorResponse(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+
+	chatID := parsed.ChatID
+	if chatID == 0 && parsed.ChatUsername != "" {
+		resolvedID, err := s.clientMgr.ResolveUsername(r.Context(), parsed.ChatUsername)
+		if err != nil {
+			s.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("No se pudo encontrar el canal o usuario: %s", err.Error()))
+			return
+		}
+		chatID = resolvedID
+	}
+
+	jobID := config.NewID()
+	for msgID := parsed.StartMsgID; msgID <= parsed.EndMsgID; msgID++ {
+		item := storage.DownloadItem{
+			ID:        config.NewID(),
+			JobID:     jobID,
+			MessageID: int64(msgID),
+			ChatID:    chatID,
+			Status:    "queued",
+			Source:    "ipc",
+			FileName:  fmt.Sprintf("mensaje_%d", msgID),
+		}
+		s.downloader.QueueItem(item)
+	}
+	s.broadcastState()
+
+	logbus.Info(logbus.CatServer, i18n.T("server.ipcDownloadReceived"), body.URL)
+
+	s.jsonResponse(w, http.StatusOK, map[string]string{
+		"status":  "ok",
+		"job_id":  jobID,
+		"message": "Descarga añadida desde línea de comandos",
+	})
 }
 
 // ---------------------------------------------------------------------------

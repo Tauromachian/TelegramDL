@@ -35,6 +35,8 @@ var messagesES = map[string]string{
 	"server.tokenSentDetail":        "Pedido desde %s",
 	"server.folderRejected":         "Carpeta de descargas rechazada",
 	"server.shellOpenError":         "ShellExecuteW no pudo abrir %s: %v",
+	"server.ipcDownloadReceived":    "URL recibida desde línea de comandos: %s",
+	"server.ipcDownloadFailed":      "No se pudo enviar la descarga a la instancia activa: %v",
 
 	// Cliente de Telegram (pkg/telegram y parte de pkg/server)
 	"telegram.noCredentials":     "Sin credenciales de Telegram configuradas",
@@ -215,6 +217,7 @@ var messagesES = map[string]string{
 	"cli.usageServer":         "  TelegramDL.exe --server     Ejecutar el servidor sin abrir ventana",
 	"cli.usageUpdate":         "  TelegramDL.exe --update     Buscar e instalar la última actualización",
 	"cli.usageDownload":       "TelegramDL.exe --download <URL>  Descarga desde URL sin abrir interfaz gráfica",
+	"cli.usageUrlArg":         "  <URL>                     Añade la descarga a la instancia activa o abre la app",
 	"cli.downloadUrlRequired": "Error: --download requiere una URL",
 	"cli.alreadyRunning":      "TelegramDL ya se está ejecutando. Revisa la ventana abierta o la bandeja del sistema.",
 	"cli.dbOpenAviso":         "TelegramDL no pudo abrir su base de datos en %s.\n\nComprueba que la carpeta existe y que tienes permiso de escritura en ella.",
@@ -230,6 +233,10 @@ var messagesES = map[string]string{
 	"cli.updating":            "Actualizando de v%s a %s con %s...\n",
 	"cli.installError":        "Error al iniciar la actualización: %v\n",
 	"cli.progressState":       "Estado: %s (%d%%)\n",
+	"cli.ipcSent":             "Descarga añadida a la instancia activa.",
+	"cli.ipcConnectError":     "No se pudo conectar con la instancia activa: %v\n",
+	"cli.ipcConnectHint":      "Asegúrate de que TelegramDL está ejecutándose.\n",
+	"cli.ipcEncodeError":      "Error codificando la petición: %v\n",
 
 	// Modo CLI (--download)
 	"cli.modeHeader":           " TelegramDL - Modo CLI",

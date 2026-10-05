@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -53,6 +56,12 @@ func main() {
 		os.Exit(cli.RunCLIMode(url))
 	}
 
+	// Detectar si el primer argumento es una URL de Telegram (sin flag)
+	url := getTelegramURLArgument()
+	if url != "" {
+		os.Exit(handleURLArgument(url))
+	}
+
 	runDesktopMode()
 }
 
@@ -88,7 +97,90 @@ func printUsage() {
 	fmt.Println(i18n.T("cli.usageDesktop"))
 	fmt.Println(i18n.T("cli.usageServer"))
 	fmt.Println(i18n.T("cli.usageUpdate"))
-	fmt.Println("  --download <URL>  Descarga desde URL sin abrir interfaz gráfica")
+	fmt.Println(i18n.T("cli.usageDownload"))
+	fmt.Println(i18n.T("cli.usageUrlArg"))
+}
+
+// getTelegramURLArgument detecta si el primer argumento es una URL de Telegram
+func getTelegramURLArgument() string {
+	if len(os.Args) < 2 {
+		return ""
+	}
+	arg := os.Args[1]
+	// Ignorar flags que empiezan con -
+	if strings.HasPrefix(arg, "-") {
+		return ""
+	}
+	// Verificar si parece una URL de Telegram
+	if strings.Contains(arg, "t.me/") || strings.Contains(arg, "telegram.org/") {
+		return arg
+	}
+	return ""
+}
+
+// handleURLArgument maneja una URL pasada como argumento
+func handleURLArgument(url string) int {
+	config.InitPaths()
+	i18n.SetLanguage(i18n.DetectSystemLanguage())
+
+	// Verificar si ya hay una instancia corriendo
+	release, ok := tryAcquireInstanceLock()
+	if !ok {
+		// Hay una instancia activa, enviar la URL vía IPC
+		if release != nil {
+			release()
+		}
+		return sendURLToActiveInstance(url)
+	}
+	defer release()
+
+	// No hay instancia activa, abrir la app normalmente con la URL
+	// Guardamos la URL en una variable global para que la app la procese al arrancar
+	// Por ahora, simplemente abrimos la app en modo desktop
+	fmt.Println(i18n.T("cli.processingURL", url))
+	runDesktopMode()
+	return 0
+}
+
+// sendURLToActiveInstance envía la URL a la instancia activa vía HTTP
+func sendURLToActiveInstance(url string) int {
+	host := config.GetServerHost()
+	port := config.GetServerPort()
+	if host == "" || host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+
+	endpoint := fmt.Sprintf("http://%s:%d/api/ipc/download", host, port)
+
+	payload := map[string]string{"url": url}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, i18n.T("cli.ipcEncodeError"), err)
+		return 1
+	}
+
+	resp, err := http.Post(endpoint, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, i18n.T("cli.ipcConnectError"), err)
+		fmt.Fprint(os.Stderr, i18n.T("cli.ipcConnectHint"))
+		return 1
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "Error al enviar la URL: status %d\n", resp.StatusCode)
+		return 1
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err == nil {
+		if msg, ok := result["message"].(string); ok {
+			fmt.Println(msg)
+		}
+	}
+
+	fmt.Println(i18n.T("cli.ipcSent"))
+	return 0
 }
 
 // waitInstanceLock reintenta unos segundos antes de rendirse: tras una

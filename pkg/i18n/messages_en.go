@@ -34,6 +34,8 @@ var messagesEN = map[string]string{
 	"server.tokenSentDetail":        "Requested from %s",
 	"server.folderRejected":         "Downloads folder rejected",
 	"server.shellOpenError":         "ShellExecuteW could not open %s: %v",
+	"server.ipcDownloadReceived":    "URL received from command line: %s",
+	"server.ipcDownloadFailed":      "Could not send download to the active instance: %v",
 
 	// Telegram client (pkg/telegram and part of pkg/server)
 	"telegram.noCredentials":     "No Telegram credentials configured",
@@ -214,6 +216,7 @@ var messagesEN = map[string]string{
 	"cli.usageServer":         "  TelegramDL.exe --server     Run the server without opening a window",
 	"cli.usageUpdate":         "  TelegramDL.exe --update     Check for and install the latest update",
 	"cli.usageDownload":       "TelegramDL.exe --download <URL>  Download from URL without opening the graphical interface.",
+	"cli.usageUrlArg":         "  <URL>                     Add download to the active instance or open the app",
 	"cli.downloadUrlRequired": "Error: --download requires a URL",
 	"cli.alreadyRunning":      "TelegramDL is already running. Check the open window or the system tray.",
 	"cli.dbOpenAviso":         "TelegramDL could not open its database at %s.\n\nCheck that the folder exists and that you have write permission on it.",
@@ -229,6 +232,10 @@ var messagesEN = map[string]string{
 	"cli.updating":            "Updating from v%s to %s with %s...\n",
 	"cli.installError":        "Error starting the update: %v\n",
 	"cli.progressState":       "Status: %s (%d%%)\n",
+	"cli.ipcSent":             "Download added to the active instance.",
+	"cli.ipcConnectError":     "Could not connect to the active instance: %v\n",
+	"cli.ipcConnectHint":      "Make sure TelegramDL is running.\n",
+	"cli.ipcEncodeError":      "Error encoding the request: %v\n",
 
 	// CLI mode (--download)
 	"cli.modeHeader":           " TelegramDL - CLI mode",
