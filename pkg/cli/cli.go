@@ -51,7 +51,7 @@ func RunCLIMode(url string) int {
 	// 5. Verificar credenciales de Telegram
 	apiID, apiHash, _ := st.GetCredentials()
 	if apiID == "" || apiHash == "" {
-		fmt.Fprintf(os.Stderr, "❌ Error: No hay credenciales de Telegram configuradas.\n")
+		fmt.Fprintf(os.Stderr, "Error: No hay credenciales de Telegram configuradas.\n")
 		fmt.Fprintf(os.Stderr, "   Abre la aplicación una vez para configurarlas.\n")
 		return 1
 	}
