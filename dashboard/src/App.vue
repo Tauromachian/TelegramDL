@@ -739,7 +739,11 @@ const serverTimeNow = () =>
   shutdownServerBase.value + (Date.now() / 1000 - shutdownLocalBase.value)
 
 const shutdownCountdown = computed(() => {
-  if (!shutdownPendingAt.value || !shutdownServerBase.value || nowTick.value < 0)
+  if (
+    !shutdownPendingAt.value ||
+    !shutdownServerBase.value ||
+    nowTick.value < 0
+  )
     return 0
   return Math.max(0, Math.ceil(shutdownPendingAt.value - serverTimeNow()))
 })
@@ -1051,7 +1055,9 @@ onUnmounted(() => {
           {{ t('update.doNotClose') }}
         </div>
 
-        <small>{{ t('update.currentVersion', { version: updateInfo.current }) }}</small>
+        <small>{{
+          t('update.currentVersion', { version: updateInfo.current })
+        }}</small>
       </div>
     </div>
 
@@ -1171,7 +1177,9 @@ onUnmounted(() => {
               <div class="shutdown-info">
                 <Bell :size="15" />
                 <div class="shutdown-text">
-                  <span class="shutdown-label">{{ t('sidebar.soundLabel') }}</span>
+                  <span class="shutdown-label">{{
+                    t('sidebar.soundLabel')
+                  }}</span>
                 </div>
               </div>
               <label
@@ -1185,17 +1193,25 @@ onUnmounted(() => {
                 <input
                   type="checkbox"
                   :checked="settings.sound_notification"
-                  @change="(e) => {
-                    userChangingSound = true
-                    settings.sound_notification = e.target.checked
-                    setTimeout(() => { userChangingSound = false }, 1000)
-                  }"
+                  @change="
+                    (e) => {
+                      userChangingSound = true
+                      settings.sound_notification = e.target.checked
+                      setTimeout(() => {
+                        userChangingSound = false
+                      }, 1000)
+                    }
+                  "
                 />
                 <span></span>
               </label>
             </div>
             <small class="shutdown-sub">
-              {{ settings.sound_notification ? t('sidebar.soundEnabled') : t('sidebar.soundDisabled') }}
+              {{
+                settings.sound_notification
+                  ? t('sidebar.soundEnabled')
+                  : t('sidebar.soundDisabled')
+              }}
             </small>
           </div>
 
@@ -1210,7 +1226,9 @@ onUnmounted(() => {
               <div class="shutdown-info">
                 <Power :size="15" />
                 <div class="shutdown-text">
-                  <span class="shutdown-label">{{ t('sidebar.shutdownLabel') }}</span>
+                  <span class="shutdown-label">{{
+                    t('sidebar.shutdownLabel')
+                  }}</span>
                 </div>
               </div>
               <label
@@ -1268,7 +1286,11 @@ onUnmounted(() => {
         </div>
         <div class="sidebar-bottom">
           <span class="mini-label">{{ t('sidebar.currentLimit') }}</span>
-          <strong>{{ t('sidebar.downloadsCount', { n: settings.max_concurrent_downloads }) }}</strong>
+          <strong>{{
+            t('sidebar.downloadsCount', {
+              n: settings.max_concurrent_downloads
+            })
+          }}</strong>
           <span>{{ speedText }}</span>
         </div>
       </aside>
@@ -1279,7 +1301,9 @@ onUnmounted(() => {
             <span class="eyebrow">{{ t('sidebar.controlPanel') }}</span>
             <h1>{{ viewTitle }}</h1>
           </div>
-          <div class="topbar-meta">{{ t('sidebar.totalSpeed', { speed: totalSpeed }) }}</div>
+          <div class="topbar-meta">
+            {{ t('sidebar.totalSpeed', { speed: totalSpeed }) }}
+          </div>
         </header>
 
         <div v-if="message" class="toast success">

@@ -12,7 +12,12 @@ export function useUpdater({ api, showMessage, openConfirm }) {
   const isUpdating = ref(false)
   const isUpdateForced = ref(false)
   const updatePostponedVersion = ref(null)
-  const updateProgress = ref({ status: 'idle', downloaded: 0, total: 0, percentage: 0 })
+  const updateProgress = ref({
+    status: 'idle',
+    downloaded: 0,
+    total: 0,
+    percentage: 0
+  })
 
   const installUpdate = async () => {
     try {
@@ -51,7 +56,10 @@ export function useUpdater({ api, showMessage, openConfirm }) {
         updateInfo.value = data
         if (force) {
           isUpdateForced.value = true
-        } else if (!isUpdateForced.value && updatePostponedVersion.value !== data.latest) {
+        } else if (
+          !isUpdateForced.value &&
+          updatePostponedVersion.value !== data.latest
+        ) {
           openConfirm({
             title: t('update.availableTitle'),
             message: t('update.availableText', { version: data.latest }),
@@ -81,6 +89,6 @@ export function useUpdater({ api, showMessage, openConfirm }) {
     updatePostponedVersion,
     updateProgress,
     installUpdate,
-    checkForUpdates,
+    checkForUpdates
   }
 }

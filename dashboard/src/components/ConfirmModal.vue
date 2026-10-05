@@ -35,14 +35,24 @@ const emit = defineEmits(['confirm', 'cancel'])
               <HelpCircle v-else :size="20" />
             </div>
             <h3>{{ title }}</h3>
-            <button class="close-btn" @click="emit('cancel')"><X :size="18" /></button>
+            <button class="close-btn" @click="emit('cancel')">
+              <X :size="18" />
+            </button>
           </div>
           <div class="modal-body">
             <p>{{ message }}</p>
           </div>
           <div class="modal-footer">
-            <button v-if="cancelLabel" class="cancel-btn" @click="emit('cancel')">{{ cancelLabel }}</button>
-            <button class="confirm-btn" :class="type" @click="emit('confirm')">{{ confirmLabel }}</button>
+            <button
+              v-if="cancelLabel"
+              class="cancel-btn"
+              @click="emit('cancel')"
+            >
+              {{ cancelLabel }}
+            </button>
+            <button class="confirm-btn" :class="type" @click="emit('confirm')">
+              {{ confirmLabel }}
+            </button>
           </div>
         </div>
       </div>
@@ -70,21 +80,38 @@ const emit = defineEmits(['confirm', 'cancel'])
   border: 1px solid var(--user-border-light);
   border-radius: 18px;
   width: min(420px, 90%);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 35px var(--user-glow);
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 35px var(--user-glow);
   overflow: hidden;
 }
 
 .modal-content.danger {
   border-color: rgba(232, 136, 136, 0.4);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 45px rgba(232, 136, 136, 0.25);
-  animation: modalShake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 45px rgba(232, 136, 136, 0.25);
+  animation: modalShake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
 @keyframes modalShake {
-  10%, 90% { transform: translate3d(-1px, 0, 0); }
-  20%, 80% { transform: translate3d(2px, 0, 0); }
-  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-  40%, 60% { transform: translate3d(4px, 0, 0); }
+  10%,
+  90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+  20%,
+  80% {
+    transform: translate3d(2px, 0, 0);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translate3d(-4px, 0, 0);
+  }
+  40%,
+  60% {
+    transform: translate3d(4px, 0, 0);
+  }
 }
 
 .modal-header {
@@ -104,8 +131,14 @@ const emit = defineEmits(['confirm', 'cancel'])
   place-items: center;
 }
 
-.header-icon.primary { background: var(--user-icon-bg); color: var(--user-accent); }
-.header-icon.danger { background: #48252c; color: #ffadad; }
+.header-icon.primary {
+  background: var(--user-icon-bg);
+  color: var(--user-accent);
+}
+.header-icon.danger {
+  background: #48252c;
+  color: #ffadad;
+}
 
 .modal-header h3 {
   margin: 0;
@@ -158,18 +191,39 @@ button {
   color: var(--user-text-dim);
 }
 
-.cancel-btn:hover { background: var(--user-border); color: #fff; }
+.cancel-btn:hover {
+  background: var(--user-border);
+  color: #fff;
+}
 
 .confirm-btn {
   border: 0;
 }
 
-.confirm-btn.primary { background: var(--user-gradient); color: var(--user-bg-base); }
-.confirm-btn.primary:hover { opacity: 0.9; box-shadow: 0 4px 15px var(--user-glow); }
+.confirm-btn.primary {
+  background: var(--user-gradient);
+  color: var(--user-bg-base);
+}
+.confirm-btn.primary:hover {
+  opacity: 0.9;
+  box-shadow: 0 4px 15px var(--user-glow);
+}
 
-.confirm-btn.danger { background: #e88888; color: #041322; }
-.confirm-btn.danger:hover { background: #ffadad; box-shadow: 0 4px 15px rgba(232, 136, 136, 0.3); }
+.confirm-btn.danger {
+  background: #e88888;
+  color: #041322;
+}
+.confirm-btn.danger:hover {
+  background: #ffadad;
+  box-shadow: 0 4px 15px rgba(232, 136, 136, 0.3);
+}
 
-.fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>

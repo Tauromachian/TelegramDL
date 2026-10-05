@@ -775,7 +775,10 @@ onUnmounted(() => {
                 ><Folder :size="10" /> {{ chatFolder(chat) }}</small
               >
             </div>
-            <div class="auto-toggle-wrapper" :class="{ active: chat.auto_download }">
+            <div
+              class="auto-toggle-wrapper"
+              :class="{ active: chat.auto_download }"
+            >
               <label class="auto-toggle switch" :class="{ disabled: saving }">
                 <input
                   type="checkbox"
@@ -791,7 +794,12 @@ onUnmounted(() => {
               </span>
             </div>
             <div class="chat-name-mode-wrapper">
-              <div class="chat-name-mode-btn-wrapper" :class="{ active: chat.name_mode && chat.name_mode !== 'manual' }">
+              <div
+                class="chat-name-mode-btn-wrapper"
+                :class="{
+                  active: chat.name_mode && chat.name_mode !== 'manual'
+                }"
+              >
                 <button
                   type="button"
                   class="chat-name-mode-btn"

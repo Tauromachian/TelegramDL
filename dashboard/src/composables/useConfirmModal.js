@@ -21,7 +21,8 @@ export function useConfirmModal() {
     modal.title = config.title
     modal.message = config.message
     modal.confirmText = config.confirmText
-    modal.cancelText = config.cancelText !== undefined ? config.cancelText : t('common.cancel')
+    modal.cancelText =
+      config.cancelText !== undefined ? config.cancelText : t('common.cancel')
     modal.type = config.type || 'primary'
     modal.action = config.action
     modal.cancelAction = config.cancelAction

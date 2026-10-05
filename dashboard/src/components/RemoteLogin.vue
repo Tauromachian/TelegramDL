@@ -108,7 +108,8 @@ const handleSubmit = () => {
       <div class="info-banner">
         <ShieldCheck :size="16" />
         <span>
-          {{ t('remote.bannerA') }} <b>{{ t('remote.bannerB') }}</b>.
+          {{ t('remote.bannerA') }} <b>{{ t('remote.bannerB') }}</b
+          >.
           {{ t('remote.bannerC') }}
         </span>
       </div>
@@ -126,7 +127,9 @@ const handleSubmit = () => {
           />
           <button
             type="button"
-            :aria-label="showToken ? t('remote.hideToken') : t('remote.showToken')"
+            :aria-label="
+              showToken ? t('remote.hideToken') : t('remote.showToken')
+            "
             class="ghost-icon-btn"
             @click="showToken = !showToken"
           >
@@ -148,7 +151,9 @@ const handleSubmit = () => {
         </template>
       </button>
 
-      <div class="send-divider"><span>{{ t('remote.noToken') }}</span></div>
+      <div class="send-divider">
+        <span>{{ t('remote.noToken') }}</span>
+      </div>
 
       <button
         class="auth-button ghost"
@@ -164,7 +169,8 @@ const handleSubmit = () => {
         <span v-else>{{ t('remote.sendToTelegram') }}</span>
       </button>
       <p class="send-hint">
-        {{ t('remote.hintPre') }} <b>{{ t('remote.hintBold') }}</b>{{ t('remote.hintPost') }}
+        {{ t('remote.hintPre') }} <b>{{ t('remote.hintBold') }}</b
+        >{{ t('remote.hintPost') }}
       </p>
 
       <div

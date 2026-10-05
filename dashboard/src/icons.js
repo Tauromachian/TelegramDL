@@ -75,7 +75,8 @@ const GROSOR = 1.8
 const icono = (glifo) => ({
   inheritAttrs: false,
   setup(_, { attrs }) {
-    return () => h(HugeiconsIcon, { icon: glifo, strokeWidth: GROSOR, ...attrs })
+    return () =>
+      h(HugeiconsIcon, { icon: glifo, strokeWidth: GROSOR, ...attrs })
   }
 })
 

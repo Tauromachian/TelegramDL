@@ -11,7 +11,8 @@
 // la app; cuando el panel se ve desde un navegador remoto (celular, otra PC)
 // no está, y ahí el target="_blank" del propio enlace ya funciona solo.
 export const canOpenExternally = () =>
-  typeof window !== 'undefined' && typeof window.runtime?.BrowserOpenURL === 'function'
+  typeof window !== 'undefined' &&
+  typeof window.runtime?.BrowserOpenURL === 'function'
 
 // openExternal se engancha al @click del enlace. Fuera de la app no toca nada
 // y deja que el navegador siga el href como siempre, así que el enlace sigue
@@ -23,6 +24,6 @@ export const openExternal = (url, event) => {
   window.runtime.BrowserOpenURL(url)
 }
 
-export function useExternalLink () {
+export function useExternalLink() {
   return { openExternal, canOpenExternally }
 }

@@ -1,6 +1,16 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { KeyRound, Phone, ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Loader2, Info } from '../icons'
+import {
+  KeyRound,
+  Phone,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  ArrowLeft,
+  Loader2,
+  Info
+} from '../icons'
 import { useAuthToken } from '../composables/useAuthToken'
 import { openExternal } from '../composables/useExternalLink'
 import { useI18n } from '../i18n'
@@ -24,8 +34,16 @@ const emit = defineEmits(['auth-success'])
 
 // Paso que dicta el servidor segun el estado real de la sesion de Telegram.
 const serverStep = computed(() => {
-  if (!props.authStatus.has_credentials || props.authStatus.state === 'UNCONFIGURED') return 1
-  if (props.authStatus.state === 'NOT_LOGGED_IN' || props.authStatus.state === 'NEED_PHONE') return 2
+  if (
+    !props.authStatus.has_credentials ||
+    props.authStatus.state === 'UNCONFIGURED'
+  )
+    return 1
+  if (
+    props.authStatus.state === 'NOT_LOGGED_IN' ||
+    props.authStatus.state === 'NEED_PHONE'
+  )
+    return 2
   if (props.authStatus.state === 'WAITING_CODE') return 3
   if (props.authStatus.state === 'WAITING_2FA') return 4
   if (props.authStatus.state === 'LOGGED_IN') return 5
@@ -49,11 +67,16 @@ const phoneNumber = ref(props.authStatus.phone_number || '')
 const code = ref('')
 const password = ref('')
 
-watch(() => props.authStatus, (val) => {
-  if (val) {
-    if (val.phone_number && !phoneNumber.value) phoneNumber.value = val.phone_number
-  }
-}, { immediate: true })
+watch(
+  () => props.authStatus,
+  (val) => {
+    if (val) {
+      if (val.phone_number && !phoneNumber.value)
+        phoneNumber.value = val.phone_number
+    }
+  },
+  { immediate: true }
+)
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -124,7 +147,11 @@ const sendCode = async () => {
   }
   phoneNumber.value = cleanPhone
   await apiCall('/api/auth/send-code', { phone_number: cleanPhone })
-  emit('auth-success', { ...props.authStatus, state: 'WAITING_CODE', phone_number: cleanPhone })
+  emit('auth-success', {
+    ...props.authStatus,
+    state: 'WAITING_CODE',
+    phone_number: cleanPhone
+  })
 }
 
 const verifyCode = async () => {
@@ -148,7 +175,9 @@ const verify2FA = async () => {
     errorMessage.value = t('auth.err2fa')
     return
   }
-  const data = await apiCall('/api/auth/verify-2fa', { password: password.value })
+  const data = await apiCall('/api/auth/verify-2fa', {
+    password: password.value
+  })
   emit('auth-success', { ...data, authenticated: true })
 }
 
@@ -178,8 +207,13 @@ const goBack = async () => {
     code.value = ''
     password.value = ''
     try {
-      await fetch('/api/auth/logout', { method: 'POST', headers: { ...authHeaders() } })
-    } catch (e) { console.error(e) }
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { ...authHeaders() }
+      })
+    } catch (e) {
+      console.error(e)
+    }
     loading.value = false
     stepOverride.value = 2
     // Se conserva phoneNumber a proposito: lo normal es reintentar con el
@@ -206,9 +240,16 @@ const cancelBack = () => {
       <!-- Header -->
       <div class="auth-header">
         <div class="auth-logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="m22 2-7 20-4-9-9-4Z"/>
-            <path d="M22 2 11 13"/>
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="m22 2-7 20-4-9-9-4Z" />
+            <path d="M22 2 11 13" />
           </svg>
         </div>
         <div>
@@ -219,22 +260,37 @@ const cancelBack = () => {
 
       <!-- Stepper -->
       <div class="stepper">
-        <div class="step-item" :class="{ active: currentStep === 1, done: currentStep > 1 }">
+        <div
+          class="step-item"
+          :class="{ active: currentStep === 1, done: currentStep > 1 }"
+        >
           <span class="step-num">1</span>
           <span class="step-label">{{ t('auth.stepApi') }}</span>
         </div>
         <div class="step-divider"></div>
-        <div class="step-item" :class="{ active: currentStep === 2, done: currentStep > 2 }">
+        <div
+          class="step-item"
+          :class="{ active: currentStep === 2, done: currentStep > 2 }"
+        >
           <span class="step-num">2</span>
           <span class="step-label">{{ t('auth.stepPhone') }}</span>
         </div>
         <div class="step-divider"></div>
-        <div class="step-item" :class="{ active: currentStep === 3 || currentStep === 4, done: currentStep > 4 }">
+        <div
+          class="step-item"
+          :class="{
+            active: currentStep === 3 || currentStep === 4,
+            done: currentStep > 4
+          }"
+        >
           <span class="step-num">3</span>
           <span class="step-label">{{ t('auth.stepCode') }}</span>
         </div>
         <div class="step-divider"></div>
-        <div class="step-item" :class="{ active: currentStep === 5, done: currentStep === 5 }">
+        <div
+          class="step-item"
+          :class="{ active: currentStep === 5, done: currentStep === 5 }"
+        >
           <span class="step-num">4</span>
           <span class="step-label">{{ t('auth.stepDone') }}</span>
         </div>
@@ -250,7 +306,12 @@ const cancelBack = () => {
           </div>
         </div>
 
-        <div v-if="errorMessage" class="auth-alert danger" role="alert" aria-live="polite">
+        <div
+          v-if="errorMessage"
+          class="auth-alert danger"
+          role="alert"
+          aria-live="polite"
+        >
           <AlertCircle :size="18" class="alert-icon" />
           <span>{{ errorMessage }}</span>
         </div>
@@ -264,8 +325,10 @@ const cancelBack = () => {
               target="_blank"
               rel="noopener noreferrer"
               @click="openExternal('https://my.telegram.org', $event)"
-            >my.telegram.org</a>
-            {{ bannerBParts[0] }}<i>API development tools</i>{{ bannerBParts[1] }}
+              >my.telegram.org</a
+            >
+            {{ bannerBParts[0] }}<i>API development tools</i
+            >{{ bannerBParts[1] }}
           </span>
         </div>
 
@@ -299,7 +362,11 @@ const cancelBack = () => {
             <ArrowLeft :size="16" />
             <span>{{ t('common.cancel') }}</span>
           </button>
-          <button class="auth-button primary" :disabled="loading" @click="saveCredentials">
+          <button
+            class="auth-button primary"
+            :disabled="loading"
+            @click="saveCredentials"
+          >
             <Loader2 v-if="loading" class="spin" :size="18" />
             <template v-else>
               <span>{{ t('auth.saveContinue') }}</span>
@@ -319,7 +386,12 @@ const cancelBack = () => {
           </div>
         </div>
 
-        <div v-if="errorMessage" class="auth-alert danger" role="alert" aria-live="polite">
+        <div
+          v-if="errorMessage"
+          class="auth-alert danger"
+          role="alert"
+          aria-live="polite"
+        >
           <AlertCircle :size="18" class="alert-icon" />
           <span>{{ errorMessage }}</span>
         </div>
@@ -336,11 +408,19 @@ const cancelBack = () => {
         </div>
 
         <div class="button-group">
-          <button class="auth-button secondary btn-back" :disabled="loading" @click="goBack">
+          <button
+            class="auth-button secondary btn-back"
+            :disabled="loading"
+            @click="goBack"
+          >
             <ArrowLeft :size="16" />
             <span>{{ t('common.back') }}</span>
           </button>
-          <button class="auth-button primary" :disabled="loading" @click="sendCode">
+          <button
+            class="auth-button primary"
+            :disabled="loading"
+            @click="sendCode"
+          >
             <Loader2 v-if="loading" class="spin" :size="18" />
             <template v-else>
               <span>{{ t('auth.sendCode') }}</span>
@@ -360,7 +440,12 @@ const cancelBack = () => {
           </div>
         </div>
 
-        <div v-if="errorMessage" class="auth-alert danger" role="alert" aria-live="polite">
+        <div
+          v-if="errorMessage"
+          class="auth-alert danger"
+          role="alert"
+          aria-live="polite"
+        >
           <AlertCircle :size="18" class="alert-icon" />
           <span>{{ errorMessage }}</span>
         </div>
@@ -378,11 +463,19 @@ const cancelBack = () => {
         </div>
 
         <div class="button-group">
-          <button class="auth-button secondary btn-back" :disabled="loading" @click="goBack">
+          <button
+            class="auth-button secondary btn-back"
+            :disabled="loading"
+            @click="goBack"
+          >
             <ArrowLeft :size="16" />
             <span>{{ t('common.back') }}</span>
           </button>
-          <button class="auth-button primary" :disabled="loading" @click="verifyCode">
+          <button
+            class="auth-button primary"
+            :disabled="loading"
+            @click="verifyCode"
+          >
             <Loader2 v-if="loading" class="spin" :size="18" />
             <template v-else>
               <span>{{ t('auth.verify') }}</span>
@@ -402,7 +495,12 @@ const cancelBack = () => {
           </div>
         </div>
 
-        <div v-if="errorMessage" class="auth-alert danger" role="alert" aria-live="polite">
+        <div
+          v-if="errorMessage"
+          class="auth-alert danger"
+          role="alert"
+          aria-live="polite"
+        >
           <AlertCircle :size="18" class="alert-icon" />
           <span>{{ errorMessage }}</span>
         </div>
@@ -418,11 +516,19 @@ const cancelBack = () => {
         </div>
 
         <div class="button-group">
-          <button class="auth-button secondary btn-back" :disabled="loading" @click="goBack">
+          <button
+            class="auth-button secondary btn-back"
+            :disabled="loading"
+            @click="goBack"
+          >
             <ArrowLeft :size="16" />
             <span>{{ t('common.back') }}</span>
           </button>
-          <button class="auth-button primary" :disabled="loading" @click="verify2FA">
+          <button
+            class="auth-button primary"
+            :disabled="loading"
+            @click="verify2FA"
+          >
             <Loader2 v-if="loading" class="spin" :size="18" />
             <template v-else>
               <span>{{ t('auth.signIn') }}</span>
@@ -442,12 +548,24 @@ const cancelBack = () => {
         </div>
         <h3>{{ t('auth.successTitle') }}</h3>
         <p v-if="authStatus.user">
-          {{ t('auth.connectedAs') }} <strong>{{ authStatus.user.first_name }}</strong>
-          <span v-if="authStatus.user.username">(@{{ authStatus.user.username }})</span>
+          {{ t('auth.connectedAs') }}
+          <strong>{{ authStatus.user.first_name }}</strong>
+          <span v-if="authStatus.user.username"
+            >(@{{ authStatus.user.username }})</span
+          >
         </p>
         <p v-else>{{ t('auth.successFallback') }}</p>
 
-        <button class="auth-button primary full-width" @click="$emit('auth-success', { ...authStatus, authenticated: true, state: 'LOGGED_IN' })">
+        <button
+          class="auth-button primary full-width"
+          @click="
+            $emit('auth-success', {
+              ...authStatus,
+              authenticated: true,
+              state: 'LOGGED_IN'
+            })
+          "
+        >
           <span>{{ t('auth.goDashboard') }}</span>
           <ArrowRight :size="18" />
         </button>
@@ -528,7 +646,8 @@ const cancelBack = () => {
   transition: opacity 0.3s;
 }
 
-.step-item.active, .step-item.done {
+.step-item.active,
+.step-item.done {
   opacity: 1;
 }
 
@@ -580,8 +699,12 @@ const cancelBack = () => {
   align-items: flex-start;
 }
 
-.icon-accent { color: #42aefa; }
-.icon-amber { color: #ffc764; }
+.icon-accent {
+  color: #42aefa;
+}
+.icon-amber {
+  color: #ffc764;
+}
 
 .step-intro h3 {
   font-family: 'Space Grotesk', sans-serif;
@@ -636,7 +759,9 @@ const cancelBack = () => {
   color: #dbe7f5;
   font-size: 14px;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .form-group input:focus {
@@ -694,7 +819,10 @@ const cancelBack = () => {
   font-weight: 700;
   cursor: pointer;
   border: 0;
-  transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    background 0.2s,
+    box-shadow 0.2s;
 }
 
 .auth-button.primary {
@@ -764,12 +892,22 @@ const cancelBack = () => {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes modalRise {
-  from { opacity: 0; transform: translateY(16px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 </style>
