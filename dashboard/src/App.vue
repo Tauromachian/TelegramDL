@@ -2203,103 +2203,9 @@ onUnmounted(() => {
 /* --- Ajustes plegables ---------------------------------------------------- */
 /* Cada apartado de Ajustes es un <section> con su cabecera-botón. El cuerpo va
    con v-show, no con v-if: se oculta sin desmontar nada, así abrir y cerrar no
-   vuelve a montar los selectores de color (que son muchos botones). */
-.ajustes-acordeon {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 4px;
-}
-.ajuste-bloque {
-  border: 1px solid var(--user-border);
-  border-radius: 14px;
-  background: var(--user-bg-base);
-  overflow: hidden;
-  transition: border-color 0.2s;
-}
-.ajuste-bloque.abierto {
-  border-color: var(--user-border-light);
-}
-.ajuste-cabecera {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 14px 16px;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  text-align: left;
-  color: #dbe7f5;
-  transition: background 0.2s;
-}
-.ajuste-cabecera:hover {
-  background: var(--user-surface-light);
-}
-.ajuste-cabecera:focus-visible {
-  outline: 2px solid var(--user-accent);
-  outline-offset: -2px;
-}
-.ajuste-icono {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  background: var(--user-icon-bg);
-  color: var(--user-primary);
-  flex: none;
-}
-.ajuste-titulo {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  flex: 1;
-}
-.ajuste-titulo strong {
-  font:
-    600 13px 'Space Grotesk',
-    sans-serif;
-}
-.ajuste-titulo small {
-  font-size: 11px;
-  color: var(--user-text-dim);
-}
-.ajuste-flecha {
-  color: var(--user-text-dim);
-  flex: none;
-  transition:
-    transform 0.2s ease,
-    color 0.2s;
-}
-.ajuste-bloque.abierto .ajuste-flecha {
-  transform: rotate(90deg);
-  color: var(--user-accent);
-}
-.ajuste-cuerpo {
-  padding: 16px 16px 20px;
-  border-top: 1px solid var(--user-border);
-  animation: ajusteAbrir 0.18s ease both;
-}
-/* Mismo reparto en columnas que tenía el bloque entero, pero ahora dentro de
-   cada apartado: dos columnas si hay sitio, una sola si no. */
-.ajuste-columnas {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-  gap: 34px;
-  align-items: start;
-}
-@keyframes ajusteAbrir {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
+   vuelve a montar los selectores de color (que son muchos botones). Estilos en
+   components/AppAccordion.vue (propios) y views/SettingsView.vue (envoltorio
+   y columnas del contenido). */
 
 /* Fila de exportar / importar / limpiar historial: botones del ancho de su
    texto, no estirados como estaban cuando eran las acciones del panel. */
@@ -2345,16 +2251,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 720px) {
-  .ajuste-cabecera {
-    padding: 12px;
-    gap: 10px;
-  }
-  .ajuste-cuerpo {
-    padding: 14px 12px 16px;
-  }
-  .ajuste-columnas {
-    gap: 24px;
-  }
   .save-button.save-fab {
     right: 16px;
     bottom: 16px;
