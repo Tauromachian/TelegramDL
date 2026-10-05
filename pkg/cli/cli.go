@@ -122,7 +122,7 @@ func RunCLIMode(url string) int {
 			ChatID:    chatID,
 			Status:    "queued",
 			Source:    "manual",
-			FileName:  fmt.Sprintf("message_%d", msgID),
+			FileName:  fmt.Sprintf("mensaje_%d", msgID),
 		}
 		eng.QueueItem(item)
 		itemIDs = append(itemIDs, item.ID)
