@@ -43,7 +43,12 @@ Este archivo define la arquitectura del proyecto `tgdown` y establece las reglas
 - **Frontend**: `npm --prefix dashboard run lint` debe terminar con **0 errores** (ESLint incluye Prettier como regla `prettier/prettier`: un descuadre de formato es un error de lint). Si falla, corrige con `npm --prefix dashboard run format` y verifica con `format:check`; **PROHIBIDO** dejar errores de lint en archivos que hayas tocado.
 - **No toques `dashboard/wailsjs/` ni `dashboard/dist/`**: son código generado (excluidos del lint); se regeneran con cada build.
 
-### 8. Fuente Completa de Convenciones
+### 8. Idioma: Código en Inglés, Comentarios en Español
+- **Todo el código debe estar en inglés**: nombres de variables, funciones, clases CSS, componentes, archivos, claves de i18n y mensajes de log internos. Nada de identificadores en español (`seccionAbierta`, `ajuste-bloque`, `alternar`, …).
+- **Los comentarios van en español**: explica el porqué en español, pero sin usar palabras españolas como identificadores dentro del comentario cuando se refieran al código (usa el nombre real en inglés).
+- Las cadenas visibles para el usuario siguen la regla 4 (i18n `es.js` / `en.js`); esta regla cubre solo código y comentarios.
+
+### 9. Fuente Completa de Convenciones
 - La guía completa para contribuidores humanos vive en `CONTRIBUTING.md`; estas reglas son el subconjunto de obligado cumplimiento para asistentes de IA.
 
 ---
