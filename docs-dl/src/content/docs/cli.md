@@ -1,6 +1,6 @@
 ---
 title: Línea de Comandos (CLI) y Modos de Ejecución
-description: Guía de parámetros de consola, modo servidor headless y autoactualizaciones.
+description: Guía de parámetros de consola, descargas directas por terminal y modo servidor headless.
 ---
 
 Además de la interfaz gráfica de escritorio habitual, el ejecutable de **TelegramDL** puede iniciarse desde la terminal con diversos parámetros y modos de operación.
@@ -11,10 +11,10 @@ Además de la interfaz gráfica de escritorio habitual, el ejecutable de **Teleg
 
 ```bash
 # Windows
-TelegramDL.exe [opciones]
+TelegramDL.exe [opciones|URL]
 
 # Linux / macOS
-./TelegramDL [opciones]
+./TelegramDL [opciones|URL]
 ```
 
 ### Parámetros Disponibles
@@ -22,9 +22,45 @@ TelegramDL.exe [opciones]
 | Parámetro | Alias | Descripción |
 | :--- | :--- | :--- |
 | *(sin parámetros)* | — | Inicia la aplicación completa en modo escritorio con interfaz Wails. |
+| `<URL>` | — | **Añadir Descarga Directa**: Pasa una URL de Telegram directamente. Si la app está abierta, se añade a la cola activa; si está cerrada, se abre e inicia la descarga. |
+| `--download <URL>` | `-d` | **Modo Descarga CLI Pura**: Ejecuta la descarga en la propia consola en modo texto sin abrir la interfaz gráfica. |
 | `--server` | `-s`, `/server` | **Modo Servidor Headless**: Inicia el servidor REST y WebSocket sin abrir ninguna ventana gráfica. |
 | `--update` | `-u`, `/update` | Comprueba si existe una versión más reciente en GitHub y la instala automáticamente. |
 | `--help` | `-h`, `/?` | Muestra el mensaje de ayuda con la sintaxis de uso en consola. |
+
+---
+
+## Descarga Directa por Argumento (`<URL>`)
+
+Puedes pasar un enlace de Telegram directamente detrás del ejecutable para encolar o iniciar una descarga automáticamente:
+
+```bash
+# Ejemplo con canal público o usuario
+TelegramDL.exe https://t.me/nombre_canal/123
+
+# Ejemplo con canal privado y rango de mensajes
+TelegramDL.exe https://t.me/c/1794593738/30502-30505
+```
+
+### Comportamiento Inteligente
+
+- **Si la aplicación YA está abierta**: El proceso en consola detecta la instancia en ejecución mediante el sistema de bloqueo IPC y le transmite el enlace de forma transparente a través del puerto local (`/api/ipc/download`). La interfaz gráfica abierta reflejará la nueva descarga en tiempo real en la cola. Si no hay nada en ejecución, empezará de inmediato; si ya hay tareas activas, se mantendrá ordenada en la cola.
+- **Si la aplicación está CERRADA**: El proceso abre TelegramDL en modo escritorio, inicializa la interfaz y encola la descarga en segundo plano. Si la cola estaba vacía, la descarga se procesa al momento de arrancar.
+
+---
+
+## Modo Descarga por Consola Pura (`--download <URL>`)
+
+Si prefieres realizar una descarga puntual sin abrir la ventana nativa ni mantener un servidor Web/WebSocket en segundo plano, utiliza la opción `--download`:
+
+```bash
+TelegramDL.exe --download https://t.me/nombre_canal/123
+```
+
+En este modo:
+1. Se conecta directamente a la API MTProto de Telegram utilizando tus credenciales guardadas en la base de datos local.
+2. Muestra el progreso de la descarga en texto directamente en la terminal.
+3. Al finalizar la descarga, se cierra automáticamente devolviendo el control a la consola.
 
 ---
 
@@ -66,9 +102,10 @@ El actualizador integrado (`pkg/updater/updater.go`):
 
 ---
 
-## Bloqueo de Instancia Única
+## Bloqueo de Instancia Única y Comunicación IPC
 
-TelegramDL implementa un mecanismo de bloqueo inteligente para evitar que dos procesos utilicen la misma base de datos SQLite o el mismo puerto de red simultáneamente:
+TelegramDL implementa un mecanismo de bloqueo inteligente y comunicación entre procesos (IPC) para evitar duplicidad de instancias y gestionar el reenvío de tareas:
 
-- Si intentas abrir una segunda ventana mientras la app ya está corriendo, el nuevo proceso detecta la instancia activa, muestra un aviso y se cierra ordenadamente.
+- Si intentas abrir una segunda instancia sin argumentos, el sistema detecta que la aplicación ya está abierta y finaliza ordenadamente.
+- Si pasas una URL como argumento mientras la app está abierta, la segunda instancia no se abre duplicada: se limita a enviar la descarga a la instancia activa vía IPC HTTP local y termina su ejecución notificando el éxito en consola.
 - Al actualizarse, el nuevo proceso espera hasta 8 segundos para que el proceso anterior libere el bloqueo antes de tomar el relevo.

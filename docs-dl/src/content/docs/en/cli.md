@@ -1,6 +1,6 @@
 ---
 title: CLI & Execution Modes
-description: Console parameters guide, headless server mode, and auto-updates.
+description: Console parameters guide, direct URL downloads, pure CLI mode, and headless server mode.
 ---
 
 Beyond the standard desktop graphical window, the **TelegramDL** binary can be invoked from the command line with various parameters and operational modes.
@@ -11,10 +11,10 @@ Beyond the standard desktop graphical window, the **TelegramDL** binary can be i
 
 ```bash
 # Windows
-TelegramDL.exe [options]
+TelegramDL.exe [options|URL]
 
 # Linux / macOS
-./TelegramDL [options]
+./TelegramDL [options|URL]
 ```
 
 ### Supported Arguments
@@ -22,9 +22,45 @@ TelegramDL.exe [options]
 | Argument | Alias | Description |
 | :--- | :--- | :--- |
 | *(no arguments)* | — | Starts the full desktop application with the Wails GUI window. |
+| `<URL>` | — | **Direct Download**: Pass a Telegram link directly. If the app is open, it enqueues to the active instance; if closed, it launches the app and queues the download. |
+| `--download <URL>` | `-d` | **Pure CLI Download Mode**: Downloads the link directly in terminal text mode without launching a GUI or web server. |
 | `--server` | `-s`, `/server` | **Headless Server Mode**: Starts the REST and WebSocket service without opening a window. |
 | `--update` | `-u`, `/update` | Checks for newer releases on GitHub and self-updates the binary. |
 | `--help` | `-h`, `/?` | Prints usage information and exit. |
+
+---
+
+## Direct Download via URL Argument (`<URL>`)
+
+You can pass a Telegram URL directly after the binary to automatically enqueue or process a download:
+
+```bash
+# Example with a public channel or username
+TelegramDL.exe https://t.me/channel_name/123
+
+# Example with a private channel and message range
+TelegramDL.exe https://t.me/c/1794593738/30502-30505
+```
+
+### Smart Instance Behavior
+
+- **If the application IS ALREADY open**: The console process detects the running instance via the IPC lock system and transmits the link seamlessly over a local loopback channel (`/api/ipc/download`). The open GUI updates its queue in real time. If no active downloads are running, processing starts immediately; otherwise, it takes its place in order.
+- **If the application IS CLOSED**: The process launches TelegramDL in desktop mode, initializes the interface, and enqueues the download in the background. If the queue was empty, the download is processed as soon as the app starts up.
+
+---
+
+## Pure Console Download Mode (`--download <URL>`)
+
+If you want to perform a one-off download without launching the graphical window or maintaining a background web server, use the `--download` option:
+
+```bash
+TelegramDL.exe --download https://t.me/channel_name/123
+```
+
+In this mode:
+1. Connects directly to the Telegram MTProto API using credentials stored in your local database.
+2. Displays real-time download progress directly as text in the console terminal.
+3. Automatically closes and returns control to the terminal upon completion.
 
 ---
 
@@ -66,9 +102,10 @@ The integrated updater (`pkg/updater/updater.go`):
 
 ---
 
-## Single-Instance Locking
+## Single-Instance Locking & IPC Communication
 
-TelegramDL implements single-instance mutual exclusion to ensure database and socket safety:
+TelegramDL implements single-instance mutual exclusion and inter-process communication (IPC) to prevent duplicates and route tasks:
 
-- Launching a second instance while one is already running triggers an alert and exits gracefully without corrupting SQLite or failing on port collisions.
+- Launching a second instance without arguments detects the active application and exits gracefully.
+- Passing a URL argument while the app is open sends the download payload to the active instance via local HTTP IPC and exits after confirming success in the console.
 - During self-updates, the spawned replacement binary waits up to 8 seconds for the parent process to relinquish the instance lock before binding.
