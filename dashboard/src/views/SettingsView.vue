@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Download,
   Upload,
-  ChevronRight,
   ArrowDownToLine,
   Image as Palette,
   KeyRound,
@@ -66,15 +65,6 @@ const emit = defineEmits([
 // `settings` directamente. Cada control emite el cambio con patch() y el
 // padre lo aplica, lo que dispara su autoguardado como antes.
 const patch = (partial) => emit('update:settings', partial)
-
-// Secciones plegables, en acordeón: solo puede haber una abierta a la vez y al
-// entrar en Ajustes están todas cerradas, así la vista arranca siempre igual y
-// se ve de un vistazo lo que hay. null = ninguna abierta.
-const seccionAbierta = ref(null)
-
-const alternar = (clave) => {
-  seccionAbierta.value = seccionAbierta.value === clave ? null : clave
-}
 
 const showToken = ref(false)
 // Estado del botón de copiar ('' = normal, 'ok', 'fail'): la etiqueta se deriva
@@ -297,7 +287,7 @@ const onImportFile = async (event) => {
           </span>
         </div>
 
-        <div class="ajustes-acordeon">
+        <div class="settings-accordion">
           <AppAccordion
             :title="t('settings.downloadsTitle')"
             :description="t('settings.downloadsSub')"
@@ -306,7 +296,7 @@ const onImportFile = async (event) => {
               <ArrowDownToLine :size="15" />
             </template>
 
-            <div class="ajuste-columnas">
+            <div class="accordion-columns">
               <!-- Concurrencia y Workers -->
               <div class="settings-group">
                 <label class="setting-label">
@@ -437,7 +427,7 @@ const onImportFile = async (event) => {
               <Palette :size="15" />
             </template>
 
-            <div class="ajuste-columnas">
+            <div class="accordion-columns">
               <!-- Paleta de Color y Tema -->
               <div class="settings-group color-group">
                 <span class="setting-label">{{
@@ -762,3 +752,25 @@ const onImportFile = async (event) => {
     </button>
   </div>
 </template>
+
+<style scoped>
+.settings-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+/* Two columns when there is room, one when not. */
+.accordion-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 34px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .accordion-columns {
+    gap: 24px;
+  }
+}
+</style>
