@@ -7,22 +7,22 @@ defineProps({
   description: { type: String, default: '' }
 })
 
-const seccionAbierta = ref(false)
+const isOpen = ref(false)
 </script>
 
 <template>
-  <section class="ajuste-bloque" :class="{ abierto: seccionAbierta }">
+  <section class="accordion-block" :class="{ open: isOpen }">
     <button
       type="button"
-      class="ajuste-cabecera"
-      :aria-expanded="seccionAbierta === 'temas'"
-      @click="seccionAbierta = !seccionAbierta"
+      class="accordion-header"
+      :aria-expanded="isOpen"
+      @click="isOpen = !isOpen"
     >
-      <span class="ajuste-icono">
+      <span class="accordion-icon">
         <slot name="icon"></slot>
       </span>
 
-      <span class="ajuste-titulo">
+      <span class="accordion-title">
         <p>
           <strong>{{ title }}</strong>
         </p>
@@ -33,31 +33,31 @@ const seccionAbierta = ref(false)
         </p>
       </span>
 
-      <ChevronRight class="ajuste-flecha" :size="16" />
+      <ChevronRight class="accordion-chevron" :size="16" />
     </button>
 
-    <div v-show="seccionAbierta" class="ajuste-cuerpo">
+    <div v-show="isOpen" class="accordion-body">
       <slot></slot>
     </div>
   </section>
 </template>
 
 <style scoped>
-.ajuste-titulo > * {
+.accordion-title > * {
   margin: 0;
 }
 
-.ajuste-titulo strong {
+.accordion-title strong {
   font:
     600 13px 'Space Grotesk',
     sans-serif;
 }
-.ajuste-titulo small {
+.accordion-title small {
   font-size: 11px;
   color: var(--user-text-dim);
 }
 
-.ajuste-bloque {
+.accordion-block {
   border: 1px solid var(--user-border);
   border-radius: 14px;
   background: var(--user-bg-base);
@@ -65,11 +65,42 @@ const seccionAbierta = ref(false)
   transition: border-color 0.2s;
 }
 
-.ajuste-bloque.abierto {
+.accordion-block.open {
   border-color: var(--user-border-light);
 }
 
-.ajuste-flecha {
+.accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: #dbe7f5;
+  transition: background 0.2s;
+}
+.accordion-header:hover {
+  background: var(--user-surface-light);
+}
+.accordion-header:focus-visible {
+  outline: 2px solid var(--user-accent);
+  outline-offset: -2px;
+}
+.accordion-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--user-icon-bg);
+  color: var(--user-primary);
+  flex: none;
+}
+
+.accordion-chevron {
   color: var(--user-text-dim);
   flex: none;
   transition:
@@ -79,8 +110,34 @@ const seccionAbierta = ref(false)
   margin-left: auto;
 }
 
-.ajuste-bloque.abierto .ajuste-flecha {
+.accordion-block.open .accordion-chevron {
   transform: rotate(90deg);
   color: var(--user-accent);
+}
+
+.accordion-body {
+  padding: 16px 16px 20px;
+  border-top: 1px solid var(--user-border);
+  animation: accordionOpen 0.18s ease both;
+}
+@keyframes accordionOpen {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .accordion-header {
+    padding: 12px;
+    gap: 10px;
+  }
+  .accordion-body {
+    padding: 14px 12px 16px;
+  }
 }
 </style>
