@@ -213,6 +213,7 @@ var messagesEN = map[string]string{
 	"cli.usageDesktop":    "  TelegramDL.exe              Open the desktop interface",
 	"cli.usageServer":     "  TelegramDL.exe --server     Run the server without opening a window",
 	"cli.usageUpdate":     "  TelegramDL.exe --update     Check for and install the latest update",
+	"cli.usageDownload":    "TelegramDL.exe --download <URL>  Download from URL without opening the graphical interface.",
 	"cli.alreadyRunning":  "TelegramDL is already running. Check the open window or the system tray.",
 	"cli.dbOpenAviso":     "TelegramDL could not open its database at %s.\n\nCheck that the folder exists and that you have write permission on it.",
 	"cli.dbOpenError":     "Error: could not open the TelegramDL database at %s.\n",

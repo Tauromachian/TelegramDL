@@ -214,6 +214,7 @@ var messagesES = map[string]string{
 	"cli.usageDesktop":   "  TelegramDL.exe              Abrir la interfaz de escritorio",
 	"cli.usageServer":    "  TelegramDL.exe --server     Ejecutar el servidor sin abrir ventana",
 	"cli.usageUpdate":    "  TelegramDL.exe --update     Buscar e instalar la última actualización",
+	"cli.usageDownload":    "TelegramDL.exe --download <URL>  Descarga desde URL sin abrir interfaz gráfica",
 	"cli.alreadyRunning": "TelegramDL ya se está ejecutando. Revisa la ventana abierta o la bandeja del sistema.",
 	"cli.dbOpenAviso":    "TelegramDL no pudo abrir su base de datos en %s.\n\nComprueba que la carpeta existe y que tienes permiso de escritura en ella.",
 	"cli.dbOpenError":    "Error: no se pudo abrir la base de datos de TelegramDL en %s.\n",
