@@ -485,7 +485,7 @@ onUnmounted(() => {
         class="jump-button"
         type="button"
         @click="
-          follow = true
+          follow = true,
           scrollToBottom()
         "
       >

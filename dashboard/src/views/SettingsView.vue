@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Download,
   Upload,
-  ChevronRight,
   ArrowDownToLine,
   Image as Palette,
   KeyRound,
@@ -66,15 +65,6 @@ const emit = defineEmits([
 // `settings` directamente. Cada control emite el cambio con patch() y el
 // padre lo aplica, lo que dispara su autoguardado como antes.
 const patch = (partial) => emit('update:settings', partial)
-
-// Secciones plegables, en acordeón: solo puede haber una abierta a la vez y al
-// entrar en Ajustes están todas cerradas, así la vista arranca siempre igual y
-// se ve de un vistazo lo que hay. null = ninguna abierta.
-const seccionAbierta = ref(null)
-
-const alternar = (clave) => {
-  seccionAbierta.value = seccionAbierta.value === clave ? null : clave
-}
 
 const showToken = ref(false)
 // Estado del botón de copiar ('' = normal, 'ok', 'fail'): la etiqueta se deriva
