@@ -19,6 +19,7 @@ var messagesES = map[string]string{
 	"system.shuttingDown":              "Apagando el equipo",
 	"system.shuttingDownDetail":        "La cola de descargas terminó con el apagado automático armado",
 	"system.shutdownError":             "No se pudo apagar el equipo",
+	"system.startupURLError":           "Error procesando URL de inicio: %v",
 	"system.logCleared":                "Registro limpiado",
 
 	// Servidor HTTP (pkg/server)

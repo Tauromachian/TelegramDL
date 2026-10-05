@@ -21,11 +21,15 @@ import (
 	"tgdown/pkg/cli"
 	"tgdown/pkg/config"
 	"tgdown/pkg/i18n"
+	"tgdown/pkg/logbus"
 	"tgdown/pkg/updater"
 )
 
 //go:embed all:dashboard/dist
 var assets embed.FS
+
+// startupURL guarda la URL pasada desde línea de comandos
+var startupURL string
 
 func main() {
 	// Antes que nada, el registro y la consola hablan el idioma del sistema:
@@ -101,19 +105,15 @@ func printUsage() {
 	fmt.Println(i18n.T("cli.usageUrlArg"))
 }
 
-// getTelegramURLArgument detecta si el primer argumento es una URL de Telegram
+// getTelegramURLArgument detecta si algún argumento es una URL de Telegram
 func getTelegramURLArgument() string {
-	if len(os.Args) < 2 {
-		return ""
-	}
-	arg := os.Args[1]
-	// Ignorar flags que empiezan con -
-	if strings.HasPrefix(arg, "-") {
-		return ""
-	}
-	// Verificar si parece una URL de Telegram
-	if strings.Contains(arg, "t.me/") || strings.Contains(arg, "telegram.org/") {
-		return arg
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if strings.Contains(arg, "t.me/") || strings.Contains(arg, "telegram.org/") || strings.Contains(arg, "telegram.me/") {
+			return arg
+		}
 	}
 	return ""
 }
@@ -132,11 +132,14 @@ func handleURLArgument(url string) int {
 		}
 		return sendURLToActiveInstance(url)
 	}
-	defer release()
 
-	// No hay instancia activa, abrir la app normalmente con la URL
-	// Guardamos la URL en una variable global para que la app la procese al arrancar
-	// Por ahora, simplemente abrimos la app en modo desktop
+	// No hay instancia activa, liberar el lock y abrir la app normalmente
+	// runDesktopMode() volverá a adquirir el lock internamente
+	release()
+
+	// Guardar la URL para que la app la procese al iniciar
+	startupURL = url
+
 	fmt.Println(i18n.T("cli.processingURL", url))
 	runDesktopMode()
 	return 0
@@ -212,6 +215,21 @@ func runDesktopMode() {
 		// que el aviso tiene que ser una ventana del sistema.
 		mostrarAviso(i18n.T("cli.dbOpenAviso", config.DataDir))
 		return
+	}
+
+	// Si hay una URL de inicio, procesarla directamente en el backend
+	if startupURL != "" {
+		app.SetStartupURL(startupURL)
+
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+
+			time.Sleep(500 * time.Millisecond)
+			if err := app.server.EnqueueURL(ctx, startupURL); err != nil {
+				logbus.Warn(logbus.CatSystem, i18n.T("system.startupURLError"), err.Error())
+			}
+		}()
 	}
 
 	err := wails.Run(&options.App{

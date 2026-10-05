@@ -497,6 +497,17 @@ const startDownload = async (url) => {
   }
 }
 
+// Procesa la URL de inicio pasada desde línea de comandos
+const processStartupURL = async (url) => {
+  if (!url) return
+  try {
+    await startDownload(url)
+  } catch (err) {
+    console.error('Error procesando URL de inicio:', err)
+    showMessage(err.message, true)
+  }
+}
+
 const cancelDownload = async (id) => {
   try {
     await api('/api/cancel', {
@@ -904,6 +915,18 @@ const startApp = async () => {
     setTimeout(() => {
       bootstrapping.value = false
     }, remaining)
+  }
+
+  // Procesar URL de inicio si existe (solo en Wails runtime)
+  if (window.runtime && window.go?.main?.App?.GetStartupURL) {
+    try {
+      const startupURL = await window.go.main.App.GetStartupURL()
+      if (startupURL) {
+        await processStartupURL(startupURL)
+      }
+    } catch (err) {
+      console.error('Error obteniendo URL de inicio:', err)
+    }
   }
 }
 

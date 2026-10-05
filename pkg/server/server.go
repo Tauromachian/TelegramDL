@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -1189,33 +1190,31 @@ func (s *Server) handleGetDownloads(w http.ResponseWriter, _ *http.Request) {
 	s.jsonResponse(w, http.StatusOK, s.downloader.GetDownloads())
 }
 
-func (s *Server) handleStartDownload(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		URL string `json:"url"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.URL) == "" {
-		s.errorResponse(w, http.StatusUnprocessableEntity, "URL requerida")
-		return
+// EnqueueURL procesa una URL de Telegram y añade los elementos correspondientes a la cola.
+func (s *Server) EnqueueURL(ctx context.Context, rawURL string) error {
+	clean := strings.TrimSpace(rawURL)
+	if clean == "" {
+		return errors.New("URL vacía")
 	}
 
-	parsed, err := downloader.ParseURL(body.URL)
+	parsed, err := downloader.ParseURL(clean)
 	if err != nil {
-		s.errorResponse(w, http.StatusUnprocessableEntity, err.Error())
-		return
+		return fmt.Errorf("error parseando URL: %w", err)
 	}
 
 	chatID := parsed.ChatID
 	if chatID == 0 && parsed.ChatUsername != "" {
-		resolvedID, err := s.clientMgr.ResolveUsername(r.Context(), parsed.ChatUsername)
+		if err := s.clientMgr.WaitReady(ctx); err != nil {
+			return fmt.Errorf("cliente de Telegram no listo: %w", err)
+		}
+		resolvedID, err := s.clientMgr.ResolveUsername(ctx, parsed.ChatUsername)
 		if err != nil {
-			s.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("No se pudo encontrar el canal o usuario: %s", err.Error()))
-			return
+			return fmt.Errorf("no se pudo encontrar el canal o usuario: %w", err)
 		}
 		chatID = resolvedID
 	}
 
 	jobID := config.NewID()
-	// Crear items para el rango de mensajes
 	for msgID := parsed.StartMsgID; msgID <= parsed.EndMsgID; msgID++ {
 		item := storage.DownloadItem{
 			ID:        config.NewID(),
@@ -1230,9 +1229,26 @@ func (s *Server) handleStartDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	s.broadcastState()
 
+	logbus.Info(logbus.CatDownloads, i18n.T("server.ipcDownloadReceived", clean), "")
+	return nil
+}
+
+func (s *Server) handleStartDownload(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.URL) == "" {
+		s.errorResponse(w, http.StatusUnprocessableEntity, "URL requerida")
+		return
+	}
+
+	if err := s.EnqueueURL(r.Context(), body.URL); err != nil {
+		s.errorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	s.jsonResponse(w, http.StatusOK, map[string]string{
 		"status":  "ok",
-		"job_id":  jobID,
 		"message": "Analizando mensajes e iniciando descarga...",
 	})
 }
@@ -2281,42 +2297,13 @@ func (s *Server) handleIPCDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parsed, err := downloader.ParseURL(body.URL)
-	if err != nil {
-		s.errorResponse(w, http.StatusUnprocessableEntity, err.Error())
+	if err := s.EnqueueURL(r.Context(), body.URL); err != nil {
+		s.errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	chatID := parsed.ChatID
-	if chatID == 0 && parsed.ChatUsername != "" {
-		resolvedID, err := s.clientMgr.ResolveUsername(r.Context(), parsed.ChatUsername)
-		if err != nil {
-			s.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("No se pudo encontrar el canal o usuario: %s", err.Error()))
-			return
-		}
-		chatID = resolvedID
-	}
-
-	jobID := config.NewID()
-	for msgID := parsed.StartMsgID; msgID <= parsed.EndMsgID; msgID++ {
-		item := storage.DownloadItem{
-			ID:        config.NewID(),
-			JobID:     jobID,
-			MessageID: int64(msgID),
-			ChatID:    chatID,
-			Status:    "queued",
-			Source:    "ipc",
-			FileName:  fmt.Sprintf("mensaje_%d", msgID),
-		}
-		s.downloader.QueueItem(item)
-	}
-	s.broadcastState()
-
-	logbus.Info(logbus.CatServer, i18n.T("server.ipcDownloadReceived"), body.URL)
-
 	s.jsonResponse(w, http.StatusOK, map[string]string{
 		"status":  "ok",
-		"job_id":  jobID,
 		"message": "Descarga añadida desde línea de comandos",
 	})
 }

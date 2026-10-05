@@ -33,6 +33,7 @@ type App struct {
 	config     config.Config
 	assets     fs.FS
 	mu         sync.Mutex
+	startupURL string // URL pasada desde línea de comandos al iniciar
 }
 
 func NewApp(assets fs.FS) *App {
@@ -260,4 +261,20 @@ func (a *App) RegenerateLocalToken() string {
 		return ""
 	}
 	return a.server.RegenerateToken()
+}
+
+// GetStartupURL devuelve la URL pasada desde línea de comandos al iniciar y la limpia.
+func (a *App) GetStartupURL() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	url := a.startupURL
+	a.startupURL = ""
+	return url
+}
+
+// SetStartupURL establece la URL de inicio.
+func (a *App) SetStartupURL(url string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.startupURL = url
 }

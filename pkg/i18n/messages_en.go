@@ -18,6 +18,7 @@ var messagesEN = map[string]string{
 	"system.shuttingDown":              "Shutting the computer down",
 	"system.shuttingDownDetail":        "The download queue finished with the automatic shutdown armed",
 	"system.shutdownError":             "Could not shut down the computer",
+	"system.startupURLError":           "Error processing startup URL: %v",
 	"system.logCleared":                "Log cleared",
 
 	// HTTP server (pkg/server)
