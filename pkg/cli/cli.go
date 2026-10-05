@@ -188,7 +188,7 @@ func waitForDownloads(eng *downloader.Engine, ids []string) int {
 				fmt.Println("\n Some downloads failed. Check the history in the app for more details..")
 				return 1
 			}
-			fmt.Println("\n All downloads completed successfully..")
+			fmt.Println("\n All downloads completed successfully.")
 			return 0
 		}
 	}
