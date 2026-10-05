@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"tgdown/pkg/i18n"
 	"tgdown/pkg/storage"
 )
 
@@ -39,26 +40,26 @@ func (r *CLIProgressReporter) OnStateChange(item storage.DownloadItem) {
 
 	switch item.Status {
 	case "queued":
-		fmt.Printf("⏳ En cola: %s\n", truncate(item.FileName, 50))
+		fmt.Print(i18n.T("cli.statusQueued", truncate(item.FileName, 50)))
 	case "downloading":
 		r.printProgress(item)
 	case "completed":
-		fmt.Printf("\n✅ Completado: %s (%s)\n", truncate(item.FileName, 50), item.TotalStr)
+		fmt.Print(i18n.T("cli.statusCompleted", truncate(item.FileName, 50), item.TotalStr))
 		delete(r.activeIDs, item.ID)
 	case "failed":
-		fmt.Printf("\n❌ Fallido: %s\n", truncate(item.FileName, 50))
+		fmt.Print(i18n.T("cli.statusFailed", truncate(item.FileName, 50)))
 		if item.Error != "" {
-			fmt.Printf   (  "   Error: %s\n", item.Error)
+			fmt.Print(i18n.T("cli.statusErrorDetail", item.Error))
 		}
 		delete(r.activeIDs, item.ID)
 	case "cancelled":
-		fmt.Printf("\n⏹️ Cancelado: %s\n", truncate(item.FileName, 50))
+		fmt.Print(i18n.T("cli.statusCancelled", truncate(item.FileName, 50)))
 		delete(r.activeIDs, item.ID)
 	case "skipped":
-		fmt.Printf("⏭️  Saltado: %s (ya existe)\n", truncate(item.FileName, 50))
+		fmt.Print(i18n.T("cli.statusSkipped", truncate(item.FileName, 50)))
 		delete(r.activeIDs, item.ID)
 	case "duplicate":
-		fmt.Printf("🔄 Duplicado: %s (ya existe)\n", truncate(item.FileName, 50))
+		fmt.Print(i18n.T("cli.statusDuplicate", truncate(item.FileName, 50)))
 		delete(r.activeIDs, item.ID)
 	}
 

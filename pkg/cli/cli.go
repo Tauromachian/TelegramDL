@@ -20,7 +20,7 @@ func RunCLIMode(url string) int {
 	config.InitPaths()
 	i18n.SetLanguage(i18n.DetectSystemLanguage())
 
-	fmt.Println(" TelegramDL - CLI mode")
+	fmt.Println(i18n.T("cli.modeHeader"))
 	fmt.Println("======================")
 
 	// 2. Abrir base de datos
@@ -30,7 +30,7 @@ func RunCLIMode(url string) int {
 		dbPath = filepath.Join(config.DataDir, "tgdown.db")
 		st, err = storage.NewStorage(dbPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, " Error opening database: %v\n", err)
+			fmt.Fprint(os.Stderr, i18n.T("cli.errDatabase", err))
 			return 1
 		}
 	}
@@ -48,19 +48,23 @@ func RunCLIMode(url string) int {
 	}
 	cfg = config.NormalizeConfig(cfg)
 
+	if cfg.Language != "" {
+		i18n.SetLanguage(cfg.Language)
+	}
+
 	// 5. Verificar credenciales de Telegram
 	apiID, apiHash, _ := st.GetCredentials()
 	if apiID == "" || apiHash == "" {
-		fmt.Fprintf(os.Stderr, "Error: No Telegram credentials configured..\n")
-		fmt.Fprintf(os.Stderr, "   Open the app once to configure them..\n")
+		fmt.Fprint(os.Stderr, i18n.T("cli.errNoCredentials"))
+		fmt.Fprint(os.Stderr, i18n.T("cli.errNoCredentialsHint"))
 		return 1
 	}
 
 	// 6. Inicializar cliente Telegram
-	fmt.Println(" Connecting to Telegram...")
+	fmt.Println(i18n.T("cli.connecting"))
 	cm := telegram.NewClientManager()
 	if err := cm.InitClient(apiID, apiHash); err != nil {
-		fmt.Fprintf(os.Stderr, "Error starting Telegram client: %v\n", err)
+		fmt.Fprint(os.Stderr, i18n.T("cli.errStartTelegram", err))
 		return 1
 	}
 	defer cm.Stop()
@@ -69,10 +73,10 @@ func RunCLIMode(url string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := cm.WaitReady(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "Error waiting for connection to Telegram: %v\n", err)
+		fmt.Fprint(os.Stderr, i18n.T("cli.errWaitTelegram", err))
 		return 1
 	}
-	fmt.Println(" Connected to Telegram")
+	fmt.Println(i18n.T("cli.connected"))
 
 	// 7. Inicializar motor de descargas (SIN servidor)
 	eng := downloader.NewEngine(cm, st, cfg)
@@ -82,32 +86,32 @@ func RunCLIMode(url string) int {
 	eng.OnStateChange(reporter.OnStateChange)
 
 	// 9. Procesar la URL
-	fmt.Printf("\n Processing URL: %s\n", url)
+	fmt.Print(i18n.T("cli.processingURL", url))
 	parsed, err := downloader.ParseURL(url)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing URL: %v\n", err)
+		fmt.Fprint(os.Stderr, i18n.T("cli.errParseURL", err))
 		return 1
 	}
 
 	// 10. Resolver username si es necesario
 	chatID := parsed.ChatID
 	if chatID == 0 && parsed.ChatUsername != "" {
-		fmt.Printf(" Resolving username: @%s\n", parsed.ChatUsername)
+		fmt.Print(i18n.T("cli.resolvingUser", parsed.ChatUsername))
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		resolvedID, err := cm.ResolveUsername(ctx, parsed.ChatUsername)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "The channel or user could not be found.: %v\n", err)
+			fmt.Fprint(os.Stderr, i18n.T("cli.errUserNotFound", err))
 			return 1
 		}
 		chatID = resolvedID
-		fmt.Printf("Username resolved to ID: %d\n", chatID)
+		fmt.Print(i18n.T("cli.resolvedUser", chatID))
 	}
 
 	// 11. Crear items para el rango de mensajes
 	jobID := config.NewID()
 	msgCount := parsed.EndMsgID - parsed.StartMsgID + 1
-	fmt.Printf("Creating %d download task(s)...\n", msgCount)
+	fmt.Print(i18n.T("cli.creatingTasks", msgCount))
 
 	itemIDs := make([]string, 0, msgCount)
 	for msgID := parsed.StartMsgID; msgID <= parsed.EndMsgID; msgID++ {
@@ -124,7 +128,7 @@ func RunCLIMode(url string) int {
 		itemIDs = append(itemIDs, item.ID)
 	}
 
-	fmt.Printf("Queued downloads. Waiting for completion....\n\n")
+	fmt.Print(i18n.T("cli.queuedWaiting"))
 
 	// 12. Esperar a que termine
 	return waitForDownloads(eng, itemIDs)
@@ -174,21 +178,21 @@ func waitForDownloads(eng *downloader.Engine, ids []string) int {
 		}
 
 		if allDone {
-			fmt.Println("\n")
+			fmt.Print("\n\n")
 			fmt.Println("======================")
-			fmt.Println("Summary:")
-			fmt.Printf("   Completed: %d\n", completedCount)
-			fmt.Printf("   Sautéed:   %d\n", skippedCount)
+			fmt.Println(i18n.T("cli.summaryHeader"))
+			fmt.Print(i18n.T("cli.summaryCompleted", completedCount))
+			fmt.Print(i18n.T("cli.summarySkipped", skippedCount))
 			if failedCount > 0 {
-				fmt.Printf("   Failed:    %d\n", failedCount)
+				fmt.Print(i18n.T("cli.summaryFailed", failedCount))
 			}
 			fmt.Println("======================")
 
 			if anyFailed {
-				fmt.Println("\n Some downloads failed. Check the history in the app for more details..")
+				fmt.Println(i18n.T("cli.someFailed"))
 				return 1
 			}
-			fmt.Println("\n All downloads completed successfully.")
+			fmt.Println(i18n.T("cli.allCompleted"))
 			return 0
 		}
 	}
