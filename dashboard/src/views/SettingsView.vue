@@ -21,6 +21,7 @@ import {
 import FolderPicker from '../components/FolderPicker.vue'
 import { useAuthToken } from '../composables/useAuthToken'
 import { useI18n } from '../i18n'
+import AppAccordion from '../components/AppAccordion.vue'
 
 const { authHeaders } = useAuthToken()
 const { t, locale, availableLocales, splitOn } = useI18n()
@@ -297,514 +298,451 @@ const onImportFile = async (event) => {
         </div>
 
         <div class="ajustes-acordeon">
-          <!-- 1. Descargas -->
-          <section
-            class="ajuste-bloque"
-            :class="{ abierto: seccionAbierta === 'descargas' }"
+          <AppAccordion
+            :title="t('settings.downloadsTitle')"
+            :description="t('settings.downloadsSub')"
           >
-            <button
-              type="button"
-              class="ajuste-cabecera"
-              :aria-expanded="seccionAbierta === 'descargas'"
-              @click="alternar('descargas')"
-            >
-              <span class="ajuste-icono"><ArrowDownToLine :size="15" /></span>
-              <span class="ajuste-titulo">
-                <strong>{{ t('settings.downloadsTitle') }}</strong>
-                <small>{{ t('settings.downloadsSub') }}</small>
-              </span>
-              <ChevronRight class="ajuste-flecha" :size="16" />
-            </button>
+            <template #icon>
+              <ArrowDownToLine :size="15" />
+            </template>
 
-            <div v-show="seccionAbierta === 'descargas'" class="ajuste-cuerpo">
-              <div class="ajuste-columnas">
-                <!-- Concurrencia y Workers -->
-                <div class="settings-group">
-                  <label class="setting-label">
-                    {{ t('settings.concurrent') }}
-                    <output>
-                      {{ props.settings.max_concurrent_downloads }}
-                    </output>
-                  </label>
-                  <input
-                    :value="props.settings.max_concurrent_downloads"
-                    type="range"
-                    min="1"
-                    max="32"
-                    class="range-input"
-                    @input="
-                      patch({
-                        max_concurrent_downloads: Number($event.target.value)
-                      })
-                    "
-                  />
-                  <div class="range-hints"><span>1</span><span>32</span></div>
+            <div class="ajuste-columnas">
+              <!-- Concurrencia y Workers -->
+              <div class="settings-group">
+                <label class="setting-label">
+                  {{ t('settings.concurrent') }}
+                  <output>
+                    {{ props.settings.max_concurrent_downloads }}
+                  </output>
+                </label>
+                <input
+                  :value="props.settings.max_concurrent_downloads"
+                  type="range"
+                  min="1"
+                  max="32"
+                  class="range-input"
+                  @input="
+                    patch({
+                      max_concurrent_downloads: Number($event.target.value)
+                    })
+                  "
+                />
+                <div class="range-hints"><span>1</span><span>32</span></div>
 
-                  <div class="setting-line">
-                    <div>
-                      <strong>{{ t('settings.chunks') }}</strong>
-                      <small>{{ t('settings.chunksSub') }}</small>
-                    </div>
-                    <label class="switch">
-                      <input
-                        :checked="props.settings.parallel_chunks"
-                        type="checkbox"
-                        @change="
-                          patch({ parallel_chunks: $event.target.checked })
-                        "
-                      />
-                      <span></span>
-                    </label>
+                <div class="setting-line">
+                  <div>
+                    <strong>{{ t('settings.chunks') }}</strong>
+                    <small>{{ t('settings.chunksSub') }}</small>
                   </div>
-
-                  <label class="setting-label compact">
-                    {{ t('settings.workers') }}
-                    <output>{{ props.settings.chunk_workers }}</output>
+                  <label class="switch">
+                    <input
+                      :checked="props.settings.parallel_chunks"
+                      type="checkbox"
+                      @change="
+                        patch({ parallel_chunks: $event.target.checked })
+                      "
+                    />
+                    <span></span>
                   </label>
-                  <input
-                    :value="props.settings.chunk_workers"
-                    :disabled="!props.settings.parallel_chunks"
-                    type="range"
-                    min="1"
-                    max="8"
-                    class="range-input"
-                    @input="
-                      patch({ chunk_workers: Number($event.target.value) })
-                    "
-                  />
-                  <div class="range-hints"><span>1</span><span>8</span></div>
                 </div>
 
-                <!-- Velocidad y Directorio -->
-                <div class="settings-group">
-                  <div class="speed-setting">
-                    <label class="setting-label compact">
-                      {{ t('settings.speedLimit') }}
-                    </label>
-                    <div class="speed-row">
-                      <input
-                        :value="props.settings.speed_limit.value"
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        @input="
-                          patch({
-                            speed_limit: {
-                              ...props.settings.speed_limit,
-                              value: Number($event.target.value)
-                            }
-                          })
-                        "
-                      />
-                      <select
-                        :value="props.settings.speed_limit.unit"
-                        @change="
-                          patch({
-                            speed_limit: {
-                              ...props.settings.speed_limit,
-                              unit: $event.target.value
-                            }
-                          })
-                        "
-                      >
-                        <option>KB</option>
-                        <option>MB</option>
-                        <option>GB</option>
-                      </select>
-                      <span>/s</span>
-                    </div>
-                    <small>{{ t('settings.speedHint') }}</small>
-                  </div>
+                <label class="setting-label compact">
+                  {{ t('settings.workers') }}
+                  <output>{{ props.settings.chunk_workers }}</output>
+                </label>
+                <input
+                  :value="props.settings.chunk_workers"
+                  :disabled="!props.settings.parallel_chunks"
+                  type="range"
+                  min="1"
+                  max="8"
+                  class="range-input"
+                  @input="patch({ chunk_workers: Number($event.target.value) })"
+                />
+                <div class="range-hints"><span>1</span><span>8</span></div>
+              </div>
 
-                  <FolderPicker
-                    :model-value="props.settings.download_folder"
-                    @update:model-value="patch({ download_folder: $event })"
-                  />
-
-                  <div class="setting-line">
-                    <div>
-                      <strong>{{ t('settings.organizeByChat') }}</strong>
-                      <small>{{ t('settings.organizeByChatSub') }}</small>
-                    </div>
-                    <label class="switch">
-                      <input
-                        :checked="props.settings.organize_by_chat"
-                        type="checkbox"
-                        @change="
-                          patch({ organize_by_chat: $event.target.checked })
-                        "
-                      />
-                      <span></span>
-                    </label>
+              <!-- Velocidad y Directorio -->
+              <div class="settings-group">
+                <div class="speed-setting">
+                  <label class="setting-label compact">
+                    {{ t('settings.speedLimit') }}
+                  </label>
+                  <div class="speed-row">
+                    <input
+                      :value="props.settings.speed_limit.value"
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      @input="
+                        patch({
+                          speed_limit: {
+                            ...props.settings.speed_limit,
+                            value: Number($event.target.value)
+                          }
+                        })
+                      "
+                    />
+                    <select
+                      :value="props.settings.speed_limit.unit"
+                      @change="
+                        patch({
+                          speed_limit: {
+                            ...props.settings.speed_limit,
+                            unit: $event.target.value
+                          }
+                        })
+                      "
+                    >
+                      <option>KB</option>
+                      <option>MB</option>
+                      <option>GB</option>
+                    </select>
+                    <span>/s</span>
                   </div>
+                  <small>{{ t('settings.speedHint') }}</small>
+                </div>
+
+                <FolderPicker
+                  :model-value="props.settings.download_folder"
+                  @update:model-value="patch({ download_folder: $event })"
+                />
+
+                <div class="setting-line">
+                  <div>
+                    <strong>{{ t('settings.organizeByChat') }}</strong>
+                    <small>{{ t('settings.organizeByChatSub') }}</small>
+                  </div>
+                  <label class="switch">
+                    <input
+                      :checked="props.settings.organize_by_chat"
+                      type="checkbox"
+                      @change="
+                        patch({ organize_by_chat: $event.target.checked })
+                      "
+                    />
+                    <span></span>
+                  </label>
                 </div>
               </div>
             </div>
-          </section>
+          </AppAccordion>
 
           <!-- 2. Temas -->
-          <section
-            class="ajuste-bloque"
-            :class="{ abierto: seccionAbierta === 'temas' }"
+          <AppAccordion
+            :title="t('settings.themesTitle')"
+            :description="t('settings.themesSub')"
           >
-            <button
-              type="button"
-              class="ajuste-cabecera"
-              :aria-expanded="seccionAbierta === 'temas'"
-              @click="alternar('temas')"
-            >
-              <span class="ajuste-icono"><Palette :size="15" /></span>
-              <span class="ajuste-titulo">
-                <strong>{{ t('settings.themesTitle') }}</strong>
-                <small>{{ t('settings.themesSub') }}</small>
-              </span>
-              <ChevronRight class="ajuste-flecha" :size="16" />
-            </button>
+            <template #icon>
+              <Palette :size="15" />
+            </template>
 
-            <div v-show="seccionAbierta === 'temas'" class="ajuste-cuerpo">
-              <div class="ajuste-columnas">
-                <!-- Paleta de Color y Tema -->
-                <div class="settings-group color-group">
-                  <span class="setting-label">{{
-                    t('settings.accentTitle')
-                  }}</span>
+            <div class="ajuste-columnas">
+              <!-- Paleta de Color y Tema -->
+              <div class="settings-group color-group">
+                <span class="setting-label">{{
+                  t('settings.accentTitle')
+                }}</span>
 
-                  <!-- Los 0-15 vienen de Telegram Premium; del 16 en adelante son las
+                <!-- Los 0-15 vienen de Telegram Premium; del 16 en adelante son las
                        paletas propias del panel. Van separados con su propio título
                        para que se vea de dónde sale cada grupo. -->
-                  <span class="grupo-color-titulo">{{
-                    t('settings.telegramGroup')
-                  }}</span>
-                  <div class="color-selector-container">
-                    <div class="color-row">
-                      <button
-                        v-for="id in [0, 1, 2, 3, 4, 5, 6, 7]"
-                        :key="id"
-                        type="button"
-                        class="color-dot"
-                        :class="{ active: props.settings.color_id === id }"
-                        :style="{
-                          background: themeMap[id]?.gradient || '#38a7ff'
-                        }"
-                        :title="t('settings.colorN', { n: id })"
-                        @click="patch({ color_id: id })"
-                      ></button>
-                    </div>
-                    <div class="color-row">
-                      <button
-                        v-for="id in [8, 9, 10, 11, 12, 13, 14, 15]"
-                        :key="id"
-                        type="button"
-                        class="color-dot gradient-dot"
-                        :class="{ active: props.settings.color_id === id }"
-                        :style="{
-                          background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
-                        }"
-                        :title="t('settings.gradientN', { n: id })"
-                        @click="patch({ color_id: id })"
-                      ></button>
-                    </div>
+                <span class="grupo-color-titulo">{{
+                  t('settings.telegramGroup')
+                }}</span>
+                <div class="color-selector-container">
+                  <div class="color-row">
+                    <button
+                      v-for="id in [0, 1, 2, 3, 4, 5, 6, 7]"
+                      :key="id"
+                      type="button"
+                      class="color-dot"
+                      :class="{ active: props.settings.color_id === id }"
+                      :style="{
+                        background: themeMap[id]?.gradient || '#38a7ff'
+                      }"
+                      :title="t('settings.colorN', { n: id })"
+                      @click="patch({ color_id: id })"
+                    ></button>
                   </div>
+                  <div class="color-row">
+                    <button
+                      v-for="id in [8, 9, 10, 11, 12, 13, 14, 15]"
+                      :key="id"
+                      type="button"
+                      class="color-dot gradient-dot"
+                      :class="{ active: props.settings.color_id === id }"
+                      :style="{
+                        background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
+                      }"
+                      :title="t('settings.gradientN', { n: id })"
+                      @click="patch({ color_id: id })"
+                    ></button>
+                  </div>
+                </div>
 
-                  <!-- Colores temáticos: paletas propias del panel. Se guardan en el
+                <!-- Colores temáticos: paletas propias del panel. Se guardan en el
                        mismo ajuste (color_id) que los de arriba: elegir uno sustituye
                        al color de la cuenta, y "Restablecer color de la cuenta"
                        vuelve a dejar el de Telegram. -->
-                  <span class="grupo-color-titulo">{{
-                    t('settings.thematicGroup')
-                  }}</span>
-                  <div class="temas-lista">
+                <span class="grupo-color-titulo">{{
+                  t('settings.thematicGroup')
+                }}</span>
+                <div class="temas-lista">
+                  <button
+                    v-for="id in temasEspeciales"
+                    :key="'tema-' + id"
+                    type="button"
+                    class="tema-chip"
+                    :class="{ active: props.settings.color_id === id }"
+                    :title="
+                      themeMap[id]?.name || t('settings.themeN', { n: id })
+                    "
+                    @click="patch({ color_id: id })"
+                  >
+                    <span
+                      class="tema-muestra"
+                      :style="{ background: themeMap[id]?.gradient }"
+                    ></span>
+                    <span class="tema-nombre">{{
+                      themeMap[id]?.name || t('settings.themeN', { n: id })
+                    }}</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  class="reset-button-alt"
+                  @click="emit('reset-color')"
+                >
+                  <Zap :size="14" /> {{ t('settings.resetAccountColor') }}
+                </button>
+              </div>
+
+              <!-- Color del Loader -->
+              <div class="settings-group color-group">
+                <span class="setting-label">{{
+                  t('settings.loaderTitle')
+                }}</span>
+
+                <span class="grupo-color-titulo">{{
+                  t('settings.telegramGroup')
+                }}</span>
+                <div class="color-selector-container">
+                  <div class="color-row">
+                    <button
+                      v-for="id in [0, 1, 2, 3, 4, 5, 6, 7]"
+                      :key="'loader-' + id"
+                      type="button"
+                      class="color-dot"
+                      :class="{
+                        active: props.settings.loader_color_id === id
+                      }"
+                      :style="{
+                        background: themeMap[id]?.gradient || '#38a7ff'
+                      }"
+                      :title="t('settings.colorLoaderN', { n: id })"
+                      @click="patch({ loader_color_id: id })"
+                    ></button>
+                  </div>
+                  <div class="color-row">
+                    <button
+                      v-for="id in [8, 9, 10, 11, 12, 13, 14, 15]"
+                      :key="'loader-grad-' + id"
+                      type="button"
+                      class="color-dot gradient-dot"
+                      :class="{
+                        active: props.settings.loader_color_id === id
+                      }"
+                      :style="{
+                        background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
+                      }"
+                      :title="t('settings.gradientLoaderN', { n: id })"
+                      @click="patch({ loader_color_id: id })"
+                    ></button>
+                  </div>
+                </div>
+
+                <!-- Aquí solo va el círculo con el degradado del tema, sin nombre:
+                       del tema especial el loader únicamente toma el color, no el
+                       decorado, así que no hay nada más que enseñar. -->
+                <span class="grupo-color-titulo">{{
+                  t('settings.thematicGroupShort')
+                }}</span>
+                <div class="color-selector-container">
+                  <div class="color-row">
                     <button
                       v-for="id in temasEspeciales"
-                      :key="'tema-' + id"
+                      :key="'loader-tema-' + id"
                       type="button"
-                      class="tema-chip"
-                      :class="{ active: props.settings.color_id === id }"
+                      class="color-dot tema-dot"
+                      :class="{
+                        active: props.settings.loader_color_id === id
+                      }"
+                      :style="{ background: themeMap[id]?.gradient }"
                       :title="
                         themeMap[id]?.name || t('settings.themeN', { n: id })
                       "
-                      @click="patch({ color_id: id })"
-                    >
-                      <span
-                        class="tema-muestra"
-                        :style="{ background: themeMap[id]?.gradient }"
-                      ></span>
-                      <span class="tema-nombre">{{
-                        themeMap[id]?.name || t('settings.themeN', { n: id })
-                      }}</span>
-                    </button>
+                      @click="patch({ loader_color_id: id })"
+                    ></button>
                   </div>
-
-                  <button
-                    type="button"
-                    class="reset-button-alt"
-                    @click="emit('reset-color')"
-                  >
-                    <Zap :size="14" /> {{ t('settings.resetAccountColor') }}
-                  </button>
                 </div>
 
-                <!-- Color del Loader -->
-                <div class="settings-group color-group">
-                  <span class="setting-label">{{
-                    t('settings.loaderTitle')
-                  }}</span>
-
-                  <span class="grupo-color-titulo">{{
-                    t('settings.telegramGroup')
-                  }}</span>
-                  <div class="color-selector-container">
-                    <div class="color-row">
-                      <button
-                        v-for="id in [0, 1, 2, 3, 4, 5, 6, 7]"
-                        :key="'loader-' + id"
-                        type="button"
-                        class="color-dot"
-                        :class="{
-                          active: props.settings.loader_color_id === id
-                        }"
-                        :style="{
-                          background: themeMap[id]?.gradient || '#38a7ff'
-                        }"
-                        :title="t('settings.colorLoaderN', { n: id })"
-                        @click="patch({ loader_color_id: id })"
-                      ></button>
-                    </div>
-                    <div class="color-row">
-                      <button
-                        v-for="id in [8, 9, 10, 11, 12, 13, 14, 15]"
-                        :key="'loader-grad-' + id"
-                        type="button"
-                        class="color-dot gradient-dot"
-                        :class="{
-                          active: props.settings.loader_color_id === id
-                        }"
-                        :style="{
-                          background: `linear-gradient(135deg, ${themeMap[id]?.primary || '#38a7ff'} 49.8%, ${themeMap[id]?.secondary || '#b48bf2'} 50.2%)`
-                        }"
-                        :title="t('settings.gradientLoaderN', { n: id })"
-                        @click="patch({ loader_color_id: id })"
-                      ></button>
-                    </div>
-                  </div>
-
-                  <!-- Aquí solo va el círculo con el degradado del tema, sin nombre:
-                       del tema especial el loader únicamente toma el color, no el
-                       decorado, así que no hay nada más que enseñar. -->
-                  <span class="grupo-color-titulo">{{
-                    t('settings.thematicGroupShort')
-                  }}</span>
-                  <div class="color-selector-container">
-                    <div class="color-row">
-                      <button
-                        v-for="id in temasEspeciales"
-                        :key="'loader-tema-' + id"
-                        type="button"
-                        class="color-dot tema-dot"
-                        :class="{
-                          active: props.settings.loader_color_id === id
-                        }"
-                        :style="{ background: themeMap[id]?.gradient }"
-                        :title="
-                          themeMap[id]?.name || t('settings.themeN', { n: id })
-                        "
-                        @click="patch({ loader_color_id: id })"
-                      ></button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    class="reset-button-alt"
-                    @click="emit('reset-loader-color')"
-                  >
-                    <Zap :size="14" /> {{ t('settings.resetLoaderColor') }}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  class="reset-button-alt"
+                  @click="emit('reset-loader-color')"
+                >
+                  <Zap :size="14" /> {{ t('settings.resetLoaderColor') }}
+                </button>
               </div>
             </div>
-          </section>
+          </AppAccordion>
 
           <!-- 3. Idioma -->
-          <section
-            class="ajuste-bloque"
-            :class="{ abierto: seccionAbierta === 'idioma' }"
+          <AppAccordion
+            :title="t('settings.langTitle')"
+            :description="t('settings.langSub')"
           >
-            <button
-              type="button"
-              class="ajuste-cabecera"
-              :aria-expanded="seccionAbierta === 'idioma'"
-              @click="alternar('idioma')"
-            >
-              <span class="ajuste-icono"><Languages :size="15" /></span>
-              <span class="ajuste-titulo">
-                <strong>{{ t('settings.langTitle') }}</strong>
-                <small>{{ t('settings.langSub') }}</small>
-              </span>
-              <ChevronRight class="ajuste-flecha" :size="16" />
-            </button>
+            <template #icon>
+              <Languages :size="15" />
+            </template>
 
-            <div v-show="seccionAbierta === 'idioma'" class="ajuste-cuerpo">
-              <div class="settings-group">
-                <!-- El idioma se aplica al instante y se guarda como un ajuste
+            <div class="settings-group">
+              <!-- El idioma se aplica al instante y se guarda como un ajuste
                      más (settings.language). El chip activo sigue a `locale`,
                      que es el idioma realmente en uso, no al valor bruto del
                      ajuste (vacío la primera vez, antes de autodetectar). -->
-                <div class="temas-lista">
-                  <button
-                    v-for="lang in availableLocales"
-                    :key="lang.id"
-                    type="button"
-                    class="tema-chip idioma-chip"
-                    :class="{ active: locale === lang.id }"
-                    :aria-pressed="locale === lang.id"
-                    @click="patch({ language: lang.id })"
-                  >
-                    <span class="tema-nombre">{{ lang.label }}</span>
-                  </button>
-                </div>
-                <small>{{ t('settings.langNote') }}</small>
+              <div class="temas-lista">
+                <button
+                  v-for="lang in availableLocales"
+                  :key="lang.id"
+                  type="button"
+                  class="tema-chip idioma-chip"
+                  :class="{ active: locale === lang.id }"
+                  :aria-pressed="locale === lang.id"
+                  @click="patch({ language: lang.id })"
+                >
+                  <span class="tema-nombre">{{ lang.label }}</span>
+                </button>
               </div>
+              <small>{{ t('settings.langNote') }}</small>
             </div>
-          </section>
+          </AppAccordion>
 
           <!-- 4. Acceso remoto -->
-          <section
-            class="ajuste-bloque"
-            :class="{ abierto: seccionAbierta === 'remoto' }"
+          <AppAccordion
+            :title="t('settings.remoteTitle')"
+            :description="t('settings.remoteSub')"
           >
-            <button
-              type="button"
-              class="ajuste-cabecera"
-              :aria-expanded="seccionAbierta === 'remoto'"
-              @click="alternar('remoto')"
-            >
-              <span class="ajuste-icono"><KeyRound :size="15" /></span>
-              <span class="ajuste-titulo">
-                <strong>{{ t('settings.remoteTitle') }}</strong>
-                <small>{{ t('settings.remoteSub') }}</small>
-              </span>
-              <ChevronRight class="ajuste-flecha" :size="16" />
-            </button>
+            <template #icon>
+              <KeyRound :size="15" />
+            </template>
 
-            <div v-show="seccionAbierta === 'remoto'" class="ajuste-cuerpo">
-              <div class="settings-group">
-                <small>
-                  {{ remoteDescParts[0]
-                  }}<a
-                    class="inline-link"
-                    href="https://tailscale.com"
-                    target="_blank"
-                    rel="noopener"
-                    >Tailscale</a
-                  >{{ remoteDescParts[1] }}
-                </small>
+            <div class="settings-group">
+              <small>
+                {{ remoteDescParts[0]
+                }}<a
+                  class="inline-link"
+                  href="https://tailscale.com"
+                  target="_blank"
+                  rel="noopener"
+                  >Tailscale</a
+                >{{ remoteDescParts[1] }}
+              </small>
 
-                <div class="token-row">
-                  <input
-                    :value="showToken ? apiToken : maskedToken"
-                    type="text"
-                    readonly
-                  />
-                </div>
+              <div class="token-row">
+                <input
+                  :value="showToken ? apiToken : maskedToken"
+                  type="text"
+                  readonly
+                />
+              </div>
 
-                <div
-                  class="settings-actions"
-                  style="margin-top: 0; padding: 0; flex-wrap: wrap"
+              <div
+                class="settings-actions"
+                style="margin-top: 0; padding: 0; flex-wrap: wrap"
+              >
+                <button
+                  type="button"
+                  class="reset-button-alt"
+                  @click="showToken = !showToken"
                 >
-                  <button
-                    type="button"
-                    class="reset-button-alt"
-                    @click="showToken = !showToken"
-                  >
-                    <component :is="showToken ? EyeOff : Eye" :size="14" />
-                    {{ showToken ? t('settings.hide') : t('settings.show') }}
-                  </button>
-                  <button
-                    type="button"
-                    class="reset-button-alt"
-                    @click="copyToken"
-                  >
-                    <Copy :size="14" /> {{ copyLabel }}
-                  </button>
-                  <button
-                    type="button"
-                    class="reset-button-alt"
-                    @click="emit('regenerate-token')"
-                  >
-                    <RefreshCw :size="14" /> {{ t('settings.regenerate') }}
-                  </button>
-                </div>
+                  <component :is="showToken ? EyeOff : Eye" :size="14" />
+                  {{ showToken ? t('settings.hide') : t('settings.show') }}
+                </button>
+                <button
+                  type="button"
+                  class="reset-button-alt"
+                  @click="copyToken"
+                >
+                  <Copy :size="14" /> {{ copyLabel }}
+                </button>
+                <button
+                  type="button"
+                  class="reset-button-alt"
+                  @click="emit('regenerate-token')"
+                >
+                  <RefreshCw :size="14" /> {{ t('settings.regenerate') }}
+                </button>
               </div>
             </div>
-          </section>
+          </AppAccordion>
 
           <!-- 5. Datos: escucha e historial -->
-          <section
-            class="ajuste-bloque"
-            :class="{ abierto: seccionAbierta === 'datos' }"
+          <AppAccordion
+            :title="t('settings.dataTitle')"
+            :description="t('settings.dataSub')"
           >
-            <button
-              type="button"
-              class="ajuste-cabecera"
-              :aria-expanded="seccionAbierta === 'datos'"
-              @click="alternar('datos')"
-            >
-              <span class="ajuste-icono"><HardDrive :size="15" /></span>
-              <span class="ajuste-titulo">
-                <strong>{{ t('settings.dataTitle') }}</strong>
-                <small>{{ t('settings.dataSub') }}</small>
-              </span>
-              <ChevronRight class="ajuste-flecha" :size="16" />
-            </button>
+            <template #icon>
+              <HardDrive :size="15" />
+            </template>
 
-            <div v-show="seccionAbierta === 'datos'" class="ajuste-cuerpo">
-              <div class="settings-group">
-                <div class="settings-actions acciones-datos">
-                  <button
-                    type="button"
-                    class="reset-button-alt"
-                    :disabled="exporting"
-                    @click="exportListener"
-                  >
-                    <Download :size="14" />
-                    {{
-                      exporting
-                        ? t('settings.exportingListener')
-                        : t('settings.exportListener')
-                    }}
-                  </button>
-                  <button
-                    type="button"
-                    class="reset-button-alt"
-                    :disabled="importing"
-                    @click="pickImportFile"
-                  >
-                    <Upload :size="14" />
-                    {{
-                      importing
-                        ? t('settings.importingListener')
-                        : t('settings.importListener')
-                    }}
-                  </button>
-                  <button
-                    class="clear-history-button boton-historial"
-                    type="button"
-                    @click="emit('clear-history')"
-                  >
-                    <Trash2 :size="15" /> {{ t('settings.clearHistory') }}
-                  </button>
-                  <input
-                    ref="importInput"
-                    type="file"
-                    accept="application/json,.json"
-                    style="display: none"
-                    @change="onImportFile"
-                  />
-                </div>
+            <div class="settings-group">
+              <div class="settings-actions acciones-datos">
+                <button
+                  type="button"
+                  class="reset-button-alt"
+                  :disabled="exporting"
+                  @click="exportListener"
+                >
+                  <Download :size="14" />
+                  {{
+                    exporting
+                      ? t('settings.exportingListener')
+                      : t('settings.exportListener')
+                  }}
+                </button>
+                <button
+                  type="button"
+                  class="reset-button-alt"
+                  :disabled="importing"
+                  @click="pickImportFile"
+                >
+                  <Upload :size="14" />
+                  {{
+                    importing
+                      ? t('settings.importingListener')
+                      : t('settings.importListener')
+                  }}
+                </button>
+                <button
+                  class="clear-history-button boton-historial"
+                  type="button"
+                  @click="emit('clear-history')"
+                >
+                  <Trash2 :size="15" /> {{ t('settings.clearHistory') }}
+                </button>
+                <input
+                  ref="importInput"
+                  type="file"
+                  accept="application/json,.json"
+                  style="display: none"
+                  @change="onImportFile"
+                />
               </div>
             </div>
-          </section>
+          </AppAccordion>
         </div>
       </aside>
     </div>
