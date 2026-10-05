@@ -2227,19 +2227,9 @@ onUnmounted(() => {
 /* --- Ajustes plegables ---------------------------------------------------- */
 /* Cada apartado de Ajustes es un <section> con su cabecera-botón. El cuerpo va
    con v-show, no con v-if: se oculta sin desmontar nada, así abrir y cerrar no
-   vuelve a montar los selectores de color (que son muchos botones). */
-.ajustes-acordeon {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 4px;
-}
-.ajuste-columnas {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-  gap: 34px;
-  align-items: start;
-}
+   vuelve a montar los selectores de color (que son muchos botones). Estilos en
+   components/AppAccordion.vue (propios) y views/SettingsView.vue (envoltorio
+   y columnas del contenido). */
 
 /* Fila de exportar / importar / limpiar historial: botones del ancho de su
    texto, no estirados como estaban cuando eran las acciones del panel. */
@@ -2285,9 +2275,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 720px) {
-  .ajuste-columnas {
-    gap: 24px;
-  }
   .save-button.save-fab {
     right: 16px;
     bottom: 16px;

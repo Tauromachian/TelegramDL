@@ -65,6 +65,10 @@ const isOpen = ref(false)
   transition: border-color 0.2s;
 }
 
+.accordion-block + .accordion-block {
+  margin-top: 12px;
+}
+
 .accordion-block.open {
   border-color: var(--user-border-light);
 }
@@ -120,6 +124,14 @@ const isOpen = ref(false)
   border-top: 1px solid var(--user-border);
   animation: accordionOpen 0.18s ease both;
 }
+
+.accordion-body :deep(.ajuste-columnas) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 34px;
+  align-items: start;
+}
+
 @keyframes accordionOpen {
   from {
     opacity: 0;
@@ -138,6 +150,9 @@ const isOpen = ref(false)
   }
   .accordion-body {
     padding: 14px 12px 16px;
+  }
+  .accordion-body :deep(.ajuste-columnas) {
+    gap: 24px;
   }
 }
 </style>

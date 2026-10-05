@@ -484,10 +484,7 @@ onUnmounted(() => {
         v-if="unseen"
         class="jump-button"
         type="button"
-        @click="
-          follow = true,
-          scrollToBottom()
-        "
+        @click="((follow = true), scrollToBottom())"
       >
         <ArrowDownToLine :size="14" />
         {{
