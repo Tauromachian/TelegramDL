@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -73,6 +74,7 @@ type Server struct {
 	hadActiveDownloads bool
 	shutdownTimer      *time.Timer
 	shutdownDeadline   time.Time
+	botCancel          context.CancelFunc
 }
 
 type wsClient struct {
@@ -144,6 +146,8 @@ func NewServer(
 	le.OnStateChange(func(item listener.ListenerItem) {
 		s.triggerBroadcast()
 	})
+
+	s.restartBotListener()
 
 	return s
 }
@@ -313,6 +317,10 @@ func (s *Server) Start(port int) error {
 func (s *Server) Stop() {
 	s.stopOnce.Do(func() { close(s.stopCh) })
 	s.mu.Lock()
+	if s.botCancel != nil {
+		s.botCancel()
+		s.botCancel = nil
+	}
 	if s.shutdownTimer != nil {
 		// Si la aplicación se cierra a mitad de la cuenta atrás, el apagado se
 		// cancela: quien la cerró está delante del equipo.
@@ -1647,6 +1655,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	s.downloader.UpdateConfig(cfg)
 	s.listener.UpdateConfig(cfg)
+	s.restartBotListener()
 	s.broadcastState()
 
 	s.jsonResponse(w, http.StatusOK, map[string]any{
@@ -2592,5 +2601,198 @@ func (s *Server) executeScheduledShutdown() {
 	logbus.Warn(logbus.CatSystem, i18n.T("system.shuttingDown"), i18n.T("system.shuttingDownDetail"))
 	if err := shutdownSystem(); err != nil {
 		logbus.Error(logbus.CatSystem, i18n.T("system.shutdownError"), err.Error())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Listener interactivo para bot de Telegram (comandos y recepción de enlaces)
+// ---------------------------------------------------------------------------
+
+var telegramURLRegex = regexp.MustCompile(`(?i)(?:https?://)?(?:[a-zA-Z0-9-]+\.)*(?:t|telegram)\.me/[^\s]+`)
+
+func extractTelegramLinks(text string) []string {
+	matches := telegramURLRegex.FindAllString(text, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool)
+	var result []string
+	for _, m := range matches {
+		m = strings.TrimRight(m, ".,;:!?)>]}")
+		if !seen[m] {
+			seen[m] = true
+			result = append(result, m)
+		}
+	}
+	return result
+}
+
+func (s *Server) restartBotListener() {
+	s.mu.Lock()
+	if s.botCancel != nil {
+		s.botCancel()
+		s.botCancel = nil
+	}
+
+	cfg := s.config
+	if !cfg.NotificationBotEnabled || cfg.NotificationBotToken == "" || cfg.NotificationChatID == 0 {
+		s.mu.Unlock()
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.botCancel = cancel
+	s.mu.Unlock()
+
+	go s.runBotListener(ctx, cfg.NotificationBotToken, cfg.NotificationChatID, cfg.NotificationTopicID)
+}
+
+func (s *Server) runBotListener(ctx context.Context, token string, authorizedChatID int64, topicID *int64) {
+	client := &http.Client{Timeout: 35 * time.Second}
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates", token)
+
+	offset := 0
+
+	// Obtener el último update_id al arrancar para no procesar mensajes antiguos acumulados
+	initReqURL := fmt.Sprintf("%s?offset=-1&limit=1", apiURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, initReqURL, nil)
+	if err == nil {
+		resp, err := client.Do(req)
+		if err == nil {
+			var initRes struct {
+				OK     bool `json:"ok"`
+				Result []struct {
+					UpdateID int `json:"update_id"`
+				} `json:"result"`
+			}
+			if json.NewDecoder(resp.Body).Decode(&initRes) == nil && initRes.OK && len(initRes.Result) > 0 {
+				offset = initRes.Result[0].UpdateID + 1
+			}
+			resp.Body.Close()
+		}
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		pollURL := fmt.Sprintf("%s?offset=%d&timeout=20", apiURL, offset)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, pollURL, nil)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+				continue
+			}
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+				continue
+			}
+		}
+
+		var res struct {
+			OK     bool `json:"ok"`
+			Result []struct {
+				UpdateID int `json:"update_id"`
+				Message  *struct {
+					MessageID       int64  `json:"message_id"`
+					MessageThreadID *int64 `json:"message_thread_id,omitempty"`
+					From            struct {
+						ID int64 `json:"id"`
+					} `json:"from"`
+					Chat struct {
+						ID int64 `json:"id"`
+					} `json:"chat"`
+					Text string `json:"text,omitempty"`
+				} `json:"message,omitempty"`
+			} `json:"result"`
+		}
+
+		decodeErr := json.NewDecoder(resp.Body).Decode(&res)
+		resp.Body.Close()
+
+		if decodeErr != nil || !res.OK {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+				continue
+			}
+		}
+
+		for _, up := range res.Result {
+			if up.UpdateID >= offset {
+				offset = up.UpdateID + 1
+			}
+
+			if up.Message == nil || up.Message.Chat.ID != authorizedChatID {
+				continue
+			}
+
+			text := strings.TrimSpace(up.Message.Text)
+			if text == "" {
+				continue
+			}
+
+			var replyThreadID *int64
+			if up.Message.MessageThreadID != nil && *up.Message.MessageThreadID > 0 {
+				replyThreadID = up.Message.MessageThreadID
+			} else {
+				replyThreadID = topicID
+			}
+
+			n := notifier.NewNotifier(token, authorizedChatID, replyThreadID)
+
+			if text == "/start" || text == "/help" {
+				replyText := "🚀 <b>TelegramDL Bot</b>\n\nEnvíame cualquier enlace de Telegram (ejemplo: <code>https://t.me/c/123456/789</code> o rangos <code>https://t.me/c/123456/10-20</code>) para añadirlo a la cola de descargas."
+				n.SendMessage(ctx, replyText)
+				continue
+			}
+
+			candidates := extractTelegramLinks(text)
+			if len(candidates) == 0 {
+				replyText := "⚠️ <b>Enlace no reconocido.</b>\nEnvía un enlace válido de Telegram (ej: <code>https://t.me/c/123456/789</code>)."
+				n.SendMessage(ctx, replyText)
+				continue
+			}
+
+			var added []string
+			var failedErrs []string
+
+			for _, rawURL := range candidates {
+				err := s.EnqueueURL(ctx, rawURL)
+				if err == nil {
+					added = append(added, rawURL)
+					logbus.Info(logbus.CatDownloads, i18n.T("server.ipcDownloadReceived", rawURL), "Bot Telegram")
+				} else {
+					failedErrs = append(failedErrs, fmt.Sprintf("• <code>%s</code>: <i>%s</i>", html.EscapeString(rawURL), html.EscapeString(err.Error())))
+				}
+			}
+
+			if len(added) > 0 {
+				addedLinks := make([]string, len(added))
+				for i, l := range added {
+					addedLinks[i] = "• <code>" + html.EscapeString(l) + "</code>"
+				}
+				replyText := fmt.Sprintf("📥 <b>Descarga(s) añadida(s) a la cola:</b>\n%s", strings.Join(addedLinks, "\n"))
+				if len(failedErrs) > 0 {
+					replyText += fmt.Sprintf("\n\n⚠️ <b>Errores:</b>\n%s", strings.Join(failedErrs, "\n"))
+				}
+				n.SendMessage(ctx, replyText)
+			} else if len(failedErrs) > 0 {
+				replyText := fmt.Sprintf("❌ <b>Error al procesar enlace(s):</b>\n%s", strings.Join(failedErrs, "\n"))
+				n.SendMessage(ctx, replyText)
+			}
+		}
 	}
 }
