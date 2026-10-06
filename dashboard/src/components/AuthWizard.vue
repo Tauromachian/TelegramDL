@@ -182,7 +182,7 @@ const verify2FA = async () => {
 }
 
 // Vuelve al paso anterior del asistente.
-//
+
 // Los pasos 1 y 2 se desandan sin tocar el servidor: basta con volver a pintar
 // la pantalla anterior y que el usuario reenvie el dato. El paso de 2FA es
 // distinto: Telegram ya consumio el codigo de verificacion al pedir la
