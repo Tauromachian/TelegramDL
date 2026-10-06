@@ -130,10 +130,10 @@ var messagesEN = map[string]string{
 
 	// Telegram bot notifications (pkg/notifier)
 	"notifier.sendError":         "error sending notification: %v",
-	"notifier.testMessage":        "✅ Test message from TelegramDL",
-	"notifier.queueComplete":      "Download queue finished: %d completed, %d failed",
-	"notifier.queueCompleteError": "Failed links:\n%s",
-	"notifier.downloadFailed":     "Download of %s failed\nError: %s",
+	"notifier.testMessage":        "🚀 <b>TelegramDL</b>\n\n✅ <i>Test notification sent successfully!</i>\nBot is configured and ready to receive alerts.",
+	"notifier.queueComplete":      "📊 <b>Download Summary — TelegramDL</b>\n\n✅ <b>Completed:</b> %d\n❌ <b>Failed:</b> %d",
+	"notifier.queueCompleteError": "\n\n⚠️ <b>Error details:</b>\n%s",
+	"notifier.downloadFailed":     "🚨 <b>Download Failed</b>\n\n📄 <b>File:</b> <code>%s</code>\n⚠️ <b>Error:</b> <i>%s</i>",
 
 	// Message resolution on Telegram ([DOWNLOAD FETCH] tag)
 	"fetch.noAccessHashCache":    "Channel %d has no cached accessHash. Querying dialogs...",

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io/fs"
 	"log"
 	"net"
@@ -2512,8 +2513,12 @@ func (s *Server) maybeScheduleShutdown() {
 		s.mu.Unlock()
 		message := i18n.T("notifier.queueComplete", completed, failed)
 		if failed > 0 && len(failedLinks) > 0 {
-			failedText := strings.Join(failedLinks, "\n")
-			message += "\n" + i18n.T("notifier.queueCompleteError", failedText)
+			escapedLinks := make([]string, len(failedLinks))
+			for i, link := range failedLinks {
+				escapedLinks[i] = "• <code>" + html.EscapeString(link) + "</code>"
+			}
+			failedText := strings.Join(escapedLinks, "\n")
+			message += i18n.T("notifier.queueCompleteError", failedText)
 		}
 		s.downloader.SendNotification(message)
 		s.mu.Lock()

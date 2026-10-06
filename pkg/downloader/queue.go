@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"log"
 	"sort"
 	"time"
@@ -290,7 +291,7 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 
 		// Enviar notificación de error si está configurado
 		if e.config.NotifyOnError {
-			e.sendNotification(i18n.T("notifier.downloadFailed", curItem.FileName, err.Error()))
+			e.sendNotification(i18n.T("notifier.downloadFailed", html.EscapeString(curItem.FileName), html.EscapeString(err.Error())))
 		}
 	} else {
 		curItem.Status = "completed"

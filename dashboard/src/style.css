@@ -361,6 +361,60 @@ select {
   letter-spacing: 0.02em;
   color: var(--user-text-dim);
 }
+
+/* Campos de Notificaciones Telegram */
+.notif-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.notif-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #dbe7f5;
+}
+.notif-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.notif-input-row input {
+  flex: 1;
+  min-width: 0;
+  background: var(--user-bg-base);
+  border: 1px solid var(--user-border-light);
+  color: #dbe7f5;
+  border-radius: 10px;
+  padding: 11px 14px;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.notif-input-row input:focus {
+  border-color: var(--user-primary);
+  box-shadow: 0 0 0 3px var(--user-glow);
+}
+.notif-input-row input::placeholder {
+  color: #5f7890;
+}
+.notif-hint {
+  font-size: 11px;
+  color: var(--user-text-dim);
+  margin-top: 2px;
+}
+.notif-chat-badge {
+  padding: 8px 12px;
+  background: rgba(56, 167, 255, 0.1);
+  border: 1px solid rgba(56, 167, 255, 0.25);
+  border-radius: 8px;
+  color: var(--user-primary);
+  font-size: 12px;
+  margin-top: 4px;
+}
 .primary-button,
 .save-button {
   border: 0;
