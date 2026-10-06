@@ -128,6 +128,13 @@ var messagesEN = map[string]string{
 	"downloader.pauseExcess":         "Pausing excess task %s to respect the new limit",
 	"downloader.entryKeptFile":       "Entry %s removed without deleting %s: the file belongs to another download",
 
+	// Telegram bot notifications (pkg/notifier)
+	"notifier.sendError":         "error sending notification: %v",
+	"notifier.testMessage":        "✅ Test message from TelegramDL",
+	"notifier.queueComplete":      "Download queue finished: %d completed, %d failed",
+	"notifier.queueCompleteError": "Failed links:\n%s",
+	"notifier.downloadFailed":     "Download of %s failed\nError: %s",
+
 	// Message resolution on Telegram ([DOWNLOAD FETCH] tag)
 	"fetch.noAccessHashCache":    "Channel %d has no cached accessHash. Querying dialogs...",
 	"fetch.noAccessHashChannels": "Channel %d still has no accessHash. Querying ChannelsGetChannels...",

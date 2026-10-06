@@ -370,7 +370,34 @@ export default {
     spaceTitle: 'Not enough disk space!',
     spaceCriticalTitle: 'Critical Space Alert!',
     spaceCriticalText:
-      'Due to external changes to your disk, there is no longer enough space to complete the queued downloads.\n\nYou need to free at least {needed} or cancel some tasks to avoid errors.'
+      'Due to external changes to your disk, there is no longer enough space to complete the queued downloads.\n\nYou need to free at least {needed} or cancel some tasks to avoid errors.',
+    notificationsTitle: 'Telegram Notifications',
+    notificationsSub: 'Receive alerts via your own bot',
+    notificationsEnabled: 'Enable notifications',
+    notificationsDesc:
+      'Create a bot with @BotFather, paste the token here and send /start to connect it.',
+    botToken: 'Bot token',
+    botTokenPlaceholder: 'E.g. 123456789:ABCdefGHIjklMNOpqrsTUVwxyz',
+    detectChat: 'Detect chat',
+    detectChatHint:
+      'Open a chat with your bot and send /start, then click here.',
+    detectedChat: 'Detected chat',
+    noChatDetected: 'No chat detected',
+    chatID: 'Chat ID',
+    topicID: 'Topic ID (optional)',
+    topicIDHint: 'Only for groups with topics. Leave empty for the main topic.',
+    sendTest: 'Send test',
+    notifyOnComplete: 'Notify when queue finishes',
+    notifyOnCompleteSub: 'Sends a summary when all downloads finish.',
+    notifyOnError: 'Notify errors',
+    notifyOnErrorSub: 'Sends an alert when a download fails.',
+    detectingChat: 'Detecting...',
+    sendingTest: 'Sending...',
+    testSent: 'Test message sent',
+    detectError:
+      'Could not detect the chat. Make sure to send /start to your bot.',
+    testError: 'Could not send the test message.',
+    invalidToken: 'Invalid token. It must be in format id:hash.'
   },
 
   folder: {

@@ -374,7 +374,36 @@ export default {
     spaceTitle: '¡Espacio en disco insuficiente!',
     spaceCriticalTitle: '¡Alerta de Espacio Crítico!',
     spaceCriticalText:
-      'Debido a cambios externos en tu disco, ya no hay espacio suficiente para completar las descargas en cola. \n\nNecesitas liberar al menos {needed} o cancelar algunas tareas para evitar errores.'
+      'Debido a cambios externos en tu disco, ya no hay espacio suficiente para completar las descargas en cola. \n\nNecesitas liberar al menos {needed} o cancelar algunas tareas para evitar errores.',
+    notificationsTitle: 'Notificaciones Telegram',
+    notificationsSub: 'Recibe alertas mediante un bot propio',
+    notificationsEnabled: 'Activar notificaciones',
+    notificationsDesc:
+      'Crea un bot con @BotFather, pega el token aquí y envíale /start para conectarlo.',
+    botToken: 'Token del bot',
+    botTokenPlaceholder: 'Ej: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz',
+    detectChat: 'Detectar chat',
+    detectChatHint:
+      'Abre un chat con tu bot y envíale /start, luego pulsa aquí.',
+    detectedChat: 'Chat detectado',
+    noChatDetected: 'No hay chat detectado',
+    chatID: 'ID del chat',
+    topicID: 'ID del tema (opcional)',
+    topicIDHint:
+      'Solo para grupos con temas. Déjalo vacío para el tema principal.',
+    sendTest: 'Enviar prueba',
+    notifyOnComplete: 'Notificar al terminar la cola',
+    notifyOnCompleteSub:
+      'Envía un resumen cuando todas las descargas terminen.',
+    notifyOnError: 'Notificar errores',
+    notifyOnErrorSub: 'Envía una alerta cuando una descarga falle.',
+    detectingChat: 'Detectando...',
+    sendingTest: 'Enviando...',
+    testSent: 'Mensaje de prueba enviado',
+    detectError:
+      'No se pudo detectar el chat. Asegúrate de enviar /start a tu bot.',
+    testError: 'No se pudo enviar el mensaje de prueba.',
+    invalidToken: 'Token inválido. Debe tener el formato id:hash.'
   },
 
   folder: {

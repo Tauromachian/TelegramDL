@@ -26,6 +26,7 @@ import (
 	"tgdown/pkg/i18n"
 	"tgdown/pkg/listener"
 	"tgdown/pkg/logbus"
+	"tgdown/pkg/notifier"
 	"tgdown/pkg/storage"
 	"tgdown/pkg/telegram"
 	"tgdown/pkg/updater"
@@ -579,6 +580,10 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/settings", s.handleSettings)
 	mux.HandleFunc("/api/settings/speed", s.handleSpeedLimit)
 	mux.HandleFunc("/api/settings/speed-limit", s.handleSpeedLimit)
+
+	// Notifications
+	mux.HandleFunc("/api/notifications/test", s.handleNotificationTest)
+	mux.HandleFunc("/api/notifications/detect", s.handleNotificationDetect)
 
 	// Listener
 	mux.HandleFunc("/api/listener", s.handleListenerItems)
@@ -1470,9 +1475,12 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		s.mu.RLock()
 		cfg := s.config
 		s.mu.RUnlock()
+		// Enmascarar el token del bot por seguridad
+		maskedCfg := cfg
+		maskedCfg.NotificationBotToken = notifier.MaskToken(cfg.NotificationBotToken)
 		s.jsonResponse(w, http.StatusOK, map[string]any{
 			"status":   "ok",
-			"settings": cfg,
+			"settings": maskedCfg,
 		})
 		return
 	}
@@ -1571,6 +1579,37 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if v, ok := raw["notification_bot_enabled"]; ok && v != nil {
+		if b, ok := v.(bool); ok {
+			cfg.NotificationBotEnabled = b
+		}
+	}
+	if v, ok := raw["notification_bot_token"]; ok && v != nil {
+		if sVal, ok := v.(string); ok {
+			cfg.NotificationBotToken = sVal
+		}
+	}
+	if v, ok := raw["notification_chat_id"]; ok && v != nil {
+		cfg.NotificationChatID = int64(config.ParseInt64(v))
+	}
+	if v, ok := raw["notification_topic_id"]; ok {
+		if v == nil {
+			cfg.NotificationTopicID = nil
+		} else {
+			topicID := int64(config.ParseInt64(v))
+			cfg.NotificationTopicID = &topicID
+		}
+	}
+	if v, ok := raw["notify_on_complete"]; ok && v != nil {
+		if b, ok := v.(bool); ok {
+			cfg.NotifyOnComplete = b
+		}
+	}
+	if v, ok := raw["notify_on_error"]; ok && v != nil {
+		if b, ok := v.(bool); ok {
+			cfg.NotifyOnError = b
+		}
+	}
 
 	cfg = config.NormalizeConfig(cfg)
 
@@ -1610,6 +1649,85 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, http.StatusOK, map[string]any{
 		"status":   "ok",
 		"settings": cfg,
+	})
+}
+
+// handleNotificationTest envía un mensaje de prueba mediante el bot de notificaciones.
+func (s *Server) handleNotificationTest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.errorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var body struct {
+		Token   string  `json:"token"`
+		ChatID  int64   `json:"chat_id"`
+		TopicID *int64  `json:"topic_id,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.errorResponse(w, http.StatusUnprocessableEntity, "Datos inválidos")
+		return
+	}
+
+	// Validar token
+	if err := notifier.ValidateToken(body.Token); err != nil {
+		s.errorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Validar chatID
+	if err := notifier.ValidateChatID(body.ChatID); err != nil {
+		s.errorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Validar topicID si se especifica
+	if err := notifier.ValidateTopicID(body.TopicID); err != nil {
+		s.errorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Crear notificador y enviar mensaje de prueba
+	n := notifier.NewNotifier(body.Token, body.ChatID, body.TopicID)
+	testMessage := i18n.T("notifier.testMessage")
+	n.SendMessage(context.Background(), testMessage)
+
+	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// handleNotificationDetect detecta el chatID usando getUpdates del Bot API.
+func (s *Server) handleNotificationDetect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.errorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var body struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.errorResponse(w, http.StatusUnprocessableEntity, "Datos inválidos")
+		return
+	}
+
+	// Validar token
+	if err := notifier.ValidateToken(body.Token); err != nil {
+		s.errorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Crear notificador temporal para detección
+	n := notifier.NewNotifier(body.Token, 0, nil)
+	chatID, chatName, err := n.DetectChat(context.Background())
+	if err != nil {
+		s.errorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	s.jsonResponse(w, http.StatusOK, map[string]any{
+		"status":    "ok",
+		"chat_id":   chatID,
+		"chat_name": chatName,
 	})
 }
 
@@ -2349,16 +2467,31 @@ func (s *Server) watchShutdownWhenDone(item storage.DownloadItem) {
 func (s *Server) maybeScheduleShutdown() {
 	s.mu.RLock()
 	armed := s.config.ShutdownWhenDone
+	notifyOnComplete := s.config.NotifyOnComplete
 	s.mu.RUnlock()
-	if !armed {
+	if !armed && !notifyOnComplete {
 		return
 	}
 
 	active := false
+	completed := 0
+	failed := 0
+	failedLinks := []string{}
 	for _, d := range s.downloader.GetDownloads() {
 		if d.Status == "queued" || d.Status == "downloading" {
 			active = true
 			break
+		}
+		if d.Status == "completed" {
+			completed++
+		}
+		if d.Status == "failed" {
+			failed++
+			// Agregar el enlace fallido a la lista
+			if d.MessageID > 0 {
+				link := fmt.Sprintf("https://t.me/c/%d/%d", d.ChatID, d.MessageID)
+				failedLinks = append(failedLinks, link)
+			}
 		}
 	}
 
@@ -2373,6 +2506,19 @@ func (s *Server) maybeScheduleShutdown() {
 		return
 	}
 	s.hadActiveDownloads = false
+
+	// Enviar notificación de resumen si está configurado
+	if notifyOnComplete && (completed > 0 || failed > 0) {
+		s.mu.Unlock()
+		message := i18n.T("notifier.queueComplete", completed, failed)
+		if failed > 0 && len(failedLinks) > 0 {
+			failedText := strings.Join(failedLinks, "\n")
+			message += "\n" + i18n.T("notifier.queueCompleteError", failedText)
+		}
+		s.downloader.SendNotification(message)
+		s.mu.Lock()
+	}
+
 	s.shutdownDeadline = time.Now().Add(shutdownDelay)
 	s.shutdownTimer = time.AfterFunc(shutdownDelay, s.executeScheduledShutdown)
 	s.mu.Unlock()

@@ -180,6 +180,18 @@ type Config struct {
 	// usuario todavía no ha elegido ninguno: el panel detecta entonces el
 	// idioma del sistema la primera vez y guarda aquí el resultado.
 	Language string `json:"language"`
+	// NotificationBotEnabled activa las notificaciones mediante bot de Telegram.
+	NotificationBotEnabled bool `json:"notification_bot_enabled"`
+	// NotificationBotToken es el token del bot de Telegram para notificaciones.
+	NotificationBotToken string `json:"notification_bot_token"`
+	// NotificationChatID es el ID del chat donde se envían las notificaciones.
+	NotificationChatID int64 `json:"notification_chat_id"`
+	// NotificationTopicID es el ID del tema del grupo (opcional, para grupos con temas).
+	NotificationTopicID *int64 `json:"notification_topic_id,omitempty"`
+	// NotifyOnComplete envía notificación cuando la cola de descargas termina.
+	NotifyOnComplete bool `json:"notify_on_complete"`
+	// NotifyOnError envía notificación cuando una descarga falla.
+	NotifyOnError bool `json:"notify_on_error"`
 }
 
 var (
@@ -575,6 +587,12 @@ func NormalizeConfig(raw Config) Config {
 	raw.Language = strings.ToLower(strings.TrimSpace(raw.Language))
 	if raw.Language != "es" && raw.Language != "en" {
 		raw.Language = ""
+	}
+
+	// Normalizar campos de notificaciones
+	raw.NotificationBotToken = strings.TrimSpace(raw.NotificationBotToken)
+	if raw.NotificationTopicID != nil && *raw.NotificationTopicID <= 0 {
+		raw.NotificationTopicID = nil
 	}
 
 	// Dos entradas con el mismo grupo y el mismo tema son la misma cosa: la

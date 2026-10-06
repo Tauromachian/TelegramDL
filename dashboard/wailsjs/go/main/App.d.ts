@@ -7,6 +7,8 @@ export function GetLocalToken():Promise<string>;
 
 export function GetServerInfo():Promise<main.ServerInfo>;
 
+export function GetStartupURL():Promise<string>;
+
 export function Handler():Promise<http.Handler>;
 
 export function PostponeUpdate(arg1:string):Promise<void>;
@@ -14,3 +16,5 @@ export function PostponeUpdate(arg1:string):Promise<void>;
 export function RegenerateLocalToken():Promise<string>;
 
 export function SelectDirectory():Promise<string>;
+
+export function SetStartupURL(arg1:string):Promise<void>;

@@ -129,6 +129,13 @@ var messagesES = map[string]string{
 	"downloader.pauseExcess":         "Pausando tarea en exceso %s para respetar nuevo límite",
 	"downloader.entryKeptFile":       "Entrada %s eliminada sin borrar %s: el archivo pertenece a otra descarga",
 
+	// Notificaciones por bot de Telegram (pkg/notifier)
+	"notifier.sendError":         "error enviando notificación: %v",
+	"notifier.testMessage":        "✅ Mensaje de prueba de TelegramDL",
+	"notifier.queueComplete":      "Cola de descargas terminada: %d completados, %d fallidos",
+	"notifier.queueCompleteError": "Enlaces fallidos:\n%s",
+	"notifier.downloadFailed":     "Falló la descarga de %s\nError: %s",
+
 	// Resolución de mensajes en Telegram (tag [DOWNLOAD FETCH])
 	"fetch.noAccessHashCache":    "Canal %d sin accessHash en caché. Consultando dialogs...",
 	"fetch.noAccessHashChannels": "Canal %d sigue sin accessHash. Consultando ChannelsGetChannels...",

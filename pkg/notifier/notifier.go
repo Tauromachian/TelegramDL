@@ -1,0 +1,247 @@
+package notifier
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"strings"
+	"time"
+
+	"tgdown/pkg/i18n"
+)
+
+// Notifier maneja el envío de notificaciones mediante un bot de Telegram.
+type Notifier struct {
+	token   string
+	chatID  int64
+	topicID *int64 // Opcional: para grupos con temas
+	client  *http.Client
+}
+
+// NewNotifier crea una nueva instancia de Notifier.
+func NewNotifier(token string, chatID int64, topicID *int64) *Notifier {
+	return &Notifier{
+		token:   token,
+		chatID:  chatID,
+		topicID: topicID,
+		client: &http.Client{
+			Timeout: 5 * time.Second,
+		},
+	}
+}
+
+// SendMessageEnvia un mensaje de texto al chat configurado.
+// Fire-and-forget: no bloquea al llamante; los errores se registran en log.
+func (n *Notifier) SendMessage(ctx context.Context, text string) {
+	go func() {
+		if err := n.sendSync(ctx, text); err != nil {
+			log.Printf("[NOTIFIER] %s", i18n.T("notifier.sendError", err))
+		}
+	}()
+}
+
+// sendSync realiza el envío síncrono del mensaje.
+func (n *Notifier) sendSync(ctx context.Context, text string) error {
+	if n.token == "" || n.chatID == 0 {
+		return fmt.Errorf("notifier not configured: missing token or chat ID")
+	}
+
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", n.token)
+
+	payload := map[string]any{
+		"chat_id": n.chatID,
+		"text":    text,
+		"parse_mode": "HTML",
+	}
+
+	// Si hay topicID especificado, agregarlo al payload
+	if n.topicID != nil && *n.topicID > 0 {
+		payload["message_thread_id"] = *n.topicID
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := n.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Telegram API returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		OK     bool   `json:"ok"`
+		Error  string `json:"description"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !result.OK {
+		return fmt.Errorf("Telegram API error: %s", result.Error)
+	}
+
+	return nil
+}
+
+// DetectChatIntententa detectar el chatID usando getUpdates del Bot API.
+// Devuelve el chatID detectado y el nombre del chat (si está disponible).
+func (n *Notifier) DetectChat(ctx context.Context) (int64, string, error) {
+	if n.token == "" {
+		return 0, "", fmt.Errorf("token not configured")
+	}
+
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates", n.token)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := n.client.Do(req)
+	if err != nil {
+		return 0, "", fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, "", fmt.Errorf("Telegram API returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		OK     bool `json:"ok"`
+		Result []struct {
+			UpdateID int `json:"update_id"`
+			Message  *struct {
+				Chat struct {
+					ID       int64  `json:"id"`
+					Type     string `json:"type"`
+					Username string `json:"username,omitempty"`
+					Title    string `json:"title,omitempty"`
+					FirstName string `json:"first_name,omitempty"`
+				} `json:"chat"`
+				Text string `json:"text,omitempty"`
+			} `json:"message,omitempty"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, "", fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !result.OK {
+		return 0, "", fmt.Errorf("Telegram API error")
+	}
+
+	if len(result.Result) == 0 {
+		return 0, "", fmt.Errorf("no updates found; user must start the conversation first")
+	}
+
+	// Tomar el último mensaje
+	lastUpdate := result.Result[len(result.Result)-1]
+	if lastUpdate.Message == nil {
+		return 0, "", fmt.Errorf("last update has no message")
+	}
+
+	chat := lastUpdate.Message.Chat
+	chatName := chat.Title
+	if chatName == "" {
+		if chat.FirstName != "" {
+			chatName = chat.FirstName
+			if chat.Username != "" {
+				chatName += " (@" + chat.Username + ")"
+			}
+		} else if chat.Username != "" {
+			chatName = "@" + chat.Username
+		} else {
+			chatName = fmt.Sprintf("Chat %d", chat.ID)
+		}
+	}
+
+	return chat.ID, chatName, nil
+}
+
+// MaskToken devuelve una versión enmascarada del token para visualización segura.
+func MaskToken(token string) string {
+	if token == "" {
+		return ""
+	}
+	parts := strings.Split(token, ":")
+	if len(parts) != 2 {
+		return "***"
+	}
+	// Mostrar solo los primeros 3 caracteres del ID y los últimos 4 caracteres del hash
+	id := parts[0]
+	hash := parts[1]
+	if len(id) > 3 {
+		id = id[:3] + strings.Repeat("*", len(id)-3)
+	}
+	if len(hash) > 4 {
+		hash = strings.Repeat("*", len(hash)-4) + hash[len(hash)-4:]
+	}
+	return id + ":" + hash
+}
+
+// ValidateToken verifica que el token tenga el formato correcto (id:hash).
+func ValidateToken(token string) error {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return fmt.Errorf("token cannot be empty")
+	}
+
+	parts := strings.Split(token, ":")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid token format: must be in format id:hash")
+	}
+
+	id := parts[0]
+	hash := parts[1]
+
+	if id == "" || hash == "" {
+		return fmt.Errorf("invalid token: id and hash cannot be empty")
+	}
+
+	// Validar que sean caracteres válidos (alphanumeric y underscore)
+	for _, c := range id {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
+			return fmt.Errorf("invalid characters in token id")
+		}
+	}
+	for _, c := range hash {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '-') {
+			return fmt.Errorf("invalid characters in token hash")
+		}
+	}
+
+	return nil
+}
+
+// ValidateChatID verifica que el chatID sea válido.
+func ValidateChatID(chatID int64) error {
+	if chatID == 0 {
+		return fmt.Errorf("chat ID cannot be 0")
+	}
+	return nil
+}
+
+// ValidateTopicID verifica que el topicID sea válido (debe ser positivo si se especifica).
+func ValidateTopicID(topicID *int64) error {
+	if topicID != nil && *topicID <= 0 {
+		return fmt.Errorf("topic ID must be positive if specified")
+	}
+	return nil
+}

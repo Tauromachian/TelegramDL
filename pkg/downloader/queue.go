@@ -287,6 +287,11 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 		curItem.Status = "failed"
 		curItem.Error = err.Error()
 		curItem.Speed = "0 B/s"
+
+		// Enviar notificación de error si está configurado
+		if e.config.NotifyOnError {
+			e.sendNotification(i18n.T("notifier.downloadFailed", curItem.FileName, err.Error()))
+		}
 	} else {
 		curItem.Status = "completed"
 		curItem.Error = ""

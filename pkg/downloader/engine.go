@@ -24,6 +24,7 @@ import (
 
 	"tgdown/pkg/config"
 	"tgdown/pkg/i18n"
+	"tgdown/pkg/notifier"
 	"tgdown/pkg/storage"
 	"tgdown/pkg/telegram"
 )
@@ -232,6 +233,25 @@ func (e *Engine) UpdateConfig(cfg config.Config) {
 			e.enforceConcurrencyLimit()
 		}
 	}
+}
+
+// sendNotification envía una notificación mediante el bot de Telegram si está configurado.
+func (e *Engine) sendNotification(text string) {
+	e.mu.RLock()
+	cfg := e.config
+	e.mu.RUnlock()
+
+	if !cfg.NotificationBotEnabled || cfg.NotificationBotToken == "" || cfg.NotificationChatID == 0 {
+		return
+	}
+
+	n := notifier.NewNotifier(cfg.NotificationBotToken, cfg.NotificationChatID, cfg.NotificationTopicID)
+	n.SendMessage(context.Background(), text)
+}
+
+// SendNotification es el método público para enviar notificaciones desde fuera del Engine.
+func (e *Engine) SendNotification(text string) {
+	e.sendNotification(text)
 }
 
 func (e *Engine) GetDownloads() []storage.DownloadItem {

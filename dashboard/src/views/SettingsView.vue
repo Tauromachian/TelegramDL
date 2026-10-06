@@ -15,7 +15,9 @@ import {
   Image as Palette,
   KeyRound,
   HardDrive,
-  Languages
+  Languages,
+  Bell,
+  Send
 } from '../icons'
 import FolderPicker from '../components/FolderPicker.vue'
 import { useAuthToken } from '../composables/useAuthToken'
@@ -267,6 +269,71 @@ const onImportFile = async (event) => {
     props.notify(err.message || t('settings.listenerImportFail'), true)
   } finally {
     importing.value = false
+  }
+}
+
+// Estado y funciones para notificaciones del bot
+const showBotToken = ref(false)
+const detectingChat = ref(false)
+const sendingTest = ref(false)
+const detectedChatName = ref('')
+
+const detectChat = async () => {
+  if (!props.settings.notification_bot_token) {
+    props.notify(t('settings.invalidToken'), true)
+    return
+  }
+  detectingChat.value = true
+  try {
+    const response = await fetch('/api/notifications/detect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ token: props.settings.notification_bot_token })
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(data.detail || data.error || t('settings.detectError'))
+    }
+    patch({
+      notification_chat_id: data.chat_id
+    })
+    detectedChatName.value = data.chat_name || ''
+    props.notify(`${t('settings.detectedChat')}: ${data.chat_name}`)
+  } catch (err) {
+    props.notify(err.message || t('settings.detectError'), true)
+  } finally {
+    detectingChat.value = false
+  }
+}
+
+const sendTestNotification = async () => {
+  if (
+    !props.settings.notification_bot_token ||
+    !props.settings.notification_chat_id
+  ) {
+    props.notify(t('settings.invalidToken'), true)
+    return
+  }
+  sendingTest.value = true
+  try {
+    const response = await fetch('/api/notifications/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({
+        token: props.settings.notification_bot_token,
+        chat_id: props.settings.notification_chat_id,
+        topic_id: props.settings.notification_topic_id
+      })
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(data.detail || data.error || t('settings.testError'))
+    }
+    props.notify(t('settings.testSent'))
+  } catch (err) {
+    props.notify(err.message || t('settings.testError'), true)
+  } finally {
+    sendingTest.value = false
   }
 }
 </script>
@@ -679,7 +746,183 @@ const onImportFile = async (event) => {
             </div>
           </AppAccordion>
 
-          <!-- 5. Datos: escucha e historial -->
+          <!-- 5. Notificaciones Telegram -->
+          <AppAccordion
+            :title="t('settings.notificationsTitle')"
+            :description="t('settings.notificationsSub')"
+          >
+            <template #icon>
+              <Bell :size="15" />
+            </template>
+
+            <div class="settings-group">
+              <div class="settings-toggle">
+                <label class="toggle-label">
+                  <input
+                    type="checkbox"
+                    :checked="settings.notification_bot_enabled"
+                    @change="
+                      patch({ notification_bot_enabled: $event.target.checked })
+                    "
+                  />
+                  <span></span>
+                  {{ t('settings.notificationsEnabled') }}
+                </label>
+                <small>{{ t('settings.notificationsDesc') }}</small>
+              </div>
+
+              <div
+                v-if="settings.notification_bot_enabled"
+                class="settings-input-group"
+              >
+                <label>{{ t('settings.botToken') }}</label>
+                <div class="input-with-icon">
+                  <input
+                    :type="showBotToken ? 'text' : 'password'"
+                    :value="settings.notification_bot_token"
+                    :placeholder="t('settings.botTokenPlaceholder')"
+                    @input="
+                      patch({ notification_bot_token: $event.target.value })
+                    "
+                  />
+                  <button
+                    type="button"
+                    class="icon-button"
+                    @click="showBotToken = !showBotToken"
+                    :title="
+                      showBotToken ? t('settings.hide') : t('settings.show')
+                    "
+                  >
+                    <Eye v-if="!showBotToken" :size="16" />
+                    <EyeOff v-else :size="16" />
+                  </button>
+                </div>
+              </div>
+
+              <div
+                v-if="settings.notification_bot_enabled"
+                class="settings-actions"
+              >
+                <button
+                  type="button"
+                  class="reset-button-alt"
+                  :disabled="detectingChat || !settings.notification_bot_token"
+                  @click="detectChat"
+                >
+                  <RefreshCw :size="14" :class="{ spinning: detectingChat }" />
+                  {{
+                    detectingChat
+                      ? t('settings.detectingChat')
+                      : t('settings.detectChat')
+                  }}
+                </button>
+                <button
+                  type="button"
+                  class="reset-button-alt"
+                  :disabled="
+                    sendingTest ||
+                    !settings.notification_bot_token ||
+                    !settings.notification_chat_id
+                  "
+                  @click="sendTestNotification"
+                >
+                  <Send v-if="!sendingTest" :size="14" />
+                  <RefreshCw
+                    v-else
+                    :size="14"
+                    :class="{ spinning: sendingTest }"
+                  />
+                  {{
+                    sendingTest
+                      ? t('settings.sendingTest')
+                      : t('settings.sendTest')
+                  }}
+                </button>
+              </div>
+
+              <div
+                v-if="settings.notification_bot_enabled && detectedChatName"
+                class="settings-info"
+              >
+                <small
+                  >{{ t('settings.detectedChat') }}:
+                  {{ detectedChatName }}</small
+                >
+              </div>
+
+              <div
+                v-if="settings.notification_bot_enabled"
+                class="settings-input-group"
+              >
+                <label>{{ t('settings.chatID') }}</label>
+                <input
+                  type="number"
+                  :value="settings.notification_chat_id"
+                  @input="
+                    patch({
+                      notification_chat_id: Number($event.target.value) || 0
+                    })
+                  "
+                />
+              </div>
+
+              <div
+                v-if="settings.notification_bot_enabled"
+                class="settings-input-group"
+              >
+                <label>{{ t('settings.topicID') }}</label>
+                <input
+                  type="number"
+                  :value="settings.notification_topic_id || ''"
+                  :placeholder="t('settings.topicIDHint')"
+                  @input="
+                    patch({
+                      notification_topic_id: $event.target.value
+                        ? Number($event.target.value)
+                        : null
+                    })
+                  "
+                />
+                <small>{{ t('settings.topicIDHint') }}</small>
+              </div>
+
+              <div
+                v-if="settings.notification_bot_enabled"
+                class="settings-toggle"
+              >
+                <label class="toggle-label">
+                  <input
+                    type="checkbox"
+                    :checked="settings.notify_on_complete"
+                    @change="
+                      patch({ notify_on_complete: $event.target.checked })
+                    "
+                  />
+                  <span></span>
+                  {{ t('settings.notifyOnComplete') }}
+                </label>
+                <small>{{ t('settings.notifyOnCompleteSub') }}</small>
+              </div>
+
+              <div
+                v-if="settings.notification_bot_enabled"
+                class="settings-toggle"
+              >
+                <label class="toggle-label">
+                  <input
+                    type="checkbox"
+                    :checked="settings.notify_on_error"
+                    @change="patch({ notify_on_error: $event.target.checked })"
+                  />
+                  <span></span>
+                  {{ t('settings.notifyOnError') }}
+                </label>
+                <small>{{ t('settings.notifyOnErrorSub') }}</small>
+              </div>
+            </div>
+          </AppAccordion>
+
+          <!-- 6. Datos: escucha e historial -->
           <AppAccordion
             :title="t('settings.dataTitle')"
             :description="t('settings.dataSub')"

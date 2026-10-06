@@ -10,6 +10,10 @@ export function GetServerInfo() {
   return window['go']['main']['App']['GetServerInfo']();
 }
 
+export function GetStartupURL() {
+  return window['go']['main']['App']['GetStartupURL']();
+}
+
 export function Handler() {
   return window['go']['main']['App']['Handler']();
 }
@@ -24,4 +28,8 @@ export function RegenerateLocalToken() {
 
 export function SelectDirectory() {
   return window['go']['main']['App']['SelectDirectory']();
+}
+
+export function SetStartupURL(arg1) {
+  return window['go']['main']['App']['SetStartupURL'](arg1);
 }
