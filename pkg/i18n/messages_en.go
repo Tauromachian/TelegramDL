@@ -132,7 +132,7 @@ var messagesEN = map[string]string{
 	"notifier.sendError":         "error sending notification: %v",
 	"notifier.testMessage":        "🚀 <b>TelegramDL</b>\n\n✅ <i>Test notification sent successfully!</i>\nBot is configured and ready to receive alerts.",
 	"notifier.queueComplete":      "📊 <b>Download Summary — TelegramDL</b>\n\n✅ <b>Completed:</b> %d\n❌ <b>Failed:</b> %d",
-	"notifier.queueCompleteError": "\n\n⚠️ <b>Error details:</b>\n%s",
+	"notifier.queueCompleteError": "\n\n⚠️ <b>Failed items / links:</b>\n%s",
 	"notifier.downloadFailed":     "🚨 <b>Download Failed</b>\n\n📄 <b>File:</b> <code>%s</code>\n⚠️ <b>Error:</b> <i>%s</i>",
 
 	// Message resolution on Telegram ([DOWNLOAD FETCH] tag)

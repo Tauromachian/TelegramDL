@@ -2477,10 +2477,9 @@ func (s *Server) watchShutdownWhenDone(item storage.DownloadItem) {
 	}
 }
 
-// maybeScheduleShutdown decide si toca programar el apagado. Hace falta que el
-// interruptor esté armado y que la cola se haya quedado vacía tras haber tenido
-// actividad: sin esa memoria, encender el PC con el interruptor puesto lo
-// apagaría a los pocos segundos sin haber descargado nada.
+// maybeScheduleShutdown decide si toca programar el apagado o enviar notificación.
+// Hace falta que el interruptor esté armado o que las notificaciones estén activadas,
+// y que la cola se haya quedado vacía tras haber tenido actividad.
 func (s *Server) maybeScheduleShutdown() {
 	s.mu.RLock()
 	armed := s.config.ShutdownWhenDone
@@ -2493,7 +2492,7 @@ func (s *Server) maybeScheduleShutdown() {
 	active := false
 	completed := 0
 	failed := 0
-	failedLinks := []string{}
+	failedItems := []string{}
 	for _, d := range s.downloader.GetDownloads() {
 		if d.Status == "queued" || d.Status == "downloading" {
 			active = true
@@ -2504,10 +2503,29 @@ func (s *Server) maybeScheduleShutdown() {
 		}
 		if d.Status == "failed" {
 			failed++
-			// Agregar el enlace fallido a la lista
-			if d.MessageID > 0 {
-				link := fmt.Sprintf("https://t.me/c/%d/%d", d.ChatID, d.MessageID)
-				failedLinks = append(failedLinks, link)
+			link := ""
+			if strings.HasPrefix(d.Source, "http://") || strings.HasPrefix(d.Source, "https://") {
+				link = d.Source
+			} else if d.MessageID > 0 && d.ChatID != 0 {
+				chatIDStr := strconv.FormatInt(d.ChatID, 10)
+				if strings.HasPrefix(chatIDStr, "-100") {
+					chatIDStr = strings.TrimPrefix(chatIDStr, "-100")
+				} else if strings.HasPrefix(chatIDStr, "-") {
+					chatIDStr = strings.TrimPrefix(chatIDStr, "-")
+				}
+				link = fmt.Sprintf("https://t.me/c/%s/%d", chatIDStr, d.MessageID)
+			}
+
+			fileName := html.EscapeString(d.FileName)
+			if link != "" {
+				escapedLink := html.EscapeString(link)
+				if fileName != "" && fileName != link {
+					failedItems = append(failedItems, fmt.Sprintf("• <b>%s</b>\n  <code>%s</code>", fileName, escapedLink))
+				} else {
+					failedItems = append(failedItems, fmt.Sprintf("• <code>%s</code>", escapedLink))
+				}
+			} else if fileName != "" {
+				failedItems = append(failedItems, fmt.Sprintf("• <b>%s</b>", fileName))
 			}
 		}
 	}
@@ -2528,26 +2546,26 @@ func (s *Server) maybeScheduleShutdown() {
 	if notifyOnComplete && (completed > 0 || failed > 0) {
 		s.mu.Unlock()
 		message := i18n.T("notifier.queueComplete", completed, failed)
-		if failed > 0 && len(failedLinks) > 0 {
-			escapedLinks := make([]string, len(failedLinks))
-			for i, link := range failedLinks {
-				escapedLinks[i] = "• <code>" + html.EscapeString(link) + "</code>"
-			}
-			failedText := strings.Join(escapedLinks, "\n")
+		if failed > 0 && len(failedItems) > 0 {
+			failedText := strings.Join(failedItems, "\n")
 			message += i18n.T("notifier.queueCompleteError", failedText)
 		}
 		s.downloader.SendNotification(message)
 		s.mu.Lock()
 	}
 
-	s.shutdownDeadline = time.Now().Add(shutdownDelay)
-	s.shutdownTimer = time.AfterFunc(shutdownDelay, s.executeScheduledShutdown)
-	s.mu.Unlock()
+	if armed {
+		s.shutdownDeadline = time.Now().Add(shutdownDelay)
+		s.shutdownTimer = time.AfterFunc(shutdownDelay, s.executeScheduledShutdown)
+		s.mu.Unlock()
 
-	logbus.Warn(logbus.CatSystem,
-		i18n.T("system.shutdownScheduled", int(shutdownDelay.Seconds())),
-		i18n.T("system.shutdownScheduledHint"))
-	s.triggerBroadcast()
+		logbus.Warn(logbus.CatSystem,
+			i18n.T("system.shutdownScheduled", int(shutdownDelay.Seconds())),
+			i18n.T("system.shutdownScheduledHint"))
+		s.triggerBroadcast()
+	} else {
+		s.mu.Unlock()
+	}
 }
 
 // executeScheduledShutdown es la cuenta atrás vencida. El interruptor y la cola
