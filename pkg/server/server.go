@@ -1587,7 +1587,9 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if v, ok := raw["notification_bot_token"]; ok && v != nil {
 		if sVal, ok := v.(string); ok {
-			cfg.NotificationBotToken = sVal
+			if !strings.Contains(sVal, "*") {
+				cfg.NotificationBotToken = sVal
+			}
 		}
 	}
 	if v, ok := raw["notification_chat_id"]; ok && v != nil {
@@ -1670,8 +1672,15 @@ func (s *Server) handleNotificationTest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	token := body.Token
+	if strings.Contains(token, "*") || strings.TrimSpace(token) == "" {
+		s.mu.RLock()
+		token = s.config.NotificationBotToken
+		s.mu.RUnlock()
+	}
+
 	// Validar token
-	if err := notifier.ValidateToken(body.Token); err != nil {
+	if err := notifier.ValidateToken(token); err != nil {
 		s.errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -1689,7 +1698,7 @@ func (s *Server) handleNotificationTest(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Crear notificador y enviar mensaje de prueba
-	n := notifier.NewNotifier(body.Token, body.ChatID, body.TopicID)
+	n := notifier.NewNotifier(token, body.ChatID, body.TopicID)
 	testMessage := i18n.T("notifier.testMessage")
 	n.SendMessage(context.Background(), testMessage)
 
@@ -1711,14 +1720,21 @@ func (s *Server) handleNotificationDetect(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	token := body.Token
+	if strings.Contains(token, "*") || strings.TrimSpace(token) == "" {
+		s.mu.RLock()
+		token = s.config.NotificationBotToken
+		s.mu.RUnlock()
+	}
+
 	// Validar token
-	if err := notifier.ValidateToken(body.Token); err != nil {
+	if err := notifier.ValidateToken(token); err != nil {
 		s.errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	// Crear notificador temporal para detección
-	n := notifier.NewNotifier(body.Token, 0, nil)
+	n := notifier.NewNotifier(token, 0, nil)
 	chatID, chatName, err := n.DetectChat(context.Background())
 	if err != nil {
 		s.errorResponse(w, http.StatusBadRequest, err.Error())

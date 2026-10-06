@@ -565,6 +565,28 @@ func (s *Storage) LoadConfig(defaults config.Config, legacyPath string) (config.
 	if val, ok := kv["language"]; ok && val != "" {
 		cfg.Language = val
 	}
+	if val, ok := kv["notification_bot_enabled"]; ok {
+		cfg.NotificationBotEnabled = val == "1" || val == "true"
+	}
+	if val, ok := kv["notification_bot_token"]; ok {
+		cfg.NotificationBotToken = val
+	}
+	if val, ok := kv["notification_chat_id"]; ok {
+		if n, err := strconv.ParseInt(val, 10, 64); err == nil {
+			cfg.NotificationChatID = n
+		}
+	}
+	if val, ok := kv["notification_topic_id"]; ok && val != "" && val != "None" && val != "null" {
+		if n, err := strconv.ParseInt(val, 10, 64); err == nil {
+			cfg.NotificationTopicID = &n
+		}
+	}
+	if val, ok := kv["notify_on_complete"]; ok {
+		cfg.NotifyOnComplete = val == "1" || val == "true"
+	}
+	if val, ok := kv["notify_on_error"]; ok {
+		cfg.NotifyOnError = val == "1" || val == "true"
+	}
 
 	// Cargar listener_chats
 	chatRows, err := s.db.Query("SELECT chat_id, topic_id, topic_name, name, folder, topic_folder, auto_download, f_photos, f_videos, f_audios, f_docs, f_stickers, name_mode FROM listener_chats ORDER BY chat_id, topic_id")
@@ -676,6 +698,17 @@ func (s *Storage) SaveConfig(cfg config.Config) error {
 		"speed_value":              fmt.Sprintf("%f", cfg.SpeedLimit.Value),
 		"speed_unit":               cfg.SpeedLimit.Unit,
 		"language":                 cfg.Language,
+		"notification_bot_enabled": strconv.FormatBool(cfg.NotificationBotEnabled),
+		"notification_bot_token":   cfg.NotificationBotToken,
+		"notification_chat_id":     strconv.FormatInt(cfg.NotificationChatID, 10),
+		"notify_on_complete":       strconv.FormatBool(cfg.NotifyOnComplete),
+		"notify_on_error":          strconv.FormatBool(cfg.NotifyOnError),
+	}
+
+	if cfg.NotificationTopicID != nil {
+		pairs["notification_topic_id"] = strconv.FormatInt(*cfg.NotificationTopicID, 10)
+	} else {
+		pairs["notification_topic_id"] = "None"
 	}
 
 	// shutdown_when_done queda fuera a propósito: no debe sobrevivir a un

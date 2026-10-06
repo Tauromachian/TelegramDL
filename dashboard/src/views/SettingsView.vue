@@ -759,7 +759,12 @@ const sendTestNotification = async () => {
               <!-- Activar notificaciones -->
               <div
                 class="setting-line"
-                style="border-top: none; margin-top: 0; padding-top: 0"
+                style="
+                  border-top: none;
+                  margin-top: 0;
+                  padding-top: 0;
+                  border-bottom: none;
+                "
               >
                 <div>
                   <strong>{{ t('settings.notificationsEnabled') }}</strong>
@@ -778,160 +783,169 @@ const sendTestNotification = async () => {
               </div>
 
               <template v-if="settings.notification_bot_enabled">
-                <!-- Token del bot -->
-                <div class="notif-field">
-                  <label class="notif-label">{{
-                    t('settings.botToken')
-                  }}</label>
-                  <div class="notif-input-row">
-                    <input
-                      :type="showBotToken ? 'text' : 'password'"
-                      :value="settings.notification_bot_token"
-                      :placeholder="t('settings.botTokenPlaceholder')"
-                      @input="
-                        patch({ notification_bot_token: $event.target.value })
-                      "
-                    />
-                    <button
-                      type="button"
-                      class="reset-button-alt"
-                      style="padding: 11px 14px"
-                      @click="showBotToken = !showBotToken"
-                      :title="
-                        showBotToken ? t('settings.hide') : t('settings.show')
-                      "
-                    >
-                      <Eye v-if="!showBotToken" :size="15" />
-                      <EyeOff v-else :size="15" />
-                    </button>
+                <div class="notif-grid">
+                  <!-- Token del bot -->
+                  <div class="notif-field">
+                    <label class="notif-label">{{
+                      t('settings.botToken')
+                    }}</label>
+                    <div class="notif-input-row">
+                      <input
+                        :type="showBotToken ? 'text' : 'password'"
+                        :value="settings.notification_bot_token"
+                        :placeholder="t('settings.botTokenPlaceholder')"
+                        @input="
+                          patch({ notification_bot_token: $event.target.value })
+                        "
+                      />
+                      <button
+                        type="button"
+                        class="reset-button-alt"
+                        style="padding: 10px 12px"
+                        @click="showBotToken = !showBotToken"
+                        :title="
+                          showBotToken ? t('settings.hide') : t('settings.show')
+                        "
+                      >
+                        <Eye v-if="!showBotToken" :size="15" />
+                        <EyeOff v-else :size="15" />
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <!-- Botones de Acción: Detectar chat y Enviar prueba -->
-                <div class="settings-actions" style="margin-top: 4px">
-                  <button
-                    type="button"
-                    class="reset-button-alt"
-                    :disabled="
-                      detectingChat || !settings.notification_bot_token
-                    "
-                    @click="detectChat"
-                  >
-                    <RefreshCw
-                      :size="14"
-                      :class="{ spinning: detectingChat }"
-                    />
-                    {{
-                      detectingChat
-                        ? t('settings.detectingChat')
-                        : t('settings.detectChat')
-                    }}
-                  </button>
-                  <button
-                    type="button"
-                    class="reset-button-alt"
-                    :disabled="
-                      sendingTest ||
-                      !settings.notification_bot_token ||
-                      !settings.notification_chat_id
-                    "
-                    @click="sendTestNotification"
-                  >
-                    <Send v-if="!sendingTest" :size="14" />
-                    <RefreshCw
-                      v-else
-                      :size="14"
-                      :class="{ spinning: sendingTest }"
-                    />
-                    {{
-                      sendingTest
-                        ? t('settings.sendingTest')
-                        : t('settings.sendTest')
-                    }}
-                  </button>
+                  <!-- ID del Chat -->
+                  <div class="notif-field">
+                    <label class="notif-label">{{
+                      t('settings.chatID')
+                    }}</label>
+                    <div class="notif-input-row">
+                      <input
+                        type="number"
+                        :value="settings.notification_chat_id || ''"
+                        placeholder="123456789"
+                        @input="
+                          patch({
+                            notification_chat_id:
+                              Number($event.target.value) || 0
+                          })
+                        "
+                      />
+                    </div>
+                  </div>
+
+                  <!-- ID del Tema (opcional) -->
+                  <div class="notif-field">
+                    <label class="notif-label">{{
+                      t('settings.topicID')
+                    }}</label>
+                    <div class="notif-input-row">
+                      <input
+                        type="number"
+                        :value="settings.notification_topic_id || ''"
+                        :placeholder="t('settings.topicIDHint')"
+                        @input="
+                          patch({
+                            notification_topic_id: $event.target.value
+                              ? Number($event.target.value)
+                              : null
+                          })
+                        "
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Botones de Acción: Detectar chat y Enviar prueba -->
+                  <div class="notif-field notif-actions-col">
+                    <div class="settings-actions" style="margin-top: 0">
+                      <button
+                        type="button"
+                        class="reset-button-alt"
+                        :disabled="
+                          detectingChat || !settings.notification_bot_token
+                        "
+                        @click="detectChat"
+                      >
+                        <RefreshCw
+                          :size="14"
+                          :class="{ spinning: detectingChat }"
+                        />
+                        {{
+                          detectingChat
+                            ? t('settings.detectingChat')
+                            : t('settings.detectChat')
+                        }}
+                      </button>
+                      <button
+                        type="button"
+                        class="reset-button-alt"
+                        :disabled="
+                          sendingTest ||
+                          !settings.notification_bot_token ||
+                          !settings.notification_chat_id
+                        "
+                        @click="sendTestNotification"
+                      >
+                        <Send v-if="!sendingTest" :size="14" />
+                        <RefreshCw
+                          v-else
+                          :size="14"
+                          :class="{ spinning: sendingTest }"
+                        />
+                        {{
+                          sendingTest
+                            ? t('settings.sendingTest')
+                            : t('settings.sendTest')
+                        }}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Info Chat Detectado -->
                 <div v-if="detectedChatName" class="notif-chat-badge">
-                  <small
-                    >{{ t('settings.detectedChat') }}:
-                    <strong>{{ detectedChatName }}</strong></small
-                  >
+                  <small>
+                    {{ t('settings.detectedChat') }}:
+                    <strong>{{ detectedChatName }}</strong>
+                  </small>
                 </div>
 
-                <!-- ID del Chat -->
-                <div class="notif-field">
-                  <label class="notif-label">{{ t('settings.chatID') }}</label>
-                  <div class="notif-input-row">
-                    <input
-                      type="number"
-                      :value="settings.notification_chat_id || ''"
-                      placeholder="123456789"
-                      @input="
-                        patch({
-                          notification_chat_id: Number($event.target.value) || 0
-                        })
-                      "
-                    />
+                <!-- Toggles en 2 columnas -->
+                <div class="notif-toggles-grid">
+                  <!-- Notificar al terminar la cola -->
+                  <div class="notif-toggle-card">
+                    <div>
+                      <strong>{{ t('settings.notifyOnComplete') }}</strong>
+                      <small>{{ t('settings.notifyOnCompleteSub') }}</small>
+                    </div>
+                    <label class="switch">
+                      <input
+                        type="checkbox"
+                        :checked="settings.notify_on_complete"
+                        @change="
+                          patch({ notify_on_complete: $event.target.checked })
+                        "
+                      />
+                      <span></span>
+                    </label>
                   </div>
-                </div>
 
-                <!-- ID del Tema (opcional) -->
-                <div class="notif-field">
-                  <label class="notif-label">{{ t('settings.topicID') }}</label>
-                  <div class="notif-input-row">
-                    <input
-                      type="number"
-                      :value="settings.notification_topic_id || ''"
-                      :placeholder="t('settings.topicIDHint')"
-                      @input="
-                        patch({
-                          notification_topic_id: $event.target.value
-                            ? Number($event.target.value)
-                            : null
-                        })
-                      "
-                    />
+                  <!-- Notificar errores -->
+                  <div class="notif-toggle-card">
+                    <div>
+                      <strong>{{ t('settings.notifyOnError') }}</strong>
+                      <small>{{ t('settings.notifyOnErrorSub') }}</small>
+                    </div>
+                    <label class="switch">
+                      <input
+                        type="checkbox"
+                        :checked="settings.notify_on_error"
+                        @change="
+                          patch({ notify_on_error: $event.target.checked })
+                        "
+                      />
+                      <span></span>
+                    </label>
                   </div>
-                  <small class="notif-hint">{{
-                    t('settings.topicIDHint')
-                  }}</small>
-                </div>
-
-                <!-- Notificar al terminar la cola -->
-                <div class="setting-line">
-                  <div>
-                    <strong>{{ t('settings.notifyOnComplete') }}</strong>
-                    <small>{{ t('settings.notifyOnCompleteSub') }}</small>
-                  </div>
-                  <label class="switch">
-                    <input
-                      type="checkbox"
-                      :checked="settings.notify_on_complete"
-                      @change="
-                        patch({ notify_on_complete: $event.target.checked })
-                      "
-                    />
-                    <span></span>
-                  </label>
-                </div>
-
-                <!-- Notificar errores -->
-                <div class="setting-line" style="border-bottom: none">
-                  <div>
-                    <strong>{{ t('settings.notifyOnError') }}</strong>
-                    <small>{{ t('settings.notifyOnErrorSub') }}</small>
-                  </div>
-                  <label class="switch">
-                    <input
-                      type="checkbox"
-                      :checked="settings.notify_on_error"
-                      @change="
-                        patch({ notify_on_error: $event.target.checked })
-                      "
-                    />
-                    <span></span>
-                  </label>
                 </div>
               </template>
             </div>
