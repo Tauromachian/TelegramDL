@@ -5,7 +5,8 @@ const props = defineProps({
   variant: {
     type: String,
     default: 'primary',
-    validator: (v) => ['primary', 'text', 'icon', 'pager'].includes(v)
+    validator: (v) =>
+      ['primary', 'secondary', 'text', 'icon', 'pager'].includes(v)
   },
   size: {
     type: String,
@@ -100,6 +101,34 @@ const ariaCurrent = computed(
 .btn--primary:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* --- secondary: acción de cabecera ("Pausar todo", "Cancelar todo") ------- */
+.btn--secondary {
+  background: var(--user-surface-light);
+  border: 1px solid var(--user-border);
+  color: var(--user-text-dim);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: var(--user-icon-bg);
+  color: var(--user-accent);
+  border-color: var(--user-primary);
+}
+
+.btn--secondary.btn--tone-danger:hover:not(:disabled) {
+  background: rgba(125, 48, 61, 0.3);
+  border-color: #a95663;
+  color: #ffadb5;
+}
+
+.btn--secondary:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* --- text: acción de texto dentro de una fila ("Pausar", "Cancelar") -------- */
