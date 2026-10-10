@@ -19,6 +19,7 @@ import {
 } from '../icons'
 import { useI18n } from '../i18n'
 
+import AppButton from '../components/AppButton.vue'
 import AppPill from '../components/AppPill.vue'
 
 const { t, has } = useI18n()
@@ -305,9 +306,10 @@ const allActivePaused = computed(() => {
             <h2>{{ t('downloads.monitorTitle') }}</h2>
           </div>
           <div class="header-actions">
-            <button
+            <AppButton
               v-if="hasActiveOrQueued || allActivePaused"
-              class="action-btn-mini"
+              variant="secondary"
+              size="sm"
               @click="allActivePaused ? emit('resume-all') : emit('pause-all')"
             >
               <component :is="allActivePaused ? Play : Pause" :size="12" />
@@ -316,15 +318,17 @@ const allActivePaused = computed(() => {
                   ? t('downloads.resumeAll')
                   : t('downloads.pauseAll')
               }}
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               v-if="activeDownloads.length || pendingDownloads.length"
-              class="action-btn-mini danger"
+              variant="secondary"
+              size="sm"
+              tone="danger"
               @click="emit('cancel-all')"
             >
               <X :size="12" />
               <span>{{ t('downloads.cancelAll') }}</span>
-            </button>
+            </AppButton>
             <div v-if="disk" class="disk-monitor">
               <div class="disk-bar">
                 <div
