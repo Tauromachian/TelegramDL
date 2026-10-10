@@ -240,16 +240,18 @@ const allActivePaused = computed(() => {
           placeholder="https://t.me/c/..."
           :aria-label="t('downloads.inputAria')"
         />
-        <button
-          class="primary-button"
-          :disabled="loading || !inputUrl.trim()"
+
+        <AppButton
+          variant="primary"
+          :loading="loading"
+          :disabled="!inputUrl.trim()"
           @click="handleStart"
         >
-          <span>{{
-            loading ? t('downloads.adding') : t('downloads.start')
-          }}</span>
+          <span>
+            {{ loading ? t('downloads.adding') : t('downloads.start') }}
+          </span>
           <ArrowUpRight :size="18" />
-        </button>
+        </AppButton>
       </div>
       <small class="form-hint">{{ t('downloads.rangeHint') }}</small>
     </section>
