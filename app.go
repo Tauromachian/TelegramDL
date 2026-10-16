@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"git.sr.ht/~jackmordaunt/go-toast/v2"
+	"git.sr.ht/~jackmordaunt/go-toast/v2/wintoast"
 	"github.com/energye/systray"
 	"github.com/gen2brain/beeep"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -433,16 +433,19 @@ func (a *App) ShowTrayNotification() {
 		// Registrar AppUserModelId para que Windows ponga el ícono PNG en la cabecera (al lado de appName)
 		registerAppUserModelID(appName, iconPath)
 
-		n := toast.Notification{
-			AppID: appName,
-			Title: " ",
-			Body:  body,
-			Icon:  "", // Sin ícono en la tarjeta inferior
-			Audio: toast.Default,
-		}
+		// Construir XML Toast explícito con hint-style="body" para asegurar texto normal sin negritas
+		xml := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<toast duration="short">
+    <visual>
+        <binding template="ToastGeneric">
+            <text hint-style="body" hint-wrap="true">%s</text>
+        </binding>
+    </visual>
+    <audio src="ms-winsoundevent:Notification.Default" />
+</toast>`, body)
 
-		if err := n.Push(); err != nil {
-			if errBeeep := beeep.Alert(" ", body, ""); errBeeep != nil {
+		if err := wintoast.Push(appName, xml, wintoast.PowershellFallback); err != nil {
+			if errBeeep := beeep.Notify(" ", body, ""); errBeeep != nil {
 				logbus.Warn(logbus.CatSystem, i18n.T("system.trayNotifyError", errBeeep), errBeeep.Error())
 			}
 		}
