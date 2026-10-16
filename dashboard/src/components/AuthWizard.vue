@@ -11,9 +11,10 @@ import {
   Loader2,
   Info
 } from '../icons'
-import { useAuthToken } from '../composables/useAuthToken'
+import { useAuthToken, isWailsRuntime } from '../composables/useAuthToken'
 import { openExternal } from '../composables/useExternalLink'
 import { useI18n } from '../i18n'
+import { isLoopbackHost } from '../utils/loopback.js'
 
 const { authHeaders } = useAuthToken()
 const { t, locale, setLocale, splitOn } = useI18n()
@@ -91,9 +92,16 @@ const apiCall = async (url, body) => {
   loading.value = true
   errorMessage.value = ''
   try {
+    // La cabecera propia no es un secreto: obliga al navegador a hacer el
+    // preflight de CORS, que es lo que impide que otra página web dispare este
+    // endpoint (responde sin token) desde el navegador del usuario.
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(),
+        'X-TGDL-Request': '1'
+      },
       body: JSON.stringify(body)
     })
 
@@ -125,13 +133,29 @@ const apiCall = async (url, body) => {
 }
 
 const saveCredentials = async () => {
-  if (!apiId.value || !apiHash.value) {
+  // SEC-34: validar el formato ANTES de enviar, sobre el valor ya recortado,
+  // para que los espacios de los extremos no enmascaren un campo vacío ni un
+  // valor mal formado. El backend solo hace TrimSpace y Atoi sobre api_id y
+  // no valida api_hash, así que un dato inválido llegaría hasta Telegram:
+  // acotamos aquí con el patrón canónico (api_id solo dígitos, api_hash de 32
+  // caracteres hexadecimales, igual que el placeholder de este mismo formulario).
+  const trimmedApiId = apiId.value.trim()
+  const trimmedApiHash = apiHash.value.trim()
+  if (!trimmedApiId || !trimmedApiHash) {
     errorMessage.value = t('auth.errFillBoth')
     return
   }
+  if (!/^\d+$/.test(trimmedApiId)) {
+    errorMessage.value = t('auth.errApiIdFormat')
+    return
+  }
+  if (!/^[0-9a-fA-F]{32}$/.test(trimmedApiHash)) {
+    errorMessage.value = t('auth.errApiHashFormat')
+    return
+  }
   const data = await apiCall('/api/auth/credentials', {
-    api_id: apiId.value.trim(),
-    api_hash: apiHash.value.trim()
+    api_id: trimmedApiId,
+    api_hash: trimmedApiHash
   })
   emit('auth-success', data)
 }
@@ -163,12 +187,32 @@ const verifyCode = async () => {
     phone_number: phoneNumber.value,
     code: code.value.trim()
   })
+  // SEC-34: Telegram ya consumió el código en este punto (tanto si entra
+  // directo como si pide 2FA después). Ningún paso posterior lo reutiliza,
+  // así que se vacía el ref de inmediato para no retenerlo en memoria.
+  // Si la llamada falla, apiCall lanza antes y el valor queda para reintentar.
+  code.value = ''
   if (data.status === '2fa_required' || data.state === 'WAITING_2FA') {
     emit('auth-success', { ...props.authStatus, state: 'WAITING_2FA' })
   } else {
     emit('auth-success', { ...data, authenticated: true })
   }
 }
+
+// SEC-05: cuando el panel se ve desde fuera de este equipo y por HTTP, la
+// contraseña de 2FA viaja en claro por la red. Aquí SOLO se advierte, no se
+// bloquea el envío: el acceso por HTTP en la LAN es un escenario documentado
+// (REMOTE_ACCESS.md) y cortar el envío rompería a usuarios legítimos; la
+// decisión de continuar es del usuario.
+const insecureTransport = computed(() => {
+  // Dentro de la ventana nativa (Wails) el panel no viaja por la red: ahí no
+  // hay nada que advertir, aunque el hostname interno no sea loopback.
+  if (isWailsRuntime()) return false
+  return (
+    !isLoopbackHost(window.location.hostname) &&
+    window.location.protocol !== 'https:'
+  )
+})
 
 const verify2FA = async () => {
   if (!password.value) {
@@ -178,6 +222,13 @@ const verify2FA = async () => {
   const data = await apiCall('/api/auth/verify-2fa', {
     password: password.value
   })
+  // SEC-34: este es el punto final real del login. Tras este éxito solo queda
+  // el paso 5, que únicamente pinta la pantalla de éxito y no lee password,
+  // y el resto del panel nunca tuvo acceso a este ref; por eso se vacía aquí,
+  // justo antes de emitir, para que la contraseña 2FA no permanezca en
+  // memoria durante el resto de la sesión. Si la llamada falla, apiCall lanza
+  // antes y el valor se conserva para que el usuario pueda reintentar.
+  password.value = ''
   emit('auth-success', { ...data, authenticated: true })
 }
 
@@ -207,9 +258,16 @@ const goBack = async () => {
     code.value = ''
     password.value = ''
     try {
+      // La puerta de setup del servidor exige Content-Type JSON en las
+      // mutaciones que van sin token: sin él respondería 415 y el intento de
+      // login quedaría pendiente en el servidor.
       await fetch('/api/auth/logout', {
         method: 'POST',
-        headers: { ...authHeaders() }
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(),
+          'X-TGDL-Request': '1'
+        }
       })
     } catch (e) {
       console.error(e)
@@ -367,10 +425,14 @@ const cancelBack = () => {
 
         <div class="form-group">
           <label>TGDL_API_HASH</label>
+          <!-- SEC-34: el hash es un secreto de la app, no debe verse en pantalla
+               (ni en capturas/grabaciones); autocomplete="off" igual que el campo
+               de token de RemoteLogin para que el navegador no lo guarde. -->
           <input
             v-model="apiHash"
-            type="text"
+            type="password"
             :placeholder="t('auth.apiHashPlaceholder')"
+            autocomplete="off"
             @keyup.enter="saveCredentials"
           />
         </div>
@@ -536,6 +598,18 @@ const cancelBack = () => {
             :placeholder="t('auth.tfaPlaceholder')"
             @keyup.enter="verify2FA"
           />
+          <!-- Advertencia en línea junto al campo: no bloquea el envío (ver
+               insecureTransport en el script), solo pone el riesgo sobre la
+               mesa antes de que el usuario pulse "Iniciar Sesión". -->
+          <div
+            v-if="insecureTransport"
+            class="auth-alert danger"
+            role="alert"
+            aria-live="polite"
+          >
+            <AlertCircle :size="18" class="alert-icon" />
+            <span>{{ t('auth.tfaHttpWarning') }}</span>
+          </div>
         </div>
 
         <div class="button-group">

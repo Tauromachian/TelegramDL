@@ -68,6 +68,11 @@ type ClientManager struct {
 	cancelRun            context.CancelFunc
 	runWg                sync.WaitGroup
 	mu                   sync.RWMutex
+	// dcMu serializa únicamente la creación de pools por DC (SEC-18). La
+	// llamada de red client.DC() se hace fuera de cm.mu para no bloquear
+	// todo el manejador; este candado corto evita que dos goroutines abran
+	// dos pools duplicados para el mismo DC mientras tanto.
+	dcMu                 sync.Mutex
 	readyChan            chan struct{}
 	phoneCodeHash        string
 	pendingPhone         string
@@ -242,10 +247,20 @@ func (cm *ClientManager) DownloadClientForDC(ctx context.Context, dc int) (*tg.C
 		return nil, errors.New(i18n.T("telegram.notConnected"))
 	}
 
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
+	// SEC-18: la apertura del pool es I/O de red, así que NO se hace con
+	// cm.mu tomado (antes bloqueaba DownloadClient, GetChatName, RawClient,
+	// WaitReady, FetchDialogs, Stop y company durante toda la llamada).
+	// dcMu serializa solo la creación para que dos descargas simultáneas no
+	// abran pools duplicados para el mismo DC.
+	cm.dcMu.Lock()
+	defer cm.dcMu.Unlock()
 
-	if dlClient, ok := cm.dcClients[dc]; ok && dlClient != nil {
+	// Doble comprobación: otra goroutine pudo publicar el pool mientras
+	// esperábamos a dcMu. Si ya está publicado, se devuelve sin tocar la red.
+	cm.mu.RLock()
+	dlClient, ok = cm.dcClients[dc]
+	cm.mu.RUnlock()
+	if ok && dlClient != nil {
 		return dlClient, nil
 	}
 
@@ -256,12 +271,31 @@ func (cm *ClientManager) DownloadClientForDC(ctx context.Context, dc int) (*tg.C
 	}
 
 	dlClient = tg.NewClient(pool)
+
+	// Publicación con cm.mu tomado solo el tiempo de la asignación.
+	cm.mu.Lock()
+	// Carrera residual: la sesión pudo reiniciarse (stopRunning/InitClient)
+	// mientras DC conectaba. Ese pool pertenece al cliente viejo y quedaría
+	// publicado en un manejador que ya no lo usa, así que se descarta con su
+	// API de cierre en lugar de dejarlo abandonado.
+	if cm.client != client {
+		cm.mu.Unlock()
+		if cerrErr := pool.Close(); cerrErr != nil {
+			log.Printf("[TG CLIENT] Error cerrando pool DC %d descartado: %v", dc, cerrErr)
+		}
+		return nil, errors.New("cliente de Telegram no conectado")
+	}
 	if cm.dcPools == nil {
 		cm.dcPools = make(map[int]telegram.CloseInvoker)
 		cm.dcClients = make(map[int]*tg.Client)
 	}
 	cm.dcPools[dc] = pool
 	cm.dcClients[dc] = dlClient
+	// El candado se suelta antes de loguear: es precisamente el motivo del
+	// reordenamiento (SEC-18), para no retener cm.mu durante una llamada de
+	// red o de log.
+	cm.mu.Unlock()
+
 	log.Printf("[TG CLIENT] %s", i18n.T("telegram.poolDCOpened", dc, DownloadConnections))
 	return dlClient, nil
 }
@@ -675,6 +709,27 @@ func (cm *ClientManager) Client() *telegram.Client {
 }
 
 func (cm *ClientManager) InitClient(apiIDStr, apiHash string) error {
+	// SEC-01: validar las credenciales ANTES de tocar la sesión. Antes,
+	// stopRunning() se ejecutaba primero y un api_id inválido mataba el
+	// cliente MTProto vivo solo para devolver después un error. La
+	// validación no lee ni escribe cm, así que un error de formato sale sin
+	// llamar a stopRunning() y sin modificar ningún campo del manejador.
+	apiIDStr = strings.TrimSpace(apiIDStr)
+	apiHash = strings.TrimSpace(apiHash)
+
+	// Borrado intencionado de credenciales: solo en ese caso se decide parar
+	// la sesión actual, porque el usuario pide vaciar la configuración.
+	borrarSesion := apiIDStr == "" || apiHash == ""
+	id := 0
+	if !borrarSesion {
+		var err error
+		id, err = strconv.Atoi(apiIDStr)
+		if err != nil {
+			// Sin stopRunning() ni mutación de cm: el estado previo queda intacto.
+			return fmt.Errorf(i18n.T("telegram.invalidAPIID"), err)
+		}
+	}
+
 	// Detener la sesión anterior antes de tomar el mutex. La goroutine de
 	// Telegram puede necesitarlo mientras termina.
 	cm.stopRunning()
@@ -682,19 +737,12 @@ func (cm *ClientManager) InitClient(apiIDStr, apiHash string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	apiIDStr = strings.TrimSpace(apiIDStr)
-	apiHash = strings.TrimSpace(apiHash)
-	if apiIDStr == "" || apiHash == "" {
+	if borrarSesion {
 		cm.apiID = 0
 		cm.apiHash = ""
 		cm.client = nil
 		cm.rawClient = nil
 		return nil
-	}
-
-	id, err := strconv.Atoi(apiIDStr)
-	if err != nil {
-		return fmt.Errorf(i18n.T("telegram.invalidAPIID"), err)
 	}
 
 	cm.apiID = id
@@ -868,6 +916,28 @@ func (cm *ClientManager) stopRunning() {
 	cm.dcClients = make(map[int]*tg.Client)
 	cm.primaryDC = 0
 	cm.mu.Unlock()
+}
+
+// HaySesionGuardada informa si existe el fichero de sesión de Telegram en
+// disco. El panel (pkg/server) usa este método para decidir si los endpoints
+// de configuración de /api/auth/ pueden responder sin token SOLO mientras no
+// haya sesión guardada: es el único momento en que configurar la cuenta no
+// expone ni destruye nada ajeno (ver SECURITY_FIXPLAN.md §1.3, cierre de
+// SEC-01). Nil-safe: un manejador nulo no tiene sesión.
+func (cm *ClientManager) HaySesionGuardada() bool {
+	if cm == nil {
+		return false
+	}
+	// Copiar el path y soltar el candado ANTES de os.Stat: no se hace I/O con
+	// el candado tomado, aunque la llamada sea barata (estilo SEC-18).
+	cm.mu.RLock()
+	sessionPath := cm.sessionPath
+	cm.mu.RUnlock()
+
+	// Cualquier error de stat (incluido «no existe») cuenta como «sin
+	// sesión»: es la respuesta conservadora, porque hace exigir token.
+	_, err := os.Stat(sessionPath)
+	return err == nil
 }
 
 func (cm *ClientManager) GetAuthStatus(ctx context.Context) AuthStatus {

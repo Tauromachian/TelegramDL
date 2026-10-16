@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"io"
 	"io/fs"
 	"log"
 	"net"
@@ -22,6 +23,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"golang.org/x/net/netutil"
 
 	"tgdown/pkg/config"
 	"tgdown/pkg/downloader"
@@ -68,6 +70,44 @@ type Server struct {
 	// dejaba que cualquiera en la red llenase los mensajes guardados del
 	// usuario a razón de uno por minuto, día y noche.
 	tokenSendByIP map[string]time.Time
+
+	// haySesion informa si hay una sesión de Telegram guardada en disco. Es
+	// una costura para las pruebas: NewServer lo conecta a
+	// ClientManager.HaySesionGuardada, y un servidor de test puede sustituirlo
+	// para probar la puerta de setup sin una sesión real de Telegram.
+	haySesion func() bool
+
+	// Límites de frecuencia de la puerta de setup (SEC-09): 5 intentos por
+	// minuto y origen y 30 por minuto en total, contados solo en las
+	// mutaciones de /api/auth/ que responden sin token. Los mapas se purgan al
+	// registrar cada intento para no crecer sin límite (mismo criterio que
+	// tokenSendByIP).
+	setupRateByOrigin map[string]rateWindow
+	setupRateGlobal   rateWindow
+
+	// setupStatusRate acota /api/auth/status cuando la puerta la deja pasar
+	// sin token (solo sin sesión guardada): 30 por minuto y origen, en un mapa
+	// aparte para que quien martillee status no se coma la cuota de mutaciones
+	// que necesita el asistente de login (SEC-09).
+	setupStatusRate map[string]rateWindow
+
+	// ipcRateByOrigin limita /api/ipc/download sin token a 30 intentos por
+	// minuto y origen (SEC-03). Quien trae token válido no consume cuota.
+	ipcRateByOrigin map[string]rateWindow
+
+	// authLogByOrigin suprime la inundación del registro de los 401 (SEC-32):
+	// como mucho un aviso por origen y minuto (rateWindow con maxAttempts=1).
+	// Las ventanas caducadas se purgan al registrar cada rechazo para que el
+	// mapa no crezca sin límite aunque lleguen orígenes nuevos a millares.
+	authLogByOrigin map[string]rateWindow
+
+	// hostRejectLastAt es el instante del último aviso de Host rechazado por
+	// hostValidationMiddleware (SEC-08). A propósito es un único timestamp
+	// global y no un mapa indexado por el Host: el índice lo controlaría el
+	// atacante (un dominio distinto por petición) y el mapa crecería sin
+	// techo. Con un solo reloj, como mucho se escribe un aviso por minuto y
+	// la memoria que ocupa la supresión no depende de nadie más.
+	hostRejectLastAt time.Time
 
 	// Apagado del equipo al terminar la cola (interruptor shutdown_when_done).
 	// hadActiveDownloads recuerda que hubo descargas activas o en cola: solo
@@ -135,6 +175,13 @@ func NewServer(
 		stopCh:         make(chan struct{}),
 		broadcastCh:    make(chan struct{}, 1),
 		tokenSendByIP:  make(map[string]time.Time),
+
+		setupRateByOrigin: make(map[string]rateWindow),
+		ipcRateByOrigin:   make(map[string]rateWindow),
+		authLogByOrigin:   make(map[string]rateWindow),
+		setupStatusRate:   make(map[string]rateWindow),
+		// Costura para tests: aquí se conecta con la sesión real de Telegram.
+		haySesion: func() bool { return cm != nil && cm.HaySesionGuardada() },
 	}
 
 	s.apiToken = s.loadOrCreateToken()
@@ -174,12 +221,22 @@ const (
 	// token. Solo devuelve un booleano sin revelar información sensible.
 	hasCredentialsAPIPath = "/api/auth/has-credentials"
 
-	// authAPIPrefix agrupa los endpoints de configuración de Telegram que
-	// necesitan ser públicos para permitir la configuración inicial sin token.
-	// Estos endpoints no revelan información sensible, solo permiten configurar
-	// la cuenta de Telegram. El abuso se limita por las protecciones de Telegram
-	// (rate limiting, código de verificación, 2FA).
-	authAPIPrefix = "/api/auth/"
+	// rateWindowDuration es la ventana de las limitaciones de frecuencia de la
+	// puerta de setup y del endpoint IPC: un minuto redondo.
+	rateWindowDuration = time.Minute
+
+	// Intentos admitidos por ventana de frecuencia: la puerta de setup admite
+	// 5 por origen y 30 en total; el IPC de descargas, 30 por origen (SEC-03
+	// y SEC-09).
+	setupMaxPorOrigen = 5
+	setupMaxGlobal    = 30
+	ipcMaxPorOrigen   = 30
+
+	// setupStatusMax es la cuota de /api/auth/status en la puerta de setup.
+	// Es más holgada que la de las mutaciones porque el panel la consulta de
+	// forma event-driven, pero evita que un bombardeo de GETs sin sesión
+	// dispare decenas de esperas de hasta 3 s en WaitReady (SEC-09).
+	setupStatusMax = 30
 
 	// tokenSendCooldown es lo que hay que esperar entre dos envíos del token.
 	// Al ser un endpoint abierto, es lo que evita que alguien que alcance el
@@ -206,6 +263,29 @@ const (
 	// el apagado del equipo, con el interruptor «Apagar al terminar» armado.
 	// Da margen a encadenar más descargas o a desarmar el interruptor.
 	shutdownDelay = 15 * time.Second
+
+	// maxCuerpoAPI limita el cuerpo de cada petición de /api/ a 1 MiB. Ningún
+	// endpoint legítimo necesita más (el mayor es el listado de ajustes o una
+	// descarga por URL), y sin techo cualquier visitante podía obligar al
+	// servidor a leer cuerpos gigantes hasta agotar memoria (SEC-02).
+	maxCuerpoAPI = 1 << 20
+
+	// maxConexionesSimultaneas acota las conexiones TCP que el servidor
+	// admite a la vez. Por encima de este número, Accept espera a que se
+	// libere una entrada en vez de crear goroutines y búferes sin límite: sin
+	// el techo, abrir conexiones y no consumirlas bastaba para tumbar la app
+	// completa, incluida la ventana de Wails, que comparte el servidor (SEC-02).
+	maxConexionesSimultaneas = 64
+
+	// maxClientesWS es el techo de paneles conectados por WebSocket a la vez.
+	// Quien llega con el techo lleno recibe un 503 antes del handshake, en
+	// vez de una conexión que se abriría para morir en el registro (SEC-16).
+	maxClientesWS = 32
+
+	// maxLecturaWS limita el tamaño de los mensajes que se leen del panel:
+	// el cliente no manda nada con más de 4 KiB, así que un WebSocket
+	// malintencionado no puede forzar búferes de tamaño arbitrario (SEC-16).
+	maxLecturaWS = 4 << 10
 )
 
 // publicAPIPaths son los únicos endpoints de la API que responden sin token.
@@ -216,56 +296,606 @@ var publicAPIPaths = map[string]bool{
 	"/api/ipc/download":   true,
 }
 
-// isPublicAPIPath determina si un endpoint puede responder sin token.
-// Los endpoints de configuración de Telegram (/api/auth/credentials, /api/auth/send-code,
-// /api/auth/verify-code, /api/auth/verify-2fa, /api/auth/status, /api/auth/logout)
-// son públicos para permitir la configuración inicial sin token.
-// Los endpoints de token (/api/auth/token, /api/auth/token/regenerate) requieren autenticación.
+// rutasSetup son los endpoints de configuración de Telegram que pueden
+// responder sin token SOLO mientras no haya sesión guardada y cumpliendo
+// las condiciones de setupSinToken.
+var rutasSetup = map[string]bool{
+	"/api/auth/status":      true,
+	"/api/auth/credentials": true,
+	"/api/auth/send-code":   true,
+	"/api/auth/verify-code": true,
+	"/api/auth/verify-2fa":  true,
+	"/api/auth/logout":      true,
+}
+
+// isPublicAPIPath determina si un endpoint puede responder sin token: solo
+// lookup exacto en publicAPIPaths.
+//
+// Antes todo el prefijo /api/auth/ entero era público por strings.HasPrefix
+// (hallazgo SEC-01): logout destructivo en bucle, fuga de PII (teléfono y
+// nombre) y sobrescritura de credenciales sin ningún token. Ahora la única vía
+// sin token para configurar la cuenta es la puerta de setup de handlerDeAPI
+// (ver rutasSetup y setupSinToken), que exige, entre otras cosas, no tener
+// sesión de Telegram guardada.
 func isPublicAPIPath(path string) bool {
-	if publicAPIPaths[path] {
+	return publicAPIPaths[path]
+}
+
+// handlerDeAPI decide con qué cadena de middleware se sirve una petición de
+// /api/. El orden de las ramas es el contrato:
+//
+//  1. públicos exactos (publicAPIPaths): responden sin token, igual que antes;
+//  2. quien trae token válido: exactamente el mismo camino de siempre, para
+//     que quien se autentica no vea ninguna regresión;
+//  3. la puerta de setup: los endpoints de rutasSetup sin token, solo cuando
+//     setupSinToken lo permite (sin sesión guardada y con la forma exigida);
+//  4. cualquier otro caso: el 401 estándar de authMiddleware.
+func (s *Server) handlerDeAPI(r *http.Request) http.Handler {
+	if isPublicAPIPath(r.URL.Path) {
+		return s.corsMiddleware(s.mux)
+	}
+	if s.checkAuth(r) {
+		return s.corsMiddleware(s.authMiddleware(s.mux))
+	}
+	if rutasSetup[r.URL.Path] {
+		return s.corsMiddleware(s.setupHandler(s.mux))
+	}
+	return s.corsMiddleware(s.authMiddleware(s.mux))
+}
+
+// setupHandler aplica la puerta de setup a una ruta de rutasSetup. Si
+// setupSinToken devuelve codigo 0 es porque hay sesión guardada: sin responder
+// aquí, el paso siguiente resuelve el 401 estándar con authMiddleware.
+func (s *Server) setupHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ok, codigo, detalle, retryAfter := s.setupSinToken(r)
+		if ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if codigo == 0 {
+			s.authMiddleware(next).ServeHTTP(w, r)
+			return
+		}
+		// Se responde exactamente el código y el detalle que indicó la puerta.
+		// El 429 replica el patrón de handleSendTokenToTelegram: cabecera
+		// Retry-After y cuerpo con estado rate_limited.
+		if codigo == http.StatusTooManyRequests {
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+			s.jsonResponse(w, codigo, map[string]any{
+				"status":      "rate_limited",
+				"detail":      detalle,
+				"retry_after": retryAfter,
+			})
+			return
+		}
+		s.errorResponse(w, codigo, detalle)
+	})
+}
+
+// rateWindow cuenta los intentos de una ventana de un minuto. Al cumplirse
+// rateWindowDuration la ventana se reabre desde cero.
+type rateWindow struct {
+	start    time.Time
+	attempts int
+}
+
+// add anota un intento en la ventana. Devuelve false cuando la ventana ya agotó
+// maxAttempts, con los segundos que quedan para que caduque (>= 1).
+func (w *rateWindow) add(now time.Time, maxAttempts int) (bool, int) {
+	if w.start.IsZero() || now.Sub(w.start) >= rateWindowDuration {
+		w.start = now
+		w.attempts = 0
+	}
+	if w.attempts >= maxAttempts {
+		falta := rateWindowDuration - now.Sub(w.start)
+		return false, int(falta.Seconds()) + 1
+	}
+	w.attempts++
+	return true, 0
+}
+
+// consumeSetupQuota gasta un intento de la cuota de la puerta de setup para
+// este origen (5/min por origen y 30/min en total). El intento solo llega al
+// contador global si el del origen todavía tenía sitio: así un origen ya
+// limitado no consume la cuota global de los demás.
+//
+// Debe llamarse sin s.mu tomado.
+func (s *Server) consumeSetupQuota(origin string) (bool, int) {
+	ahora := time.Now()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.setupRateByOrigin == nil {
+		s.setupRateByOrigin = make(map[string]rateWindow)
+	}
+	// Se purgan las ventanas caducadas para que el mapa no crezca sin límite
+	// si alguien insiste desde muchas direcciones.
+	for k, w := range s.setupRateByOrigin {
+		if w.start.IsZero() || ahora.Sub(w.start) >= rateWindowDuration {
+			delete(s.setupRateByOrigin, k)
+		}
+	}
+
+	local := s.setupRateByOrigin[origin]
+	okLocal, retryLocal := local.add(ahora, setupMaxPorOrigen)
+	s.setupRateByOrigin[origin] = local
+	if !okLocal {
+		return false, retryLocal
+	}
+
+	okGlobal, retryGlobal := s.setupRateGlobal.add(ahora, setupMaxGlobal)
+	if !okGlobal {
+		return false, retryGlobal
+	}
+	return true, 0
+}
+
+// consumeStatusQuota gasta un intento de la cuota propia de /api/auth/status
+// cuando la puerta la deja pasar sin token (solo sin sesión guardada):
+// setupStatusMax por minuto y origen, sin cuota global para que el desgaste
+// de status no recorte la de las mutaciones del asistente de login.
+//
+// Debe llamarse sin s.mu tomado.
+func (s *Server) consumeStatusQuota(origin string) (bool, int) {
+	ahora := time.Now()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.setupStatusRate == nil {
+		s.setupStatusRate = make(map[string]rateWindow)
+	}
+	// Se purgan las ventanas caducadas, igual que en las demás cuotas, para
+	// que el mapa no crezca sin límite si alguien insiste desde muchas
+	// direcciones.
+	for k, w := range s.setupStatusRate {
+		if w.start.IsZero() || ahora.Sub(w.start) >= rateWindowDuration {
+			delete(s.setupStatusRate, k)
+		}
+	}
+
+	w := s.setupStatusRate[origin]
+	ok, retry := w.add(ahora, setupStatusMax)
+	s.setupStatusRate[origin] = w
+	return ok, retry
+}
+
+// consumeIPCQuota gasta un intento de la cuota de /api/ipc/download sin token
+// (30 por minuto y origen). Igual que consumeSetupQuota, purga las ventanas
+// caducadas antes de contar para que el mapa no crezca sin límite.
+//
+// Debe llamarse sin s.mu tomado.
+func (s *Server) consumeIPCQuota(origin string) (bool, int) {
+	ahora := time.Now()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.ipcRateByOrigin == nil {
+		s.ipcRateByOrigin = make(map[string]rateWindow)
+	}
+	for k, w := range s.ipcRateByOrigin {
+		if w.start.IsZero() || ahora.Sub(w.start) >= rateWindowDuration {
+			delete(s.ipcRateByOrigin, k)
+		}
+	}
+
+	w := s.ipcRateByOrigin[origin]
+	ok, retry := w.add(ahora, ipcMaxPorOrigen)
+	s.ipcRateByOrigin[origin] = w
+	return ok, retry
+}
+
+// haySesionGuardada informa si hay una sesión de Telegram guardada en disco.
+// Es la costura que permite probar la puerta de setup en tests sin una sesión
+// real: NewServer conecta el campo con ClientManager.HaySesionGuardada, y si
+// nadie lo asignó (construcción directa de &Server{}) se responde «sin
+// sesión».
+func (s *Server) haySesionGuardada() bool {
+	if s.haySesion == nil {
+		return false
+	}
+	return s.haySesion()
+}
+
+// setupSinToken decide si una petición sin token puede pasar por la puerta de
+// configuración de /api/auth/. Solo se admite mientras NO exista sesión de
+// Telegram guardada: es el único momento en que configurar la cuenta no
+// expone ni destruye nada ajeno (cierre de SEC-01: logout destructivo, fuga de
+// PII y sobrescritura de credenciales sin token).
+//
+// Con sesión guardada devuelve codigo 0 sin responder, para que el enrutado
+// deje que authMiddleware emita el 401 estándar. Si no se permite el paso,
+// codigo y detalle indican la respuesta exacta (429/405/403/415) y retryAfter
+// los segundos de la cabecera Retry-After (0 fuera del 429).
+func (s *Server) setupSinToken(r *http.Request) (ok bool, codigo int, detalle string, retryAfter int) {
+	esMutacion := r.URL.Path != "/api/auth/status"
+	origin := requestOrigin(r)
+
+	// 1) Con sesión guardada, configuración solo con token: aquí ni se mira
+	// el resto de condiciones, el 401 lo resuelve authMiddleware.
+	if s.haySesionGuardada() {
+		return false, 0, "", 0
+	}
+
+	// 2) Frecuencia: las mutaciones gastan su cuota (5 por origen y 30 en
+	// total) y /api/auth/status la suya propia, más holgada (30 por origen y
+	// en mapa aparte). Con sesión no se llega aquí (paso 1), pero sin ella y
+	// con el cliente MTProto ya creado —la ventana entre guardar credenciales
+	// y completar el login— cada GET de status espera hasta 3 s en WaitReady
+	// (pkg/telegram): sin freno, esa espera se convierte en amplificación
+	// (SEC-09).
+	var permitido bool
+	var retry int
+	if esMutacion {
+		permitido, retry = s.consumeSetupQuota(origin)
+	} else {
+		permitido, retry = s.consumeStatusQuota(origin)
+	}
+	if !permitido {
+		logbus.Warn(logbus.CatServer,
+			i18n.T("server.setupRateLimited"),
+			i18n.T("server.requestOriginDetail", origin))
+		return false, http.StatusTooManyRequests,
+			i18n.T("server.rateLimitedDetail", retry), retry
+	}
+
+	if esMutacion {
+		// 3) Forma de la petición: un método que no sea POST no puede venir
+		// del panel (logout por <img>, SEC-01); sin la cabecera propia el
+		// navegador no hace el preflight de CORS (SEC-04); y un Content-Type
+		// que no sea JSON permite enviar el cuerpo en modo no-cors con
+		// text/plain desde otra página web (SEC-04).
+		if r.Method != http.MethodPost {
+			return false, http.StatusMethodNotAllowed, i18n.T("server.requestMethodNotAllowed"), 0
+		}
+		if r.Header.Get(ownRequestHeader) == "" {
+			return false, http.StatusForbidden, i18n.T("server.requestForbidden"), 0
+		}
+		if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			return false, http.StatusUnsupportedMediaType, i18n.T("server.requestUnsupportedType"), 0
+		}
+	}
+
+	// 4) Todo cuadra: se permite el paso y queda constancia en el registro,
+	// para que cada acceso sin token sea visible en el panel de Logs.
+	logbus.Warn(logbus.CatServer,
+		i18n.T("server.setupWithoutToken"),
+		i18n.T("server.requestOriginDetail", origin))
+	return true, 0, "", 0
+}
+
+// limiteDeCuerpo acota el cuerpo de cada petición de /api/ a maxCuerpoAPI
+// (SEC-02). Solo se envuelve la rama de la API: los estáticos y el IPC de
+// Wails no aceptan cuerpos, y el handshake del WebSocket viaja sin cuerpo, así
+// que no hay nada que limitar en ellos.
+func (s *Server) limiteDeCuerpo(h http.Handler) http.Handler {
+	return http.MaxBytesHandler(h, maxCuerpoAPI)
+}
+
+// contentSecurityPolicy es la política de seguridad del panel servido por
+// este servidor (SEC-07), directiva a directiva con la razón de cada
+// ampliación. La lista sale del grep sobre dashboard/src e index.html:
+//
+//   - default-src 'self': red de seguridad para todo recurso sin directiva
+//     propia: solo puede salir del propio origen.
+//   - script-src 'self': JavaScript solo del propio origen. Ni
+//     'unsafe-inline' ni 'unsafe-eval' jamás: el grep no encontró eval() ni
+//     new Function en el panel, y el único script inline que había (el IIFE
+//     del tema de index.html) se extrajo a /theme-init.js para que 'self' lo
+//     cubra.
+//   - style-src 'self' 'unsafe-inline' https://fonts.googleapis.com:
+//     'unsafe-inline' lo piden los atributos style que Vue inyecta (bindings
+//     :style y style="..." en App.vue, DownloadsView, ListenerView y
+//     SettingsView) y las llamadas a style.setProperty de theme-init.js sobre
+//     <html>; sin él el panel perdería progresos y colores en pantalla.
+//     fonts.googleapis.com lo pide el @import de src/style.css (línea 1).
+//   - img-src 'self' data: el logo y el favicon son del propio origen y los
+//     fondos decorativos de themes-dl.css y LogsView.vue son SVG en data:;
+//     el panel no pide ninguna imagen externa (no consulta miniaturas de
+//     Telegram por URL).
+//   - font-src 'self' https://fonts.gstatic.com: /fonts/loader.otf (fuentes
+//     propias declaradas en el @font-face de App.vue) y los woff2 que sirve
+//     la hoja de Google Fonts.
+//   - connect-src 'self': todos los fetch() del panel son /api/... del mismo
+//     origen y el WebSocket en modo web es ws(s)://mismo-origen/api/ws. El
+//     fallback ws://127.0.0.1:8000 solo se dispara en la ventana Wails (host
+//     con «wails»), donde esta CSP no llega a aplicarse.
+//   - frame-ancestors 'none': nadie puede enmarcar la pantalla de login
+//     (cierra el clickjacking sobre los botones públicos).
+//   - base-uri 'none': impide reescribir <base> para secuestrar las rutas
+//     relativas de los src.
+//   - object-src 'none': sin plugins, <object> ni <embed>.
+//
+// El panel no usa workers, ni <video>/<audio> por URL externa, ni iframes,
+// así que no hace falta ampliar worker-src, media-src ni frame-src: caen en
+// default-src 'self' (notification.wav es un asset del propio origen).
+const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
+
+// securityHeadersMiddleware añade las cabeceras de protección (SEC-07) a
+// todas las respuestas de este servidor. Sin ellas, la pantalla de login era
+// enmarcable (clickjacking), cualquier XSS futuro robaba el token de
+// localStorage y las respuestas de /api/auth/* (PII) se guardaban en la
+// caché del navegador.
+//
+// Alcance: solo el servidor HTTP propio (modo web y acceso remoto). En modo
+// escritorio los assets (index.html, JS y CSS) los sirve el asset server de
+// Wails y estas cabeceras NO se aplican allí: la ventana nativa queda fuera
+// de este middleware; solo pasan por él las rutas /api/ que Wails deriva a
+// nuestro Handler.
+//
+// El middleware solo toca w.Header() y delega sin envolver el
+// ResponseWriter: así el http.Hijacker que necesita el upgrade de /api/ws
+// sigue siendo el mismo objeto de siempre, y gorilla escribe el 101 del
+// handshake a mano después de secuestrar la conexión (las cabeceras del
+// mapa se descartan al secuestrar), con lo que el WebSocket no se rompe ni
+// se duplican cabeceras en la respuesta de cambio de protocolo.
+//
+// Cache-Control: no-store se limita a /api/: ahí viajan PII y token; los
+// assets estáticos siguen cacheándose con normalidad.
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			w.Header().Set("Cache-Control", "no-store")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// viteDevPort es el puerto del servidor de desarrollo de Vite
+// (dashboard/vite.config.js). El proxy /api reescribe el Host a la dirección
+// del backend (changeOrigin), pero el Origin de la página sigue siendo
+// localhost:8080, así que ese puerto hay que admitirlo a la hora de mirar el
+// Origin de una petición en desarrollo.
+const viteDevPort = 8080
+
+// hostLogMaxLen acorta el Host escrito en el registro: la cabecera Host es
+// entrada del atacante y no tiene por qué caber ni ser legible tal cual.
+const hostLogMaxLen = 100
+
+// hostValidationMiddleware rechaza con 421 Misdirected Request cualquier
+// petición cuya cabecera Host no apunte a este servidor (SEC-08, DNS
+// rebinding). Se sitúa ANTES de todo handler, de modo que ninguna ruta —pública
+// o protegida— llega a ejecutarse con un Host ajeno.
+//
+// La cadena final es securityHeadersMiddleware(hostValidationMiddleware(...))
+// en Handler() y en WebHandler(): el middleware de cabeceras va por fuera
+// para que la propia respuesta 421 salga ya con la CSP y el resto de
+// cabeceras de SEC-07 (si validase el Host por fuera, el 421 sería la única
+// respuesta del servidor sin ellas).
+//
+// El cuerpo se emite con s.errorResponse para que tenga exactamente la misma
+// forma JSON ({"detail": ..., "error": ...}) que el resto de errores.
+func (s *Server) hostValidationMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hostAllowed(r.Host) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Nada en silencio: el rechazo deja constancia en el registro, con
+		// supresión de inundación (ver registerHostRejection).
+		s.registerHostRejection(r.Host)
+		s.errorResponse(w, http.StatusMisdirectedRequest, "Cabecera Host no permitida")
+	})
+}
+
+// hostAllowed decide si la cabecera Host de una petición nombra a este
+// servidor (SEC-08).
+//
+// El cliente manda el Host que corresponde a la URL que tiene delante, y de
+// esa URL se encarga el DNS: si «evil.com» apunta a 127.0.0.1, una página
+// servida desde ese dominio llega aquí con Host: evil.com:8000 y Origin:
+// http://evil.com:8000, dos cabeceras que coinciden entre sí pero que no
+// nombran a este servidor. Antes de este hallazgo no existía ninguna
+// comprobación del Host en ningún punto del servidor, de modo que cualquier
+// reflejo de «mismo origen» (isOriginAllowed) acababa validando un dominio
+// ajeno: era el agujero clásico de DNS rebinding.
+//
+// Reglas aplicadas sobre el host ya sin puerto, en minúsculas y sin los
+// corchetes [] de las IPv6:
+//
+//  1. Vacío → se admite. Toda petición HTTP/1.1 real que entra por net/http
+//     lleva cabecera Host (de hecho net/http la exige), así que un valor
+//     vacío solo puede venir de una llamada directa al handler, como las que
+//     hacen los tests con httptest.NewRequest; no hay motivo para romperlas.
+//  2. IP literal → se admite sea la que sea: loopback, IP de LAN o la
+//     100.x.y.z de Tailscale. El rebinding siempre se monta sobre nombres de
+//     dominio, nunca sobre una IP.
+//  3. localhost, wails.localhost y *.wails.localhost → se admiten: la ventana
+//     de escritorio sirve el panel bajo wails.localhost con puerto dinámico.
+//  4. Nombre de una sola etiqueta (sin puntos) → se admite: los nombres
+//     cortos de LAN y los de MagicDNS (p. ej. «mispeluquin») son habituales.
+//     Riesgo residual aceptado y comentado: un nombre sin puntos solo puede
+//     resolverse dentro de la propia red o del propio equipo, no desde
+//     Internet, así que el rebinding externo sigue cortado.
+//  5. Sufijos .ts.net (MagicDNS de Tailscale) y .local (mDNS de red local) →
+//     se admiten: son infraestructuras gobernadas por el dueño de la red, y
+//     REMOTE_ACCESS.md documenta Tailscale como el método de acceso remoto
+//     recomendado para el panel (LAN y Tailscale incluidos).
+//  6. El host concreto de la configuración de escucha (bind_host), cuando no
+//     es wildcard (0.0.0.0, :: o vacío) → se admite porque nombra a este
+//     mismo servidor. Se lee con config.GetServerHost(), la misma fuente en
+//     vivo que usa Server.Start para abrir el listener (env > base de datos >
+//     valor por defecto); no se añade ninguna dependencia nueva.
+//  7. Cualquier otro nombre de dominio punteado (evil.com, panel.example.com
+//     cuando no es el bind_host) → se rechaza: es justo el caso del DNS
+//     rebinding y de un Host reescrito a mano.
+func hostAllowed(host string) bool {
+	// Regla 1: sin Host no hay nada que validar (ver comentario de la regla).
+	if strings.TrimSpace(host) == "" {
 		return true
 	}
-	// Permitir endpoints de configuración de autenticación (pero no los de token)
-	if strings.HasPrefix(path, authAPIPrefix) {
-		// Proteger endpoints de token
-		if path == "/api/auth/token" || path == "/api/auth/token/regenerate" {
-			return false
-		}
+	normalized := hostWithoutPort(host)
+
+	// Regla 2: cualquier IP literal es este mismo equipo o esta misma red.
+	if net.ParseIP(normalized) != nil {
+		return true
+	}
+
+	// Regla 3: los nombres de la ventana de escritorio de Wails.
+	if normalized == "localhost" || normalized == "wails.localhost" ||
+		strings.HasSuffix(normalized, ".wails.localhost") {
+		return true
+	}
+
+	// Regla 4: nombres de una sola etiqueta (LAN / MagicDNS cortos).
+	if !strings.Contains(normalized, ".") {
+		return true
+	}
+
+	// Regla 5: infraestructuras gobernadas (Tailscale y mDNS).
+	if strings.HasSuffix(normalized, ".ts.net") || strings.HasSuffix(normalized, ".local") {
+		return true
+	}
+
+	// Regla 6: el host de escucha concreto configurado para este servidor.
+	if bind := hostWithoutPort(config.GetServerHost()); !isWildcardBind(bind) &&
+		strings.EqualFold(bind, normalized) {
+		return true
+	}
+
+	// Regla 7: el resto de dominios punteados se rechazan.
+	return false
+}
+
+// hostWithoutPort reduce un valor «host» o «host:puerto» a la sola parte del
+// host, en minúsculas y sin los corchetes [] de las IPv6. Si no hay puerto
+// (o el valor es una IPv6 entre corchetes sin puerto), SplitHostPort falla y
+// se conserva el valor tal cual, que es lo que quieren las reglas 3 a 7.
+func hostWithoutPort(host string) string {
+	h := strings.TrimSpace(host)
+	if withoutPort, _, err := net.SplitHostPort(h); err == nil {
+		h = strings.TrimSpace(withoutPort)
+	}
+	return strings.ToLower(strings.Trim(h, "[]"))
+}
+
+// isWildcardBind indica si la dirección de escucha configurada no nombra una
+// interfaz concreta (vacío, 0.0.0.0 o ::: todas las interfaces). En ese caso
+// no hay host propio que añadir a la lista de permitidos, porque el valor no
+// identifica a este servidor ante nadie.
+func isWildcardBind(bind string) bool {
+	switch bind {
+	case "", "0.0.0.0", "::":
 		return true
 	}
 	return false
 }
 
+// registerHostRejection anota en el registro un Host rechazado por
+// hostValidationMiddleware (SEC-08): sin este aviso, un intento de DNS
+// rebinding sería invisible para quien mire el panel de logs.
+//
+// La supresión de inundación deja como mucho un aviso por minuto usando un
+// único timestamp del servidor (hostRejectLastAt). No se indexa por el Host
+// atacante: así la memoria ocupada no depende de cuantos dominios distintos
+// se prueben, ni dentro ni fuera de la ventana.
+//
+// Debe llamarse sin s.mu tomado.
+func (s *Server) registerHostRejection(host string) {
+	now := time.Now()
+
+	s.mu.Lock()
+	if !s.hostRejectLastAt.IsZero() && now.Sub(s.hostRejectLastAt) < rateWindowDuration {
+		// Ya se dejó constancia de un rechazo en la ventana actual: se
+		// silencia aquí para no inundar el registro con la misma línea.
+		s.mu.Unlock()
+		return
+	}
+	s.hostRejectLastAt = now
+	s.mu.Unlock()
+
+	// Mensaje en literal inglés al estilo de los avisos internos de app.go
+	// («engine shutdown incomplete», «database close failed»): es un aviso
+	// interno del backend, no una cadena de la interfaz. El Host va saneado
+	// y acortado porque se inyecta desde la cabecera de la petición.
+	logbus.Warn(logbus.CatServer,
+		"Request rejected: Host header is not allowed for this server",
+		"Host: "+sanitizeLogHost(host))
+}
+
+// sanitizeLogHost prepara un valor de cabecera Host para escribirlo en el
+// registro: quita los caracteres de control (CR/LF primero, que son los que
+// permitirían fabricar una línea falsa en el log) y lo acorta a
+// hostLogMaxLen bytes sin cortar por medio de un rune UTF-8. Es defensa en
+// profundidad: el logbus ya sanea, pero este valor llega de la cabecera y
+// también puede llegar de un proxy o de una llamada de test.
+func sanitizeLogHost(host string) string {
+	clean := strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, host)
+	if len(clean) > hostLogMaxLen {
+		// ToValidUTF8 descarta el último rune a medias si el corte lo parte.
+		clean = strings.ToValidUTF8(clean[:hostLogMaxLen], "")
+	}
+	return clean
+}
+
 func (s *Server) Handler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return securityHeadersMiddleware(s.hostValidationMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
-			if isPublicAPIPath(r.URL.Path) {
-				s.corsMiddleware(s.mux).ServeHTTP(w, r)
-				return
-			}
-			s.corsMiddleware(s.authMiddleware(s.mux)).ServeHTTP(w, r)
+			s.limiteDeCuerpo(s.handlerDeAPI(r)).ServeHTTP(w, r)
 			return
 		}
 		// Para cualquier ruta de frontend, devolver 404 para que Wails AssetServer
 		// sirva index.html e inyecte los bindings e IPC nativos.
 		http.NotFound(w, r)
-	})
+	})))
 }
 
 func (s *Server) WebHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return securityHeadersMiddleware(s.hostValidationMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
-			if isPublicAPIPath(r.URL.Path) {
-				s.corsMiddleware(s.mux).ServeHTTP(w, r)
-				return
-			}
-			s.corsMiddleware(s.authMiddleware(s.mux)).ServeHTTP(w, r)
+			s.limiteDeCuerpo(s.handlerDeAPI(r)).ServeHTTP(w, r)
 			return
 		}
 		// El panel estático (HTML/JS/CSS) se sirve siempre sin autenticación:
 		// la pantalla de login remoto necesita poder cargar antes de tener token.
 		s.mux.ServeHTTP(w, r)
-	})
+	})))
+}
+
+// nuevoHTTPServer monta el http.Server con los límites de red (SEC-02). Se
+// extrae a una función propia para que los tests puedan comprobar los campos
+// sin abrir puertos.
+//
+// Por qué cada límite:
+//
+//   - ReadHeaderTimeout e IdleTimeout ya estaban: acotan la lectura de las
+//     cabeceras y el tiempo ocioso entre peticiones de una conexión keep-alive.
+//   - ReadTimeout es nuevo: sin él, un atacante podía abrir una conexión y
+//     soltar el cuerpo gota a gota (slowloris) manteniendo ocupada una
+//     goroutine para siempre.
+//   - MaxHeaderBytes acaba con cabeceras gigantes que el servidor acabaría
+//     alojando en memoria.
+//   - NO se fija WriteTimeout: mataría los WebSocket, que son conexiones
+//     largas por definición, y también las respuestas amplias (historial,
+//     listado de descargas). Antes el comentario decía que solo se limitaba
+//     ReadHeaderTimeout porque ReadTimeout también habría cortado el WS: ahora
+//     ReadTimeout sí se aplica y el WebSocket sobrevive porque, tras el
+//     upgrade, handleWebSocket limpia la fecha límite heredada con
+//     conn.UnderlyingConn().SetDeadline(time.Time{}).
+func nuevoHTTPServer(h http.Handler) *http.Server {
+	return &http.Server{
+		Handler: h,
+		// 30 s para leer cabeceras y cuerpo; la conexión ociosa tiene su
+		// propio tope más amplio (IdleTimeout).
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		// 16 KiB de cabeceras como máximo; por encima se corta la petición.
+		MaxHeaderBytes: 16 << 10,
+	}
 }
 
 func (s *Server) Start(port int) error {
@@ -287,14 +917,24 @@ func (s *Server) Start(port int) error {
 		}
 	}
 
-	s.httpServer = &http.Server{
-		Handler: s.WebHandler(),
-		// Solo se limita la lectura de cabeceras y el tiempo ocioso. Ni
-		// ReadTimeout ni WriteTimeout: cortarían los WebSocket, que son
-		// conexiones largas por definición.
-		ReadHeaderTimeout: 10 * time.Second,
-		IdleTimeout:       120 * time.Second,
+	// Aviso de exposición (SEC-05): se comprueba DESPUÉS del fallback para
+	// reflejar la dirección que realmente quedó escuchando. Si no es de
+	// loopback, el panel es alcanzable desde fuera de este equipo y el
+	// tráfico (token, credenciales, contraseña 2FA) viaja en claro.
+	hostEfectivo := host
+	if tcp, ok := listener.Addr().(*net.TCPAddr); ok && tcp.IP != nil {
+		hostEfectivo = tcp.IP.String()
 	}
+	if !config.EsLoopback(hostEfectivo) {
+		logbus.Warn(logbus.CatServer, i18n.T("server.exposedWithoutTLS", hostEfectivo, port), "")
+	}
+
+	// Techo de conexiones simultáneas (SEC-02): por encima de
+	// maxConexionesSimultaneas, Accept espera a que se libere una entrada en
+	// vez de seguir creando goroutines y búferes sin límite.
+	listener = netutil.LimitListener(listener, maxConexionesSimultaneas)
+
+	s.httpServer = nuevoHTTPServer(s.WebHandler())
 
 	// Tarea de refresco y broadcast periódico debounced
 	go s.periodicBroadcastLoop()
@@ -341,8 +981,8 @@ func (s *Server) Stop() {
 	}
 }
 
-// origenPermitido decide si una petición que llega con cabecera Origin puede
-// tocar la API. Son dos casos:
+// isOriginAllowed decide si una petición que llega con cabecera Origin puede
+// tocar la API. Son estos los casos que se admiten:
 //
 //  1. El panel se sirve desde la misma dirección y puerto que la API. Esto es
 //     lo normal, y cubre el acceso remoto entero —el móvil entrando por
@@ -350,15 +990,20 @@ func (s *Server) Stop() {
 //     enumerar direcciones de antemano.
 //
 //  2. El panel corre en este mismo equipo con otra dirección: la ventana de
-//     Wails (wails.localhost), un navegador local, o el servidor de desarrollo
-//     de Vite, que usa otro puerto.
+//     Wails (wails.localhost), o el servidor de desarrollo de Vite, que usa
+//     otro puerto.
 //
 // Antes esto era una lista fija de nombres (localhost, 127.0.0.1 y el host
-// configurado). Como la dirección de escucha por defecto es 0.0.0.0, desde
-// cualquier IP real quedaban fuera los dos: el navegador manda
-// «Origin: http://192.168.1.40:8000», no coincidía con nada, y el WebSocket se
-// rechazaba con un 403. El panel cargaba pero no recibía estado nunca y se
-// quedaba reintentando la conexión cada dos segundos.
+// configurado) y después una comprobación genérica de «equipo local» que
+// admitía CUALQUIER puerto de loopback: cualquier proceso local sirviendo
+// una página en :9999 obtenía CORS de lectura sobre los endpoints públicos
+// con PII. También reflejaba r.Host como si fuese «mismo origen» sin que
+// nadie hubiese validado antes ese Host (DNS rebinding). Ambos agujeros
+// quedan cerrados aquí y en hostValidationMiddleware.
+//
+// Las peticiones sin cabecera Origin (el CLI `tgdown <url>`, curl) no llegan
+// a entrar en esta función: vacío significa «no es una petición de
+// navegador» y lo único que se omite es el CORS de siempre.
 func isOriginAllowed(origin string, r *http.Request) bool {
 	if strings.TrimSpace(origin) == "" {
 		return false
@@ -371,28 +1016,47 @@ func isOriginAllowed(origin string, r *http.Request) bool {
 		return false
 	}
 
-	// Mismo origen: el panel y la API entraron por la misma puerta.
+	// Mismo origen: el panel y la API entraron por la misma puerta. Esto solo
+	// es seguro porque el middleware de validación del Host corre ANTES en la
+	// cadena (securityHeadersMiddleware(hostValidationMiddleware(...)), en
+	// Handler() y WebHandler()) y ya ha descartado con 421 cualquier r.Host
+	// que no nombre a este servidor: sin esa garantía, un Host reescrito por
+	// DNS rebinding haría que «mismo origen» cubriese un dominio ajeno.
 	if r != nil && r.Host != "" && strings.EqualFold(parsed.Host, r.Host) {
 		return true
 	}
 
-	return isLocalHost(parsed.Host)
-}
-
-// isLocalHost indica si el host de una URL apunta a esta misma máquina.
-func isLocalHost(hostPort string) bool {
-	host := hostPort
-	if h, _, err := net.SplitHostPort(hostPort); err == nil {
-		host = h
+	originHost := hostWithoutPort(parsed.Host)
+	originPort := ""
+	if _, port, splitErr := net.SplitHostPort(parsed.Host); splitErr == nil {
+		originPort = port
 	}
-	host = strings.ToLower(strings.Trim(host, "[]"))
 
-	if host == "localhost" || host == "wails.localhost" || strings.HasSuffix(host, ".wails.localhost") {
+	// wails.localhost (con cualquier puerto): el asset server de Wails sirve
+	// el panel con un puerto dinámico, así que su Host nunca coincidirá con
+	// el del servidor; y la ventana de escritorio conecta el WebSocket
+	// directamente a ws://127.0.0.1:8000 con Origin http://wails.localhost:
+	// <puerto> (App.vue:862-865). Sin esta rama, la ventana se quedaría sin
+	// estado en el panel de escritorio.
+	if originHost == "wails.localhost" || strings.HasSuffix(originHost, ".wails.localhost") {
 		return true
 	}
-	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
-		return true
+
+	// Loopback con puerto: solo el del propio servidor (config en vivo) o el
+	// 8080 del servidor de desarrollo de Vite (dashboard/vite.config.js:40).
+	// El proxy de Vite reescribe el Host a 127.0.0.1:<puerto del backend>
+	// (changeOrigin), pero el Origin de la página sigue siendo
+	// localhost:8080, así que sin admitir ese puerto el panel se rompería en
+	// desarrollo. Puerto ausente u otro distinto → no se admite: era el
+	// agujero de «cualquier puerto de loopback».
+	if originHost == "localhost" || originHost == "127.0.0.1" || originHost == "::1" {
+		serverPort := strconv.Itoa(config.GetServerPort())
+		return originPort != "" && (originPort == serverPort || originPort == strconv.Itoa(viteDevPort))
 	}
+
+	// El resto de orígenes (IP de LAN, Tailscale, nombres de dominio) solo
+	// se admiten por la vía de mismo origen de arriba; aquí no se reflejan
+	// jamás.
 	return false
 }
 
@@ -422,6 +1086,10 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !s.checkAuth(r) {
+			// Cada rechazo deja constancia con el origen, con supresión de
+			// inundación: sin esto, la fuerza bruta del token era invisible
+			// en el panel de logs (SEC-32).
+			s.registrarRechazoAuth(r)
 			s.errorResponse(w, http.StatusUnauthorized, i18n.T("server.invalidToken"))
 			return
 		}
@@ -429,9 +1097,60 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// registrarRechazoAuth anota en el registro un 401 con el origen de la
+// petición (SEC-32): la fuerza bruta del token no dejaba rastro alguno.
+//
+// La supresión de inundación admite como mucho un aviso por origen y minuto,
+// reutilizando rateWindow con maxAttempts=1. Las ventanas caducadas se purgan
+// en cada llamada, así que el mapa no crece sin límite aunque cada petición
+// venga de un origen distinto.
+//
+// Debe llamarse sin s.mu tomado.
+func (s *Server) registrarRechazoAuth(r *http.Request) {
+	origin := requestOrigin(r)
+	ahora := time.Now()
+
+	s.mu.Lock()
+	if s.authLogByOrigin == nil {
+		s.authLogByOrigin = make(map[string]rateWindow)
+	}
+	// Se purgan las ventanas caducadas para que el mapa no crezca sin límite.
+	for k, w := range s.authLogByOrigin {
+		if w.start.IsZero() || ahora.Sub(w.start) >= rateWindowDuration {
+			delete(s.authLogByOrigin, k)
+		}
+	}
+	w := s.authLogByOrigin[origin]
+	// maxAttempts=1: dentro de la ventana solo se registra la primera vez.
+	permitido, _ := w.add(ahora, 1)
+	s.authLogByOrigin[origin] = w
+	s.mu.Unlock()
+
+	if !permitido {
+		// Este origen ya dejó su aviso en la ventana actual: se silencia aquí
+		// para no inundar el registro con la misma línea una y otra vez.
+		return
+	}
+	logbus.Warn(logbus.CatServer,
+		i18n.T("server.authRejected"),
+		i18n.T("server.requestOriginDetail", origin))
+}
+
 // wsSubprotocol es el subprotocolo que marca una conexión de TelegramDL. El
 // cliente ofrece dos: este y, como segundo, el token.
 const wsSubprotocol = "tgdl-v1"
+
+// wsCloseTokenRotated es el código de cierre de aplicación (rango 4000-4999,
+// reservado a la aplicación por RFC 6455) con el que se desconecta a los
+// paneles conectados cuando rota el token de acceso (SEC-35): el navegador
+// lo entrega como error de la aplicación, y eso distingue «vuelve a
+// autenticarte» de una caída de red genérica.
+const wsCloseTokenRotated = 4401
+
+// wsCloseTokenRotatedMsg es el motivo corto en ASCII del frame de cierre
+// anterior (máximo 123 bytes por RFC 6455). Solo describe el motivo: el valor
+// del token jamás viaja en un frame de cierre (SEC-25).
+const wsCloseTokenRotatedMsg = "token rotated"
 
 // subprotocolToken saca el token de la cabecera Sec-WebSocket-Protocol.
 func subprotocolToken(r *http.Request) string {
@@ -506,7 +1225,8 @@ func (s *Server) APIToken() string {
 
 // RegenerateToken invalida el token anterior y genera uno nuevo. Cualquier
 // dispositivo remoto que estuviera usando el token viejo deberá
-// reconfigurarse con el nuevo valor.
+// reconfigurarse con el nuevo valor, y los paneles ya conectados por
+// WebSocket se desconectan para volver a autenticarse (SEC-35).
 func (s *Server) RegenerateToken() string {
 	tok, err := config.GenerateToken()
 	if err != nil {
@@ -514,12 +1234,46 @@ func (s *Server) RegenerateToken() string {
 	}
 	s.mu.Lock()
 	s.apiToken = tok
+	// SEC-35: el snapshot de los clientes WS conectados se toma DENTRO de la
+	// misma adquisición que rota el token: es el único instante en que el
+	// mapa y s.apiToken son coherentes entre sí.
+	clients := make([]*wsClient, 0, len(s.wsClients))
+	for c := range s.wsClients {
+		clients = append(clients, c)
+	}
 	s.mu.Unlock()
 	if s.storage != nil {
 		if err := s.storage.SaveAPIToken(tok); err != nil {
 			log.Printf("[SERVER] %s", i18n.T("server.saveTokenError", err))
 		}
 	}
+
+	// SEC-35: el cierre de cada WebSocket se hace FUERA de s.mu. Nada de
+	// syscalls de red (WriteControl ni Close) con el candado global tomado:
+	// una escritura retenida en un socket dejaría parada toda la API (misma
+	// razón por la que este método ya libera el candado antes de SaveAPIToken).
+	// Tampoco hace falta c.mu: gorilla documenta que WriteControl y Close son
+	// seguros concurrentes con las escrituras normales, así que no hay
+	// inversión de candados con writeJSON.
+	for _, c := range clients {
+		// Cierre con código de aplicación 4401 (rango 4000-4999): el panel
+		// distingue «vuelve a autenticarte con el token nuevo» de una caída
+		// de red genérica. El error se descarta a propósito (best-effort): si
+		// el cliente ya se cayó por su cuenta no queda nada que avisar, y su
+		// bucle de lectura morirá igualmente.
+		_ = c.conn.WriteControl(websocket.CloseMessage,
+			websocket.FormatCloseMessage(wsCloseTokenRotated, wsCloseTokenRotatedMsg),
+			time.Now().Add(time.Second))
+		c.close()
+	}
+	// El mapa NO se borra aquí: lo hace el defer de handleWebSocket cuando su
+	// bucle de lectura muera por el cierre de arriba. Borrarlo también desde
+	// esta goruta solo añadiría un segundo escritor sobre s.wsClients sin
+	// aportar nada (y hay que dejar que ese defer siga siendo el único
+	// dueño del retiro, para que nadie lo "optimice" y termine con un
+	// cliente vivo sin registro).
+	logbus.Info(logbus.CatServer,
+		i18n.T("server.tokenRotated", len(clients)), "")
 	return tok
 }
 
@@ -653,6 +1407,15 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// Techo de clientes (SEC-16): se comprueba ANTES del upgrade para que el
+	// navegador vea un 503 de verdad. Respondido esto, se sale sin tocar el
+	// handshake: si se comprobara después, la conexión ya habría quedado
+	// abierta y el cliente solo vería un WebSocket que se cae en el acto.
+	if s.websocketLimiteSuperado() {
+		http.Error(w, i18n.T("server.wsTooManyClients"), http.StatusServiceUnavailable)
+		return
+	}
+
 	// Si el cliente ofreció subprotocolos hay que devolverle uno, o el navegador
 	// rechaza la conexión. Se responde siempre el nuestro, nunca el token.
 	var headers http.Header
@@ -663,6 +1426,19 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := s.upgrader.Upgrade(w, r, headers)
 	if err != nil {
 		return
+	}
+
+	// Handshake hecho: solo entra lo razonable. El panel no manda mensajes de
+	// más de 4 KiB, así que cualquier tamaño mayor es un ataque (SEC-16).
+	conn.SetReadLimit(maxLecturaWS)
+
+	// El servidor aplica ReadTimeout (30 s) a la conexión que acaba de ser
+	// secuestrada para el WebSocket, y esa fecha límite sigue impuesta en el
+	// socket subyacente: sin limpiarla, el panel moriría cada 30 s y entraría
+	// en bucle de reconexión. Se borra para que la conexión larga solo la rija
+	// su propia actividad.
+	if err := conn.UnderlyingConn().SetDeadline(time.Time{}); err != nil {
+		log.Printf("[SERVER] %s", i18n.T("server.wsDeadlineError", err))
 	}
 
 	client := &wsClient{conn: conn}
@@ -688,6 +1464,15 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+}
+
+// websocketLimiteSuperado indica que ya hay maxClientesWS paneles conectados.
+// Se lee bajo s.mu para que dos handshakes simultáneos no superen el techo
+// entre los dos.
+func (s *Server) websocketLimiteSuperado() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.wsClients) >= maxClientesWS
 }
 
 // periodicBroadcastLoop refresca el estado que ve el panel.
@@ -850,11 +1635,18 @@ func (s *Server) buildStateSnapshot() map[string]any {
 	// descargas de sesiones anteriores tras un reinicio.
 	sessionStats := s.downloader.GetSessionStats()
 
+	// Este snapshot viaja por el WebSocket y por el binding de Wails a todos
+	// los clientes conectados, así que el token del bot no puede salir en
+	// claro (SEC-25): se enmascara en una copia local. s.config conserva el
+	// token real, que es el que sigue usando el notificador para enviar.
+	maskedCfg := cfg
+	maskedCfg.NotificationBotToken = notifier.MaskToken(cfg.NotificationBotToken)
+
 	snap := map[string]any{
 		"type":         "state",
 		"downloads":    downloads,
 		"listener":     listenerItems,
-		"settings":     cfg,
+		"settings":     maskedCfg,
 		"active_count": activeCount,
 		"queued_count": queuedCount,
 		"speed_total":  config.FormatBytes(float64(speedBytes)) + "/s",
@@ -1236,9 +2028,76 @@ func (s *Server) handleRegenerateToken(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, http.StatusOK, map[string]string{"token": newToken})
 }
 
+// handleAuthLogout cierra la sesión de Telegram y, solo si se pide de forma
+// explícita y autenticada, gira el token de acceso (SEC-27): tras «cerrar
+// sesión» en Ajustes, cualquier cliente que aún conservara el token (otro
+// dispositivo, una pestaña olvidada, un atacante que lo hubiera capturado)
+// seguía con acceso completo al panel.
+//
+// El giro SOLO ocurre cuando se cumplen las tres condiciones siguientes:
+//
+// (a) el método es POST y el resto de guardias actuales dejan pasar la
+// petición: la puerta de setup ya exige POST (responde 405 antes, ver
+// setupSinToken) y el camino autenticado ya pasó por authMiddleware. No se
+// añade ningún 405 nuevo: los códigos de respuesta actuales quedan intactos;
+//
+// (b) clientMgr.Logout ha tenido éxito: si la sesión de Telegram no se
+// destruyó, no se gira el token, porque el cierre no se completó y el
+// usuario legítimo se quedaría sin acceso con la sesión todavía viva;
+//
+// (c) el cuerpo trae revoke_token == true Y checkAuth(r) es verdadero: quien
+// pide la revocación debe traer un token válido. Sin token (la puerta de
+// setup también alcanza este handler) el flag se ignora: si no, un atacante
+// sin token podría invalidar el token legítimo (DoS de rotación no
+// autenticada).
+//
+// Por qué un flag opt-in y no girar en todo logout: /api/auth/logout también
+// lo llama AuthWizard para cancelar o retroceder el flujo de login (p. ej.
+// «Atrás» desde 2FA); si se rotase en todo logout, esas cancelaciones
+// matarían el token del cliente web y lo expulsarían a mitad de la
+// configuración.
 func (s *Server) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
-	_ = s.clientMgr.Logout(r.Context())
+	// SEC-27: flag revoke_token leído con tolerancia y SOLO en POST (condición
+	// (a)): cuerpo ausente, vacío o malformado → false, sin error, porque las
+	// llamadas antiguas —AuthWizard y demás— van sin cuerpo y deben seguir
+	// comportándose igual que siempre. El techo del cuerpo ya lo pone
+	// limiteDeCuerpo (maxCuerpoAPI) en la cadena de /api/, así que aquí no se
+	// duplica el límite.
+	revokeToken := false
+	if r.Method == http.MethodPost && r.Body != nil {
+		var body struct {
+			RevokeToken bool `json:"revoke_token"`
+		}
+		// Si Decode falla (vacío → io.EOF o JSON malformado) el flag se queda
+		// a false a propósito: el error se conoce y se ignora aquí mismo para
+		// no romper el logout de los llamantes antiguos.
+		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+			revokeToken = body.RevokeToken
+		}
+	}
+
+	// SEC-24: el error ya no se descarta en silencio. Si Logout falla y aquí
+	// se respondiera 200, el usuario vería «sesión cerrada» con la sesión de
+	// Telegram todavía viva. Es también la condición (b) del giro: sin sesión
+	// destruida no se rota el token.
+	if err := s.clientMgr.Logout(r.Context()); err != nil {
+		logbus.Error(logbus.CatTelegram, i18n.T("server.logoutFailed"), err.Error())
+		s.jsonResponse(w, http.StatusBadGateway, map[string]string{
+			"status": "error",
+			"detail": i18n.T("server.logoutFailedDetail", err.Error()),
+		})
+		return
+	}
 	logbus.Warn(logbus.CatTelegram, i18n.T("telegram.loggedOut"), "")
+
+	// Condiciones (b) cumplida (se llegó hasta aquí) y (c): giro solo con flag
+	// explícito y petición autenticada. RegenerateToken (SEC-35) desconecta de
+	// paso todos los WebSocket con 4401 y loguea server.tokenRotated; el token
+	// nuevo NUNCA se incluye en la respuesta (SEC-25).
+	if revokeToken && s.checkAuth(r) {
+		s.RegenerateToken()
+	}
+
 	s.jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -1247,7 +2106,31 @@ func (s *Server) handleGetDownloads(w http.ResponseWriter, _ *http.Request) {
 	s.jsonResponse(w, http.StatusOK, s.downloader.GetDownloads())
 }
 
+// ErrQueueFull marca el rechazo de EnqueueURL cuando la cola de descargas ya
+// está en su techo (SEC-21). Los handlers HTTP lo detectan con errors.Is para
+// responder 429 con Retry-After en vez del 400 genérico.
+var ErrQueueFull = errors.New("download queue is full")
+
+// retryAfterQueueFull son los segundos de la cabecera Retry-After cuando la
+// cola está llena. Un minuto da tiempo a que la cola avance de verdad; un valor
+// mucho menor invitaría a reintentos casi inmediatos que la volverían a llenar
+// al instante.
+const retryAfterQueueFull = 60
+
+// respondQueueFull responde 429 a una cola llena con el mismo cuerpo que el
+// 429 de cuota IPC: status "rate_limited", detalle traducido y retry_after.
+func (s *Server) respondQueueFull(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", strconv.Itoa(retryAfterQueueFull))
+	s.jsonResponse(w, http.StatusTooManyRequests, map[string]any{
+		"status":      "rate_limited",
+		"detail":      i18n.T("server.rateLimitedDetail", retryAfterQueueFull),
+		"retry_after": retryAfterQueueFull,
+	})
+}
+
 // EnqueueURL procesa una URL de Telegram y añade los elementos correspondientes a la cola.
+// Si la cola está en su techo, corta el rango y devuelve un error que envuelve
+// ErrQueueFull: las tareas ya encoladas se quedan encoladas (SEC-21).
 func (s *Server) EnqueueURL(ctx context.Context, rawURL string) error {
 	clean := strings.TrimSpace(rawURL)
 	if clean == "" {
@@ -1282,7 +2165,14 @@ func (s *Server) EnqueueURL(ctx context.Context, rawURL string) error {
 			Source:    "manual",
 			FileName:  fmt.Sprintf("mensaje_%d", msgID),
 		}
-		s.downloader.QueueItem(item)
+		// "" = rechazado por techo de cola (SEC-21). Se corta el rango aquí:
+		// el caller decide la respuesta HTTP. El broadcast va antes de salir
+		// para que las tareas que sí entraron se vean en el panel sin esperar
+		// al siguiente polling.
+		if s.downloader.QueueItem(item) == "" {
+			s.broadcastState()
+			return fmt.Errorf("queue is full while enqueueing %s: %w", clean, ErrQueueFull)
+		}
 	}
 	s.broadcastState()
 
@@ -1300,6 +2190,12 @@ func (s *Server) handleStartDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.EnqueueURL(r.Context(), body.URL); err != nil {
+		// SEC-21: cola llena → 429 con Retry-After; cualquier otro error sigue
+		// respondiendo 400 como hasta ahora.
+		if errors.Is(err, ErrQueueFull) {
+			s.respondQueueFull(w)
+			return
+		}
 		s.errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -1310,12 +2206,28 @@ func (s *Server) handleStartDownload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// decodeOptionalBody decodifica el cuerpo JSON en los handlers que hasta ahora
+// descartaban el error con `_ =`. SEC-38: el fallo deja de ser silencioso,
+// pero un cuerpo vacío (io.EOF / io.ErrUnexpectedEOF) sigue sin registrarse:
+// en todos estos endpoints el body es opcional o sus campos se validan después
+// y se responde 422/404, así que llenar el log de EOFs por llamadas que van
+// sin cuerpo no aportaría nada. Solo se loguea la clase de error, nunca el
+// cuerpo, porque puede contener datos sensibles. Las respuestas no cambian:
+// quien hace decode ciego ya valida o falla igual que antes.
+func decodeOptionalBody(r *http.Request, dst any, handler string) {
+	err := json.NewDecoder(r.Body).Decode(dst)
+	if err == nil || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return
+	}
+	log.Printf("[SERVER] %s: invalid request body: %v", handler, err)
+}
+
 func (s *Server) handleCancelDownload(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		ID     string `json:"id"`
 		ItemID string `json:"item_id"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	decodeOptionalBody(r, &body, "handleCancelDownload")
 	id := strings.TrimSpace(body.ID)
 	if id == "" {
 		id = strings.TrimSpace(body.ItemID)
@@ -1334,7 +2246,7 @@ func (s *Server) handlePauseDownload(w http.ResponseWriter, r *http.Request) {
 		ID     string `json:"id"`
 		ItemID string `json:"item_id"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	decodeOptionalBody(r, &body, "handlePauseDownload")
 	id := strings.TrimSpace(body.ID)
 	if id == "" {
 		id = strings.TrimSpace(body.ItemID)
@@ -1356,7 +2268,7 @@ func (s *Server) handleResumeDownload(w http.ResponseWriter, r *http.Request) {
 		ID     string `json:"id"`
 		ItemID string `json:"item_id"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	decodeOptionalBody(r, &body, "handleResumeDownload")
 	id := strings.TrimSpace(body.ID)
 	if id == "" {
 		id = strings.TrimSpace(body.ItemID)
@@ -1393,7 +2305,7 @@ func (s *Server) handleRetryDownload(w http.ResponseWriter, r *http.Request) {
 		ID     string `json:"id"`
 		ItemID string `json:"item_id"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	decodeOptionalBody(r, &body, "handleRetryDownload")
 	id := strings.TrimSpace(body.ID)
 	if id == "" {
 		id = strings.TrimSpace(body.ItemID)
@@ -1467,7 +2379,7 @@ func (s *Server) handleDeleteDownload(w http.ResponseWriter, r *http.Request) {
 		ItemID     string `json:"item_id"`
 		DeleteFile *bool  `json:"delete_file"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	decodeOptionalBody(r, &body, "handleDeleteDownload")
 	id := strings.TrimSpace(body.ID)
 	if id == "" {
 		id = strings.TrimSpace(body.ItemID)
@@ -1505,7 +2417,9 @@ func (s *Server) handleOpenDownload(w http.ResponseWriter, r *http.Request) {
 		ID     string `json:"id"`
 		ItemID string `json:"item_id"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	// Con el body vacío o ilegible id queda en "", GetItem("") falla y el
+	// handler responde 404: no hay ninguna salida silenciosa.
+	decodeOptionalBody(r, &body, "handleOpenDownload")
 	id := strings.TrimSpace(body.ID)
 	if id == "" {
 		id = strings.TrimSpace(body.ItemID)
@@ -1712,9 +2626,15 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		s.onConfigChange(cfg)
 	}
 
+	// Solo se enmascara la copia que se serializa en la respuesta: ni s.config
+	// ni el cfg que se acaba de guardar en SQLite se tocan (SEC-25). Si el
+	// panel recibe el token enmascarado y lo reenvía al guardar, el fallback
+	// de notification_bot_token (strings.Contains(sVal, "*")) conserva el real.
+	maskedCfg := cfg
+	maskedCfg.NotificationBotToken = notifier.MaskToken(cfg.NotificationBotToken)
 	s.jsonResponse(w, http.StatusOK, map[string]any{
 		"status":   "ok",
-		"settings": cfg,
+		"settings": maskedCfg,
 	})
 }
 
@@ -1726,9 +2646,9 @@ func (s *Server) handleNotificationTest(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var body struct {
-		Token   string  `json:"token"`
-		ChatID  int64   `json:"chat_id"`
-		TopicID *int64  `json:"topic_id,omitempty"`
+		Token   string `json:"token"`
+		ChatID  int64  `json:"chat_id"`
+		TopicID *int64 `json:"topic_id,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		s.errorResponse(w, http.StatusUnprocessableEntity, i18n.T("server.invalidData"))
@@ -1800,7 +2720,12 @@ func (s *Server) handleNotificationDetect(w http.ResponseWriter, r *http.Request
 	n := notifier.NewNotifier(token, 0, nil)
 	chatID, chatName, err := n.DetectChat(context.Background())
 	if err != nil {
-		s.errorResponse(w, http.StatusBadRequest, err.Error())
+		// SEC-10: DetectChat ya entrega el error con el token redactado
+		// (notifier.RedactError); se vuelve a aplicar aquí con el token en
+		// mano como defensa en profundidad por si el error llega por otro
+		// camino. Si el texto ya está limpio, RedactError devuelve el error
+		// original sin tocarlo.
+		s.errorResponse(w, http.StatusBadRequest, notifier.RedactError(err, token).Error())
 		return
 	}
 
@@ -1852,9 +2777,13 @@ func (s *Server) handleSpeedLimit(w http.ResponseWriter, r *http.Request) {
 	s.downloader.UpdateConfig(cfg)
 	s.broadcastState()
 
+	// Igual que en handleSettings: el token real ya está en s.config y en
+	// SQLite; solo se enmascara la copia que sale en la respuesta (SEC-25).
+	maskedCfg := cfg
+	maskedCfg.NotificationBotToken = notifier.MaskToken(cfg.NotificationBotToken)
 	s.jsonResponse(w, http.StatusOK, map[string]any{
 		"status":   "ok",
-		"settings": cfg,
+		"settings": maskedCfg,
 	})
 }
 
@@ -1988,7 +2917,7 @@ func (s *Server) handleListenerDownload(w http.ResponseWriter, r *http.Request) 
 		ID     string `json:"id"`
 		ItemID string `json:"item_id"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	decodeOptionalBody(r, &body, "handleListenerDownload")
 	id := strings.TrimSpace(body.ID)
 	if id == "" {
 		id = strings.TrimSpace(body.ItemID)
@@ -2034,7 +2963,11 @@ func (s *Server) handleListenerDeleteItem(w http.ResponseWriter, r *http.Request
 		ID     string `json:"id"`
 		ItemID string `json:"item_id"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	// SEC-38: único handler de los ocho que NO falla con el body vacío: si id
+	// queda en "" (ni body ni query), se responde 200 sin borrar nada. Se deja
+	// constancia porque es un silencio heredado, pero no se cambia la
+	// respuesta: el cliente de la bandeja del listener depende de ese 200.
+	decodeOptionalBody(r, &body, "handleListenerDeleteItem")
 	id := strings.TrimSpace(body.ID)
 	if id == "" {
 		id = strings.TrimSpace(body.ItemID)
@@ -2072,11 +3005,27 @@ func (s *Server) handleListenerUpdateFilename(w http.ResponseWriter, r *http.Req
 	}
 
 	id := strings.TrimSpace(body.ID)
-	newFileName := strings.TrimSpace(body.FileName)
-	if id == "" || newFileName == "" {
+	// La vacíez se comprueba sobre el valor crudo y ANTES de sanitizar:
+	// downloader.SanitizeFileName devuelve "archivo" tanto para cadenas vacías
+	// como para cadenas de solo caracteres inválidos, así que si se sanitizara
+	// primero, rawFileName ya no sería nunca "" y se perdería el 400 actual
+	// para un body sin nombre de archivo. Se conserva, por tanto, el orden
+	// TrimSpace → comprobación de vacío → SanitizeFileName.
+	rawFileName := strings.TrimSpace(body.FileName)
+	if id == "" || rawFileName == "" {
 		s.errorResponse(w, http.StatusBadRequest, i18n.T("server.idAndFileNameRequired"))
 		return
 	}
+
+	// Defensa en profundidad (SEC-29): el nombre viene del cliente y se persiste
+	// tal cual en SQLite, donde después se registra en log, de modo que unos
+	// CR/LF en el valor abrirían una línea nueva falsa (inyección de log). El
+	// sink de ruta ya aplica downloader.SanitizeFileName en
+	// pkg/downloader/reserve.go al reservar el destino; aquí se aplica la misma
+	// limpieza en la entrada para que el valor guardado tampoco lo contenga.
+	// SanitizeFileName nunca devuelve cadena vacía (usa "archivo"), así que no
+	// hace falta revalidar.
+	newFileName := downloader.SanitizeFileName(rawFileName)
 
 	// Actualizar el nombre del archivo en el listener
 	if err := s.listener.UpdateItemFileName(id, newFileName); err != nil {
@@ -2241,6 +3190,7 @@ func (s *Server) SetFolderPicker(fn func() (string, error)) {
 	s.folderPicker = fn
 }
 
+
 // SetLanguageChangeHandler registra la función que se ejecuta cuando el idioma cambia en ajustes.
 func (s *Server) SetLanguageChangeHandler(fn func()) {
 	s.mu.Lock()
@@ -2253,6 +3203,18 @@ func (s *Server) SetConfigChangeHandler(fn func(config.Config)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onConfigChange = fn
+}
+
+// GetConfig devuelve una copia por valor de la configuración viva del
+// servidor. Server.config es la única fuente de verdad: la actualizan los
+// handlers de guardado (handleSettings, handleSpeedLimit, handleListenerSettings)
+// bajo candado, así que quien necesite leerla de fuera —por ejemplo el diálogo
+// nativo de carpetas de la app— debe preguntar aquí en lugar de conservar su
+// propia copia, que quedaría congelada en el valor inicial de la sesión.
+func (s *Server) GetConfig() config.Config {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.config
 }
 
 // isLocalRequest indica si la petición viene del propio equipo. Exige las dos
@@ -2574,13 +3536,49 @@ func (s *Server) handleExit(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-// handleIPCDownload receives download URLs from a secondary instance.
-// This endpoint is public (no auth) because it's called from the command line
-// when the user tries to open a second instance with a URL argument.
+// handleIPCDownload recibe URLs de descarga desde una segunda instancia del
+// programa (línea de comandos). No exige token porque el CLI no lo tiene, pero
+// sí que la petición sea loopback con la cabecera propia (X-TGDL-Request) o
+// que traiga un token válido: así se cierra el encolado ilimitado desde la
+// LAN, un túnel o una página web (SEC-03).
 func (s *Server) handleIPCDownload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		s.errorResponse(w, http.StatusMethodNotAllowed, i18n.T("server.methodNotAllowed"))
 		return
+	}
+
+	// Sin token válido solo pasa el CLI del propio equipo, con la misma forma
+	// que manda main.go. Con token, todo el resto del handler funciona como
+	// siempre.
+	if !s.checkAuth(r) {
+		if !isLocalRequest(r) {
+			logbus.Warn(logbus.CatServer,
+				i18n.T("server.ipcRemoteRejected"),
+				i18n.T("server.requestOriginDetail", requestOrigin(r)))
+			s.errorResponse(w, http.StatusUnauthorized, i18n.T("server.ipcLocalOnly"))
+			return
+		}
+		if r.Header.Get(ownRequestHeader) == "" {
+			s.errorResponse(w, http.StatusForbidden, i18n.T("server.requestForbidden"))
+			return
+		}
+		if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			s.errorResponse(w, http.StatusUnsupportedMediaType, i18n.T("server.requestUnsupportedType"))
+			return
+		}
+		// 30 intentos por minuto y origen: sin esto, repetir la petición
+		// bastaría para llenar la cola sin límite (SEC-03).
+		origin := requestOrigin(r)
+		permitido, retry := s.consumeIPCQuota(origin)
+		if !permitido {
+			w.Header().Set("Retry-After", strconv.Itoa(retry))
+			s.jsonResponse(w, http.StatusTooManyRequests, map[string]any{
+				"status":      "rate_limited",
+				"detail":      i18n.T("server.rateLimitedDetail", retry),
+				"retry_after": retry,
+			})
+			return
+		}
 	}
 
 	var body struct {
@@ -2592,6 +3590,12 @@ func (s *Server) handleIPCDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.EnqueueURL(r.Context(), body.URL); err != nil {
+		// SEC-21: la cola llena también se responde aquí con 429 + Retry-After;
+		// el resto de errores sigue con el 400 de siempre.
+		if errors.Is(err, ErrQueueFull) {
+			s.respondQueueFull(w)
+			return
+		}
 		s.errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}

@@ -25,6 +25,7 @@ var messagesEN = map[string]string{
 	// HTTP server (pkg/server)
 	"server.listening":              "Server listening on %s:%d",
 	"server.startError":             "Could not start the server on port %d",
+	"server.exposedWithoutTLS":      "Panel listening on %s (port %d) without encryption: reachable from the network. The token protects the API, but traffic travels in cleartext. See REMOTE_ACCESS.md to restrict it or use Tailscale.",
 	"server.saveTokenError":         "error saving API token to the DB: %v",
 	"server.jsonError":              "error encoding JSON response: %v",
 	"server.saveCredsError":         "error saving credentials to the DB: %v",
@@ -34,6 +35,7 @@ var messagesEN = map[string]string{
 	"server.tokenSendError":         "Could not send the token to Telegram",
 	"server.tokenSent":              "Access token sent to your Telegram Saved Messages",
 	"server.tokenSentDetail":        "Requested from %s",
+	"server.tokenRotated":           "Access token rotated (WebSocket clients disconnected: %d)",
 	"server.folderRejected":         "Downloads folder rejected",
 	"server.shellOpenError":         "ShellExecuteW could not open %s: %v",
 	"server.ipcDownloadReceived":    "URL received from command line: %s",
@@ -66,6 +68,24 @@ var messagesEN = map[string]string{
 	"server.idAndFileNameRequired": "ID and file_name required",
 	"server.chatIdRequiredInPath":   "chat_id required in path",
 	"app.windowNotReady":            "Application window is not ready",
+
+	// Public surface and setup gate (SEC-01/03/04/09/24)
+	"server.requestMethodNotAllowed": "Method not allowed",
+	"server.requestUnsupportedType":  "Expected Content-Type: application/json",
+	"server.requestForbidden":        "Invalid request",
+	"server.requestOriginDetail":     "Origin: %s",
+	"server.rateLimitedDetail":       "Wait %d seconds before trying again.",
+	"server.setupRateLimited":        "Telegram setup gate rate-limited: too many attempts without a token",
+	"server.setupWithoutToken":       "Tokenless access to the Telegram setup gate",
+	"server.ipcLocalOnly":            "This download is only accepted from this machine",
+	"server.ipcRemoteRejected":       "IPC download rejected: the origin is not this machine",
+	"server.logoutFailed":            "Could not close the Telegram session",
+	"server.logoutFailedDetail":      "Could not close the Telegram session: %s",
+
+	// Network and WebSocket limits (SEC-16/SEC-32)
+	"server.authRejected":     "Request rejected: missing or invalid access token",
+	"server.wsTooManyClients": "Too many dashboard clients connected at once; try again in a few seconds",
+	"server.wsDeadlineError":  "Could not clear the WebSocket deadline: %v",
 
 	// Telegram client (pkg/telegram and part of pkg/server)
 	"downloads.migratingDC":             "Detected migration to DC %d, reconnecting to proper data center...",
@@ -223,7 +243,7 @@ var messagesEN = map[string]string{
 	"downloader.entryKeptFile":       "Entry %s removed without deleting %s: the file belongs to another download",
 
 	// Telegram bot notifications (pkg/notifier)
-	"notifier.sendError":         "error sending notification: %v",
+	"notifier.sendError":          "error sending notification: %v",
 	"notifier.testMessage":        "🚀 <b>TelegramDL</b>\n\n✅ <i>Test notification sent successfully!</i>\nBot is configured and ready to receive alerts.",
 	"notifier.queueComplete":      "📊 <b>Download Summary — TelegramDL</b>\n\n✅ <b>Completed:</b> %d\n❌ <b>Failed:</b> %d",
 	"notifier.queueCompleteError": "\n\n⚠️ <b>Failed items / links:</b>\n%s",

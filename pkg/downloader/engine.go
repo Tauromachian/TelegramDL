@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -71,10 +72,12 @@ type Engine struct {
 	lastProgressTimes  map[string]time.Time
 	persistCh          chan storage.DownloadItem
 	chunkFlushCh       chan string
+	persistClosed      bool
 	pendingChunks      map[string][]int64
 	forceDuplicate     map[string]bool
 	jobsWG             sync.WaitGroup
 	persistWG          sync.WaitGroup
+	loopsWG            sync.WaitGroup
 	stopping           bool
 	cancelledForLimit  map[string]bool
 	jobsInFlight       map[string]bool
@@ -129,8 +132,20 @@ func NewEngine(cm *telegram.ClientManager, st *storage.Storage, cfg config.Confi
 	}
 	eng.activeCond = sync.NewCond(&eng.mu)
 	if st != nil {
-		go eng.persistenceLoop()
-		go eng.chunkFlushLoop()
+		// loopsWG lleva la cuenta de los dos bucles de persistencia para que
+		// Shutdown pueda esperar a que terminen tras cerrar sus canales
+		// (SEC-36): sin esta espera, las dos goroutines quedaban en `range`
+		// para siempre y sus escrituras podían solaparse con el cierre de
+		// SQLite que hace el llamador.
+		eng.loopsWG.Add(2)
+		go func() {
+			defer eng.loopsWG.Done()
+			eng.persistenceLoop()
+		}()
+		go func() {
+			defer eng.loopsWG.Done()
+			eng.chunkFlushLoop()
+		}()
 	}
 
 	RegisterFloodNotifier(func() {
@@ -171,6 +186,12 @@ func NewEngine(cm *telegram.ClientManager, st *storage.Storage, cfg config.Confi
 
 // Shutdown conserva las tareas activas como queued y espera a que terminen
 // los trabajos y las escrituras pendientes antes de cerrar SQLite.
+//
+// Además (SEC-36) cierra persistCh y chunkFlushCh y espera a que sus dos
+// bucles terminen antes de devolver: si no se cierran, persistenceLoop y
+// chunkFlushLoop se quedan en `range` para siempre (dos goroutines que jamás
+// salen) y un volcado tardío podría ejecutarse contra SQLite ya cerrado por el
+// llamador.
 func (e *Engine) Shutdown(ctx context.Context) error {
 	e.mu.Lock()
 	e.stopping = true
@@ -186,15 +207,60 @@ func (e *Engine) Shutdown(ctx context.Context) error {
 	}
 	e.mu.Unlock()
 
-	done := make(chan struct{})
+	// Esperar a los trabajos: son los que encolan progreso, y con ellos vivos
+	// no se puede cerrar nada (harían send a un canal cerrado).
+	jobsDone := make(chan struct{})
 	go func() {
 		e.jobsWG.Wait()
-		e.persistWG.Wait()
-		close(done)
+		close(jobsDone)
 	}()
 	select {
-	case <-done:
+	case <-jobsDone:
 	case <-ctx.Done():
+		// Camino de timeout: quedan trabajos vivos que pueden seguir
+		// llamando a enqueuePersist/requestChunkFlush, así que NO se cierran
+		// los canales (sería un "send on closed channel" que tumbaría el
+		// proceso). Los bucles se quedan abiertos hasta que el proceso termine
+		// y aquí queda constancia de que el cierre no llegó a completarse.
+		log.Printf("[ENGINE] shutdown timed out waiting for jobs: %v", ctx.Err())
+		return ctx.Err()
+	}
+
+	// El cierre va bajo el MISMO candado que protegen los envíos de
+	// enqueuePersist/requestChunkFlush: quien llegue primero, o envía con el
+	// canal aún abierto, o se encuentra persistClosed y no envía. Así ningún
+	// send puede llegar a un canal ya cerrado, ni siquiera desde el servidor
+	// HTTP, que sigue atendiendo peticiones hasta server.Stop (posterior a
+	// este Shutdown). Con el flag levantado en esta misma adquisición del
+	// candado, además, todos los persistWG.Add posibles han ocurrido ANTES de
+	// la espera siguiente: no puede haber un Add concurrente con el Wait. El
+	// flag también hace que un segundo Shutdown no vuelva a cerrar los mismos
+	// canales.
+	e.mu.Lock()
+	if !e.persistClosed {
+		e.persistClosed = true
+		close(e.persistCh)
+		close(e.chunkFlushCh)
+	}
+	e.mu.Unlock()
+
+	// Al cerrar, los ítems ya encolados se drenan antes de que el `range`
+	// termine: esperar a que los dos bucles salgan (y con ellos persistWG,
+	// cuyo contador solo puede bajar ya que no entran Adds nuevos) garantiza
+	// que ninguna escritura siga en vuelo cuando el llamador cierre SQLite.
+	loopsDone := make(chan struct{})
+	go func() {
+		e.loopsWG.Wait()
+		e.persistWG.Wait()
+		close(loopsDone)
+	}()
+	select {
+	case <-loopsDone:
+	case <-ctx.Done():
+		// Los canales ya están cerrados y los bucles siguen drenando: no hay
+		// nada más que hacer sin tirar escrituras a medias, así que se avisa
+		// y se devuelve el error para que el llamador lo registre.
+		log.Printf("[ENGINE] shutdown timed out draining persistence loops: %v", ctx.Err())
 		return ctx.Err()
 	}
 
@@ -229,7 +295,17 @@ func (e *Engine) notifyState(item storage.DownloadItem) {
 
 	for _, l := range listeners {
 		func(listener DownloadStateListener) {
-			defer func() { _ = recover() }()
+			// SEC-38: el pánico se registra ANTES de suprimirlo. Sin esto, un
+			// listener roto dejaba de recibir estados sin dejar rastro alguno
+			// (regla 5: los errores nunca en silencio). log.Printf está
+			// enganchado al bus con logbus.Attach, así que la traza llega a la
+			// vista de logs; Emit sanea los saltos de línea del stack, así que
+			// no puede falsificar nivel ni categoría.
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[ENGINE] panic in state listener: %v\n%s", r, debug.Stack())
+				}
+			}()
 			listener(item)
 		}(l)
 	}
@@ -396,6 +472,88 @@ func (e *Engine) forgetStateOf(id string) {
 	delete(e.cancelledForLimit, id)
 	delete(e.messageCache, id)
 	delete(e.queuedIDs, id)
+}
+
+// maxHistoryItems es el techo del historial: cuántas descargas pueden convivir
+// en e.downloads sin importar su estado. Al encolar por encima del techo se
+// purgan los ítems terminales más antiguos; los activos (queued, downloading,
+// paused y cualquier otro no terminal) jamás se tocan (SEC-21).
+const maxHistoryItems = 1000
+
+// makeHistoryRoom garantiza sitio para un ítem más en e.downloads sin superar
+// maxHistoryItems, purgando los terminales más antiguos si el historial ya está
+// lleno. Se llama SIN e.mu tomado: la purga delega en (*Engine).DeleteDownload,
+// que adquiere ese mismo candado, y con él tomado se produciría un deadlock.
+//
+// La purga es solo de metadatos (mapas en memoria y fila en SQLite): pasa
+// deleteFile=false para no borrar el archivo del usuario en disco.
+func (e *Engine) makeHistoryRoom() {
+	e.mu.RLock()
+	// +1 porque tras purgar se va a insertar un ítem más.
+	excess := len(e.downloads) + 1 - maxHistoryItems
+	if excess <= 0 {
+		e.mu.RUnlock()
+		return
+	}
+	ids := e.collectOldestTerminalLocked(excess)
+	e.mu.RUnlock()
+
+	for _, id := range ids {
+		// Entre soltar el candado y aquí la tarea podría haberse reanudado
+		// (ResumeDownload): solo se purga lo que siga en estado terminal, para
+		// no borrar nunca nada con un job activo.
+		e.mu.RLock()
+		item, ok := e.downloads[id]
+		stillTerminal := ok && isTerminalStatus(item.Status)
+		e.mu.RUnlock()
+		if !stillTerminal {
+			continue
+		}
+		// DeleteDownload hace todo el trabajo pesado ya probado: mapas,
+		// chatMsgMap, olvidarEstadoDe y la fila de SQLite, sin tocar ficheros.
+		// Hoy devuelve siempre nil (sus errores internos ya se registran), pero
+		// se comprueba el retorno por si deja de hacerlo: nada en silencio.
+		if err := e.DeleteDownload(id, false); err != nil {
+			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.deleteDownloadError", err))
+		}
+	}
+}
+
+// collectOldestTerminalLocked elige los IDs de hasta `need` ítems terminales
+// más antiguos (CreatedAt ascendente) sin borrar nada. Debe llamarse con e.mu
+// tomado (basta lectura): el borrado real se hace fuera del candado.
+func (e *Engine) collectOldestTerminalLocked(need int) []string {
+	if need <= 0 {
+		return nil
+	}
+
+	type candidate struct {
+		id        string
+		createdAt float64
+	}
+	terminal := make([]candidate, 0, len(e.downloads))
+	for id, item := range e.downloads {
+		if isTerminalStatus(item.Status) {
+			terminal = append(terminal, candidate{id: id, createdAt: item.CreatedAt})
+		}
+	}
+	sort.Slice(terminal, func(i, j int) bool {
+		if terminal[i].createdAt != terminal[j].createdAt {
+			return terminal[i].createdAt < terminal[j].createdAt
+		}
+		// Desempate por ID: dos ítems con el mismo timestamp tendrían, si no,
+		// un orden indeterminado entre una llamada y la siguiente.
+		return terminal[i].id < terminal[j].id
+	})
+
+	if need > len(terminal) {
+		need = len(terminal)
+	}
+	ids := make([]string, 0, need)
+	for i := 0; i < need; i++ {
+		ids = append(ids, terminal[i].id)
+	}
+	return ids
 }
 
 func (e *Engine) ClearHistory() (int64, error) {

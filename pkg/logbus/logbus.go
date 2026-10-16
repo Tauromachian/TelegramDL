@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -120,11 +121,14 @@ func (b *Bus) OpenFile(dir string) error {
 		return fmt.Errorf("%s", i18n.T("logbus.emptyLogDir"))
 	}
 	logDir := filepath.Join(dir, logDirName)
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
+	// SEC-30: el registro lleva nombres de chats y mensajes de error que el
+	// usuario puede exportar, así que ni el directorio (0700) ni el archivo
+	// (0600) deben ser legibles por otros usuarios de la máquina.
+	if err := os.MkdirAll(logDir, 0o700); err != nil {
 		return err
 	}
 	path := filepath.Join(logDir, logFileName)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}
@@ -185,14 +189,17 @@ func (b *Bus) writeFile(line string) {
 	backup := b.filePath + ".1"
 	_ = os.Remove(backup)
 	if err := os.Rename(b.filePath, backup); err != nil {
-		// Si no se pudo rotar, reabrimos en modo truncado para no crecer sin fin.
-		if f, oerr := os.OpenFile(b.filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644); oerr == nil {
+		// Si no se pudo rotar, reabrimos en modo truncado para no crecer sin
+		// fin. El modo es 0600 por lo mismo que en OpenFile (SEC-30): el
+		// archivo recién creado no debe quedar legible por otros usuarios.
+		if f, oerr := os.OpenFile(b.filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600); oerr == nil {
 			b.file = f
 			b.fileSize = 0
 		}
 		return
 	}
-	if f, oerr := os.OpenFile(b.filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); oerr == nil {
+	// Mismo 0600 que arriba: el archivo rotado se vuelve a crear desde cero.
+	if f, oerr := os.OpenFile(b.filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); oerr == nil {
 		b.file = f
 		b.fileSize = 0
 	}
@@ -202,14 +209,34 @@ func (b *Bus) writeFile(line string) {
 // Registro de entradas
 // ---------------------------------------------------------------------------
 
+// logLineBreaks sustituye cualquier salto de línea (CRLF, LF o CR) por la
+// secuencia literal "\n" (dos caracteres). Se usa "\n" y no un espacio porque
+// el registro es una pista de auditoría: un espacio borraría la huella de que
+// el origen intentó partir la línea, mientras que "\n" deja constancia del
+// intento sin permitir que se forgeen líneas físicas falsas con nivel o
+// categoría inventados (p. ej. inyectando "\n[ERROR] [AUTH] ..."). El orden de
+// los patrones hace que "\r\n" cuente como un solo salto y no genere "\n\n".
+var logLineBreaks = strings.NewReplacer("\r\n", `\n`, "\n", `\n`, "\r", `\n`)
+
+// sanitizeLogField elimina los CR/LF de un campo de texto libre para que cada
+// entrada ocupe exactamente una línea física en el archivo y en el panel
+// (SEC-28: inyección de log / CRLF). Solo reemplaza los saltos; nunca trunca.
+func sanitizeLogField(s string) string {
+	return logLineBreaks.Replace(s)
+}
+
 // Emit registra un evento con nivel, categoría, mensaje y detalle opcional.
+// Es el único punto por el que pasa toda entrada del registro, así que aquí se
+// neutralizan los saltos de línea de message y detail: pueden contener texto
+// externo (nombres de chat, mensajes de terceros, err.Error()) y nadie debe
+// poder partir la línea para falsificar nivel o categoría.
 func (b *Bus) Emit(level, category, message, detail string) Entry {
 	level = normalizeLevel(level)
 	if strings.TrimSpace(category) == "" {
 		category = CatSystem
 	}
-	message = strings.TrimSpace(message)
-	detail = strings.TrimSpace(detail)
+	message = sanitizeLogField(strings.TrimSpace(message))
+	detail = sanitizeLogField(strings.TrimSpace(detail))
 	if message == "" && detail == "" {
 		return Entry{}
 	}
@@ -253,7 +280,32 @@ func (b *Bus) notify(entry Entry) {
 
 	for _, s := range subs {
 		func(fn Subscriber) {
-			defer func() { _ = recover() }()
+			// SEC-38: el pánico se registra ANTES de suprimirlo (regla 5).
+			//
+			// Canal elegido: NO log.Printf ni Emit/logbus.Error. Los
+			// suscriptores se invocan en la misma goroutine de Emit, sin
+			// candado tomado, y log está enganchado al propio bus
+			// (logbus.Attach → Write → Emit → notify): loguear aquí re-entraría
+			// en notify y volvería a invocar al mismo suscriptor, que si panica
+			// de forma determinista provocaría recursión infinita hasta
+			// desbordar la pila. Tampoco se toma ningún candado nuevo, así que
+			// sobran los caminos que pudieran re-entrar en b.mu/subsMu/fileMu.
+			// fmt.Fprint a os.Stderr es un descriptor directo (sin pasar por
+			// Emit, aunque el bus use stderr como espejo) y writeFile está
+			// documentado como "nunca usa log.Printf": ninguno de los dos puede
+			// volver a entrar en esta tubería. stderr da visibilidad en
+			// terminal y el fichero persiste la traza en tgdown.log aunque la
+			// app vaya sin consola.
+			defer func() {
+				r := recover()
+				if r == nil {
+					return
+				}
+				line := fmt.Sprintf("panic in logbus subscriber: %v\n%s",
+					r, strings.TrimRight(string(debug.Stack()), "\n"))
+				fmt.Fprintln(os.Stderr, line)
+				b.writeFile(line)
+			}()
 			fn(entry)
 		}(s)
 	}

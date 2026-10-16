@@ -38,6 +38,9 @@ type App struct {
 	listener     *listener.ListenerEngine
 	updater      *updater.AppUpdater
 	server       *server.Server
+	// config es la copia que consume la bandeja del sistema (MinimizeToTray).
+	// El diálogo de carpetas NO la usa: pregunta al servidor con GetConfig()
+	// para no quedarse congelado en el valor de arranque (SEC-40).
 	config       config.Config
 	assets       fs.FS
 	mu           sync.Mutex
@@ -83,6 +86,12 @@ func NewApp(assets fs.FS) *App {
 		}
 	}
 
+	// SEC-30: la base de datos (y sus ficheros -wal/-shm) se acaban de crear
+	// aquí con los permisos por defecto del sistema; se cierran a 0600 justo
+	// después de un NewStorage exitoso. dbPath ya apunta a la BD realmente
+	// usada, incluido el caso de respaldo (tgdown.db).
+	config.SecureDataDir(dbPath, dbPath+"-wal", dbPath+"-shm")
+
 	// 1.b Volcar a la base de datos lo que quedara en el .env de una versión
 	// anterior y fijar desde ahí la dirección de escucha. Tiene que ir antes de
 	// cualquier config.GetServerPort/GetServerHost, porque es de donde esas
@@ -117,7 +126,6 @@ func NewApp(assets fs.FS) *App {
 		downloader: eng,
 		listener:   le,
 		updater:    up,
-		config:     cfg,
 		assets:     assets,
 	}
 
@@ -207,19 +215,33 @@ func (a *App) startup(ctx context.Context) {
 	})
 }
 
+// shutdown detiene la aplicación en el orden que evita perder estado (SEC-36):
+// primero el motor de descargas, que todavía necesita el cliente de Telegram
+// vivo para persistir su situación y devolver los bloques en vuelo; después el
+// cliente de Telegram; después el servidor HTTP, para que ninguna petición
+// entrante siga tocando la base de datos cuando se cierre; y por último SQLite.
+// Cerrar antes el cliente o la base de datos mientras hay descargas vivas era
+// lo que dejaba estados sin guardar y volcados contra una BD ya cerrada.
 func (a *App) shutdown(ctx context.Context) {
 	logbus.Info(logbus.CatSystem, i18n.T("system.closing"), "")
+	if a.downloader != nil {
+		// Un error aquí (p. ej. context.DeadlineExceeded) significa que
+		// quedaron trabajos o escrituras sin terminar: se registra para que el
+		// cierre incompleto se vea en los registros, nunca en silencio.
+		if err := a.downloader.Shutdown(ctx); err != nil {
+			logbus.Warn(logbus.CatSystem, "engine shutdown incomplete", err.Error())
+		}
+	}
 	if a.clientMgr != nil {
 		a.clientMgr.Stop()
-	}
-	if a.downloader != nil {
-		_ = a.downloader.Shutdown(ctx)
 	}
 	if a.server != nil {
 		a.server.Stop()
 	}
 	if a.storage != nil {
-		_ = a.storage.Close()
+		if err := a.storage.Close(); err != nil {
+			logbus.Error(logbus.CatSystem, "database close failed", err.Error())
+		}
 	}
 	logbus.CloseFile()
 }
@@ -233,13 +255,27 @@ func (a *App) Handler() http.Handler {
 
 // SelectDirectory abre el diálogo nativo del sistema para seleccionar carpetas
 func (a *App) SelectDirectory() (string, error) {
+	// El caso «ventana no lista» ya queda cubierto aquí: sin contexto de Wails
+	// no hay forma de abrir el diálogo nativo (el folderPicker del servidor
+	// comprueba lo mismo antes de llamarnos).
 	ctx := a.context()
 	if ctx == nil {
 		return "", fmt.Errorf("%s", i18n.T("app.windowNotReady"))
 	}
+	// La fuente de verdad de la configuración es Server.config, que los
+	// handlers de guardado actualizan al vuelo: leerla aquí hace que el
+	// diálogo arranque en la carpeta que el usuario tenga AHORA, no en la de
+	// al abrir la sesión (SEC-40). Sin servidor (o si vino vacía) se cae a la
+	// carpeta por defecto del sistema.
+	defaultDir := config.GetDefaultDownloadFolder()
+	if a.server != nil {
+		if folder := a.server.GetConfig().DownloadFolder; folder != "" {
+			defaultDir = folder
+		}
+	}
 	selected, err := wailsRuntime.OpenDirectoryDialog(ctx, wailsRuntime.OpenDialogOptions{
 		Title:            i18n.T("settings.selectFolderTitle"),
-		DefaultDirectory: a.config.DownloadFolder,
+		DefaultDirectory: defaultDir,
 	})
 	if err != nil {
 		return "", err

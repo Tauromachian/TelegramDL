@@ -18,6 +18,42 @@ import (
 	"tgdown/pkg/storage"
 )
 
+// maxQueuedDownloads es el techo de cola: cuántas tareas pueden estar a la vez
+// en un estado NO terminal (queued, downloading, paused, pending...). Sin
+// techo, una ráfaga de encolados (un rango muy largo, un cliente reintentando)
+// crecía e.downloads y dejaba una goroutine de turno esperando por ítem en
+// launchDownloadJob, sin límite de memoria ni de goroutines (SEC-21).
+const maxQueuedDownloads = 1000
+
+// isTerminalStatus indica que la tarea ya no ocupa hueco en la cola: solo los
+// estados no terminales cuentan contra maxQueuedDownloads.
+func isTerminalStatus(status string) bool {
+	switch status {
+	case "completed", "failed", "cancelled", "skipped", "duplicate":
+		return true
+	default:
+		return false
+	}
+}
+
+// activeQueueSize cuenta los ítems NO terminales del mapa de descargas.
+func activeQueueSize(downloads map[string]*storage.DownloadItem) int {
+	active := 0
+	for _, item := range downloads {
+		if !isTerminalStatus(item.Status) {
+			active++
+		}
+	}
+	return active
+}
+
+// queueIsFull decide si ya no cabe ninguna tarea más en la cola. Se extrae como
+// función pura para poder probar el techo sin crear 1000 descargas reales,
+// que en la práctica serían 1000 jobs con sus goroutines dentro del test.
+func queueIsFull(active int) bool {
+	return active >= maxQueuedDownloads
+}
+
 func (e *Engine) enforceConcurrencyLimit() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -53,7 +89,17 @@ func (e *Engine) enforceConcurrencyLimit() {
 	}
 }
 
+// QueueItem encola una descarga y arranca su job. Devuelve el ID de la tarea:
+// el de la existente cuando se trata de un duplicado, o "" cuando la cola está
+// en su techo (maxQueuedDownloads) y la nueva se rechaza sin insertar nada ni
+// lanzar job (SEC-21). Los llamadores que necesiten distinguir el rechazo
+// deben comprobar el "".
 func (e *Engine) QueueItem(item storage.DownloadItem) string {
+	// SEC-21: hacer sitio en el historial por si está en su techo. Va ANTES de
+	// tomar el candado porque la purga internamente delega en DeleteDownload,
+	// que también lo toma: llamarlo con e.mu tomado secuestraría el motor.
+	e.makeHistoryRoom()
+
 	e.mu.Lock()
 	if item.ID == "" {
 		item.ID = config.NewID()
@@ -77,6 +123,19 @@ func (e *Engine) QueueItem(item storage.DownloadItem) string {
 		}
 	}
 
+	// SEC-21: techo de cola. Si ya hay maxQueuedDownloads ítems no terminales,
+	// el nuevo se rechaza ANTES de tocar ningún mapa: e.downloads, e.chatMsgMap,
+	// e.queuedIDs y e.forceDuplicate quedan intactos y no se lanza job, así que
+	// el rechazo no deja basura detrás.
+	if active := activeQueueSize(e.downloads); queueIsFull(active) {
+		e.mu.Unlock()
+		logbus.Warn(logbus.CatDownloads,
+			"download queue is full",
+			fmt.Sprintf("rejected item %s (chat %d, message %d): %d non-terminal downloads already queued (limit %d)",
+				item.ID, item.ChatID, item.MessageID, active, maxQueuedDownloads))
+		return ""
+	}
+
 	item.Status = "queued"
 	e.queuedIDs[item.ID] = true
 	delete(e.forceDuplicate, item.ID)
@@ -89,17 +148,22 @@ func (e *Engine) QueueItem(item storage.DownloadItem) string {
 
 	e.downloads[item.ID] = &item
 	e.chatMsgMap[key] = item.ID
+	// Copia por valor ANTES de soltar el candado: e.downloads[item.ID] apunta a
+	// la variable local 'item', así que tras el Unlock otros escritores bajo
+	// e.mu (onProgress) modifican esa misma memoria mientras aquí la leemos.
+	// 'cp' es un valor privado de esta goroutine: todo lo posterior al Unlock
+	// se hace con él para evitar la carrera con SaveDownload.
 	cp := item
 	e.mu.Unlock()
 	if e.storage != nil {
-		if err := e.storage.SaveDownload(item); err != nil {
+		if err := e.storage.SaveDownload(cp); err != nil {
 			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))
 		}
 	}
 	e.notifyState(cp)
 
-	e.launchDownloadJob(item.ID)
-	return item.ID
+	e.launchDownloadJob(cp.ID)
+	return cp.ID
 }
 
 func (e *Engine) launchDownloadJob(itemID string) {
@@ -255,6 +319,12 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 		return false
 	}
 
+	// La notificación de fallo se marca aquí y se emite FUERA del candado:
+	// sendNotification toma e.mu.RLock() y este tramo retiene e.mu en
+	// escritura; la reentrancia sobre un sync.RWMutex congelaría toda la
+	// cola (deadlock) cada vez que fallara una descarga con NotifyOnError.
+	var notifyFailure bool
+
 	if errors.Is(err, context.Canceled) {
 		// Si el estado ya es 'queued', significa que fue reanudado mientras se
 		// cerraba: el wrapper lo relanzará al liberar este job.
@@ -297,11 +367,12 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 		e.sessionFailed++
 		e.sessionFailedIDs = append(e.sessionFailedIDs, itemID)
 
-		// Notificación de error: depende del mismo interruptor (bot del panel
-		// lateral) que el resumen de cola, no de uno propio.
-		if e.config.BotNotifications {
-			e.sendNotification(i18n.T("notifier.downloadFailed", html.EscapeString(curItem.FileName), html.EscapeString(err.Error())))
-		}
+		// Notificación de error: se difiere para emitirla tras soltar e.mu
+		// (sendNotification toma el RLock y reentrar con e.mu tomado en
+		// escritura dejaba el candado colgado) — ver notifyFailure más abajo.
+		// El interruptor es el mismo que el del resumen de cola
+		// (BotNotifications), no uno propio.
+		notifyFailure = e.config.BotNotifications
 	} else {
 		curItem.Status = "completed"
 		curItem.Error = ""
@@ -313,6 +384,11 @@ func (e *Engine) startDownloadJob(itemID string) (relaunch bool) {
 	curItem.UpdatedAt = float64(time.Now().Unix())
 	cp = *curItem
 	e.mu.Unlock()
+	// Emitida tras soltar e.mu (ver notifyFailure arriba): aquí ya se puede
+	// tomar el RLock que hace sendNotification sin reentrar en el candado.
+	if notifyFailure {
+		e.sendNotification(i18n.T("notifier.downloadFailed", html.EscapeString(cp.FileName), html.EscapeString(err.Error())))
+	}
 	if e.storage != nil {
 		if err := e.storage.SaveDownload(cp); err != nil {
 			log.Printf("[DOWNLOADER] %s", i18n.T("downloader.saveStateError", err))

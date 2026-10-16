@@ -14,6 +14,15 @@ export default {
     unauthorized: 'No autorizado: token de acceso inválido o ausente'
   },
 
+  // Techo de cola alcanzado (SEC-21): el backend responde 429 y redacta su
+  // propio `detail` traducido; estas claves dejan el aviso disponible para el
+  // panel cuando quiera titularlo con el número de segundos de retry_after.
+  server: {
+    queueFull: 'Cola de descargas llena',
+    queueFullDetail:
+      'Hay demasiadas descargas en cola a la vez. Espera {n} segundos y vuelve a intentarlo.'
+  },
+
   nav: {
     downloads: 'Descargas',
     listener: 'Escucha',
@@ -394,6 +403,9 @@ export default {
     copied: '¡Copiado!',
     copyFail: 'No se pudo copiar',
     regenerate: 'Regenerar token',
+    exposureTitle: 'Panel expuesto a la red sin cifrar',
+    exposureText:
+      'El servidor está escuchando en {host}, así que cualquier equipo de tu red local puede leer todo lo que viaja por él (token, credenciales y contraseña de 2FA). Cierra ese puerto o protégelo con un túnel o una VPN como Tailscale; los detalles están en REMOTE_ACCESS.md.',
     dataTitle: 'Datos y respaldo',
     dataSub: 'Exportar o importar la escucha y limpiar el historial',
     exportListener: 'Exportar escucha',
@@ -516,11 +528,16 @@ export default {
     signIn: 'Iniciar Sesión',
     backNote:
       '«Atrás» vuelve al paso del teléfono. Telegram ya usó el código anterior, así que se te enviará uno nuevo.',
+    tfaHttpWarning:
+      'Esta conexión no está cifrada: la contraseña de 2FA viajará en claro por la red. Puedes continuar, pero para protegerla usa HTTPS o accede desde localhost.',
     successTitle: '¡Conexión Exitosa!',
     connectedAs: 'Conectado como',
     successFallback: 'Tu sesión de Telegram está lista y activa.',
     goDashboard: 'Ir al Dashboard',
     errFillBoth: 'Por favor completa tanto el API ID como el API HASH',
+    errApiIdFormat: 'El API ID debe contener solo dígitos (ej. 12345678)',
+    errApiHashFormat:
+      'El API HASH debe ser de 32 caracteres hexadecimales (0-9, a-f)',
     errPhone:
       'Ingresa un número de teléfono válido con código de país (ej. +34600112233)',
     errCode: 'Ingresa el código de 5 dígitos recibido en Telegram',

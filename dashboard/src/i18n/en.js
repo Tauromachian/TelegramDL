@@ -13,6 +13,15 @@ export default {
     unauthorized: 'Unauthorized: missing or invalid access token'
   },
 
+  // Techo de cola alcanzado (SEC-21): el backend responde 429 y redacta su
+  // propio `detail` traducido; estas claves dejan el aviso disponible para el
+  // panel cuando quiera titularlo con los segundos de retry_after.
+  server: {
+    queueFull: 'Download queue full',
+    queueFullDetail:
+      'Too many downloads are queued at once. Wait {n} seconds and try again.'
+  },
+
   nav: {
     downloads: 'Downloads',
     listener: 'Listener',
@@ -386,6 +395,9 @@ export default {
     copied: 'Copied!',
     copyFail: 'Could not copy',
     regenerate: 'Regenerate token',
+    exposureTitle: 'Panel exposed to the network without encryption',
+    exposureText:
+      'The server is listening on {host}, so any device on your local network can read everything that travels through it (token, credentials and 2FA password). Close that port or protect it with a tunnel or a VPN like Tailscale; details are in REMOTE_ACCESS.md.',
     dataTitle: 'Data and backup',
     dataSub: 'Export or import the listener and clear the history',
     exportListener: 'Export listener',
@@ -505,11 +517,16 @@ export default {
     signIn: 'Sign In',
     backNote:
       '"Back" returns to the phone step. Telegram already used the previous code, so a new one will be sent to you.',
+    tfaHttpWarning:
+      'This connection is not encrypted: the 2FA password will travel over the network in cleartext. You can continue, but to protect it use HTTPS or access from localhost.',
     successTitle: 'Connection Successful!',
     connectedAs: 'Connected as',
     successFallback: 'Your Telegram session is ready and active.',
     goDashboard: 'Go to Dashboard',
     errFillBoth: 'Please fill in both the API ID and the API HASH',
+    errApiIdFormat: 'The API ID must contain only digits (e.g. 12345678)',
+    errApiHashFormat:
+      'The API HASH must be 32 hexadecimal characters (0-9, a-f)',
     errPhone:
       'Enter a valid phone number with country code (e.g. +34600112233)',
     errCode: 'Enter the 5-digit code received on Telegram',
