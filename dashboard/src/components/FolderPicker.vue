@@ -121,86 +121,90 @@ const select = () => {
     </button>
     <small>{{ t('folder.nextHint') }}</small>
 
-    <div v-if="open" class="folder-overlay" @click.self="close">
-      <div
-        class="folder-dialog"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="t('folder.dialogTitle')"
-      >
-        <div class="folder-dialog-header">
-          <div>
-            <span class="eyebrow"
-              ><Folder :size="12" /> {{ t('folder.explorerKicker') }}</span
+    <Teleport to="body">
+      <div v-if="open" class="folder-overlay" @click.self="close">
+        <div
+          class="folder-dialog"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('folder.dialogTitle')"
+        >
+          <div class="folder-dialog-header">
+            <div>
+              <span class="eyebrow"
+                ><Folder :size="12" /> {{ t('folder.explorerKicker') }}</span
+              >
+              <h3>{{ t('folder.dialogTitle') }}</h3>
+            </div>
+            <button
+              class="icon-button"
+              type="button"
+              @click="close"
+              :aria-label="t('common.close')"
             >
-            <h3>{{ t('folder.dialogTitle') }}</h3>
+              <X :size="18" />
+            </button>
           </div>
-          <button
-            class="icon-button"
-            type="button"
-            @click="close"
-            :aria-label="t('common.close')"
-          >
-            <X :size="18" />
-          </button>
-        </div>
-        <div class="folder-path" :title="currentPath">
-          {{ currentPath || t('folder.thisPC') }}
-        </div>
-        <div v-if="error" class="folder-error">{{ error }}</div>
-        <div v-if="loading" class="folder-loading">
-          <Folder :size="20" /> {{ t('folder.loading') }}
-        </div>
-        <div v-else class="folder-list">
-          <button
-            v-for="root in roots"
-            :key="root"
-            class="folder-entry root-entry"
-            type="button"
-            @click="browse(root)"
-          >
-            <HardDrive :size="18" /><span>{{ root }}</span
-            ><ChevronRight :size="15" />
-          </button>
-          <button
-            v-if="parentPath"
-            class="folder-entry parent-entry"
-            type="button"
-            @click="browse(parentPath)"
-          >
-            <ArrowLeft :size="17" /><span>{{ t('folder.backToParent') }}</span>
-          </button>
-          <button
-            v-for="entry in entries"
-            :key="entry.path"
-            class="folder-entry"
-            type="button"
-            @click="browse(entry.path)"
-          >
-            <Folder :size="18" /><span>{{ entry.name }}</span
-            ><ChevronRight :size="15" />
-          </button>
-          <div
-            v-if="!roots.length && !parentPath && !entries.length"
-            class="folder-empty"
-          >
-            {{ t('folder.noneAvailable') }}
+          <div class="folder-path" :title="currentPath">
+            {{ currentPath || t('folder.thisPC') }}
           </div>
-        </div>
-        <div class="folder-dialog-footer">
-          <button class="secondary-button" type="button" @click="close">
-            {{ t('common.cancel') }}</button
-          ><button
-            class="primary-button compact-button"
-            type="button"
-            :disabled="!currentPath || loading"
-            @click="select"
-          >
-            <Check :size="15" /> {{ t('folder.useThis') }}
-          </button>
+          <div v-if="error" class="folder-error">{{ error }}</div>
+          <div v-if="loading" class="folder-loading">
+            <Folder :size="20" /> {{ t('folder.loading') }}
+          </div>
+          <div v-else class="folder-list">
+            <button
+              v-for="root in roots"
+              :key="root"
+              class="folder-entry root-entry"
+              type="button"
+              @click="browse(root)"
+            >
+              <HardDrive :size="18" /><span>{{ root }}</span
+              ><ChevronRight :size="15" />
+            </button>
+            <button
+              v-if="parentPath"
+              class="folder-entry parent-entry"
+              type="button"
+              @click="browse(parentPath)"
+            >
+              <ArrowLeft :size="17" /><span>{{
+                t('folder.backToParent')
+              }}</span>
+            </button>
+            <button
+              v-for="entry in entries"
+              :key="entry.path"
+              class="folder-entry"
+              type="button"
+              @click="browse(entry.path)"
+            >
+              <Folder :size="18" /><span>{{ entry.name }}</span
+              ><ChevronRight :size="15" />
+            </button>
+            <div
+              v-if="!roots.length && !parentPath && !entries.length"
+              class="folder-empty"
+            >
+              {{ t('folder.noneAvailable') }}
+            </div>
+          </div>
+          <div class="folder-dialog-footer">
+            <button class="secondary-button" type="button" @click="close">
+              {{ t('common.cancel') }}</button
+            ><button
+              class="primary-button compact-button"
+              type="button"
+              :disabled="!currentPath || loading"
+              @click="select"
+            >
+              <Check :size="15" /> {{ t('folder.useThis') }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
@@ -246,7 +250,7 @@ const select = () => {
 .folder-overlay {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 10000;
   display: grid;
   place-items: center;
   padding: 20px;
@@ -256,7 +260,7 @@ const select = () => {
 }
 .folder-dialog {
   width: min(620px, 100%);
-  max-height: min(720px, 90vh);
+  max-height: min(680px, calc(100vh - 40px));
   display: flex;
   flex-direction: column;
   background: var(--user-surface);
@@ -267,6 +271,7 @@ const select = () => {
   animation: folderPop 0.25s ease;
 }
 .folder-dialog-header {
+  flex: none;
   display: flex;
   justify-content: space-between;
   align-items: start;
@@ -293,6 +298,7 @@ const select = () => {
   background: var(--user-surface-light);
 }
 .folder-path {
+  flex: none;
   margin: 0 24px 12px;
   padding: 10px 12px;
   border-radius: 8px;
@@ -305,8 +311,9 @@ const select = () => {
   text-overflow: ellipsis;
 }
 .folder-list {
-  min-height: 190px;
-  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 160px;
+  overflow-y: auto;
   padding: 0 12px 12px;
 }
 .folder-entry {
@@ -372,6 +379,7 @@ const select = () => {
   font-size: 11px;
 }
 .folder-dialog-footer {
+  flex: none;
   display: flex;
   justify-content: flex-end;
   gap: 9px;
