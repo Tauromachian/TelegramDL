@@ -73,3 +73,5 @@ func trySystemNotification(msg string) bool {
 }
 
 func registerConsoleCtrlHandler(sigCh chan os.Signal) {}
+
+func registerAppUserModelID(appID, iconPath string) {}

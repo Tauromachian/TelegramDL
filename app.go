@@ -27,6 +27,9 @@ import (
 	"tgdown/pkg/updater"
 )
 
+//go:embed build/appicon.png
+var appIconPng []byte
+
 //go:embed build/windows/icon.ico
 var trayIcon []byte
 
@@ -345,9 +348,6 @@ func (a *App) initSystemTray() {
 }
 
 func (a *App) onTrayReady() {
-	if len(trayIcon) > 0 {
-		systray.SetIcon(trayIcon)
-	}
 	systray.SetTitle("Telegram DL")
 	systray.SetTooltip("Telegram DL")
 
@@ -369,6 +369,8 @@ func (a *App) onTrayReady() {
 	})
 
 	a.trayReady = true
+	// Ocultar del tray inicialmente: solo se muestra cuando la app se minimiza
+	systray.SetIcon(nil)
 }
 
 func (a *App) onTrayExit() {
@@ -378,6 +380,7 @@ func (a *App) RestoreWindow() {
 	if ctx := a.context(); ctx != nil {
 		wailsRuntime.WindowShow(ctx)
 		wailsRuntime.WindowUnminimise(ctx)
+		systray.SetIcon(nil)
 	}
 }
 
@@ -399,9 +402,12 @@ func (a *App) UpdateTrayMenuTitles() {
 	}
 }
 
-// HideToTray oculta la ventana al system tray y envía la notificación nativa
+// HideToTray oculta la ventana al system tray, muestra el ícono en la bandeja y envía la notificación nativa
 func (a *App) HideToTray() {
 	if ctx := a.context(); ctx != nil {
+		if len(trayIcon) > 0 {
+			systray.SetIcon(trayIcon)
+		}
 		wailsRuntime.WindowHide(ctx)
 		a.ShowTrayNotification()
 	}
@@ -420,15 +426,18 @@ func (a *App) ShowTrayNotification() {
 	go func() {
 		appName := i18n.T("tray.notificationTitle")
 		body := i18n.T("tray.notificationBody")
+		iconPath := a.getAppIconPngPath()
 
 		beeep.AppName = appName
 
-		// Notificación nativa con Audio: toast.Default para hacer sonar la alerta nativa del sistema
+		// Registrar AppUserModelId para que Windows ponga el ícono PNG en la cabecera (al lado de appName)
+		registerAppUserModelID(appName, iconPath)
+
 		n := toast.Notification{
 			AppID: appName,
 			Title: " ",
 			Body:  body,
-			Icon:  "",
+			Icon:  "", // Sin ícono en la tarjeta inferior
 			Audio: toast.Default,
 		}
 
@@ -438,6 +447,19 @@ func (a *App) ShowTrayNotification() {
 			}
 		}
 	}()
+}
+
+func (a *App) getAppIconPngPath() string {
+	if len(appIconPng) == 0 {
+		return ""
+	}
+	iconPath := filepath.Join(os.TempDir(), "tgdown_appicon.png")
+	if _, err := os.Stat(iconPath); os.IsNotExist(err) {
+		if err := os.WriteFile(iconPath, appIconPng, 0644); err != nil {
+			return ""
+		}
+	}
+	return iconPath
 }
 
 func (a *App) SetConfig(cfg config.Config) {

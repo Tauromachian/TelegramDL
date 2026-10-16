@@ -8,8 +8,23 @@ import (
 	"syscall"
 	"unsafe"
 
+	"golang.org/x/sys/windows/registry"
+
 	"tgdown/pkg/i18n"
 )
+
+func registerAppUserModelID(appID, iconPath string) {
+	if appID == "" || iconPath == "" {
+		return
+	}
+	keyPath := `SOFTWARE\Classes\AppUserModelId\` + appID
+	key, _, err := registry.CreateKey(registry.CURRENT_USER, keyPath, registry.SET_VALUE)
+	if err == nil {
+		_ = key.SetStringValue("DisplayName", appID)
+		_ = key.SetStringValue("IconUri", iconPath)
+		_ = key.Close()
+	}
+}
 
 func setupConsole() {
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
