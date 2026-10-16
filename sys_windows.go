@@ -13,6 +13,28 @@ import (
 	"tgdown/pkg/i18n"
 )
 
+var (
+	winmm          = syscall.NewLazyDLL("winmm.dll")
+	procPlaySoundW = winmm.NewProc("PlaySoundW")
+)
+
+const (
+	sndAsync     = 0x0001
+	sndMemory    = 0x0004
+	sndNoDefault = 0x0002
+)
+
+func playNotificationSound() {
+	if len(notificationWav) == 0 {
+		return
+	}
+	procPlaySoundW.Call(
+		uintptr(unsafe.Pointer(&notificationWav[0])),
+		0,
+		uintptr(sndAsync|sndMemory|sndNoDefault),
+	)
+}
+
 func registerAppUserModelID(appID, iconPath string) {
 	if appID == "" || iconPath == "" {
 		return

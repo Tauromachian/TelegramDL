@@ -33,6 +33,9 @@ var appIconPng []byte
 //go:embed build/windows/icon.ico
 var trayIcon []byte
 
+//go:embed dashboard/public/notification.wav
+var notificationWav []byte
+
 type App struct {
 	ctx          context.Context
 	clientMgr    *telegram.ClientManager
@@ -452,9 +455,12 @@ func (a *App) ShowTrayNotification() {
 	}()
 }
 
-// ShowQueueFinishedNotification muestra una notificación nativa del sistema informando que la cola de descargas ha finalizado
+// ShowQueueFinishedNotification muestra una notificación nativa del sistema e infla el sonido de la web cuando finaliza la cola
 func (a *App) ShowQueueFinishedNotification() {
 	go func() {
+		// Reproducir el sonido personalizado notification.wav en segundo plano
+		playNotificationSound()
+
 		appName := i18n.T("tray.notificationTitle")
 		body := i18n.T("tray.completedBody")
 		iconPath := a.getAppIconPngPath()
@@ -464,7 +470,7 @@ func (a *App) ShowQueueFinishedNotification() {
 		// Registrar AppUserModelId para que Windows ponga el ícono PNG en la cabecera (al lado de appName)
 		registerAppUserModelID(appName, iconPath)
 
-		// Construir XML Toast explícito con hint-style="body" para asegurar texto normal sin negritas
+		// Construir XML Toast explícito con audio silencioso para que suene únicamente notification.wav
 		xml := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <toast duration="short">
     <visual>
@@ -472,7 +478,7 @@ func (a *App) ShowQueueFinishedNotification() {
             <text hint-style="body" hint-wrap="true">%s</text>
         </binding>
     </visual>
-    <audio src="ms-winsoundevent:Notification.Default" />
+    <audio silent="true" />
 </toast>`, body)
 
 		if err := wintoast.Push(appName, xml, wintoast.PowershellFallback); err != nil {

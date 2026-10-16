@@ -75,3 +75,20 @@ func trySystemNotification(msg string) bool {
 func registerConsoleCtrlHandler(sigCh chan os.Signal) {}
 
 func registerAppUserModelID(appID, iconPath string) {}
+
+func playNotificationSound() {
+	if len(notificationWav) == 0 {
+		return
+	}
+	tempPath := filepath.Join(os.TempDir(), "tgdown_notification.wav")
+	if _, err := os.Stat(tempPath); os.IsNotExist(err) {
+		_ = os.WriteFile(tempPath, notificationWav, 0644)
+	}
+	if _, err := exec.LookPath("afplay"); err == nil {
+		_ = exec.Command("afplay", tempPath).Start()
+	} else if _, err := exec.LookPath("paplay"); err == nil {
+		_ = exec.Command("paplay", tempPath).Start()
+	} else if _, err := exec.LookPath("aplay"); err == nil {
+		_ = exec.Command("aplay", tempPath).Start()
+	}
+}
