@@ -21,6 +21,7 @@ var messagesES = map[string]string{
 	"system.shutdownError":             "No se pudo apagar el equipo",
 	"system.startupURLError":           "Error procesando URL de inicio: %v",
 	"system.logCleared":                "Registro limpiado",
+	"system.trayNotifyError":           "Error al mostrar notificación nativa: %v",
 
 	// Servidor HTTP (pkg/server)
 	"server.listening":              "Servidor escuchando en %s:%d",

@@ -50,6 +50,10 @@ export function SetStartupURL(arg1) {
   return window['go']['main']['App']['SetStartupURL'](arg1);
 }
 
+export function ShowTrayNotification() {
+  return window['go']['main']['App']['ShowTrayNotification']();
+}
+
 export function UpdateTrayMenuTitles() {
   return window['go']['main']['App']['UpdateTrayMenuTitles']();
 }

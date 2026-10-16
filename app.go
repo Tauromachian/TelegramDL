@@ -11,7 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"git.sr.ht/~jackmordaunt/go-toast/v2"
 	"github.com/energye/systray"
+	"github.com/gen2brain/beeep"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"tgdown/pkg/config"
@@ -40,9 +42,10 @@ type App struct {
 	assets       fs.FS
 	mu           sync.Mutex
 	startupURL   string // URL pasada desde línea de comandos al iniciar
-	trayOpenItem *systray.MenuItem
-	trayExitItem *systray.MenuItem
-	trayReady    bool
+	trayOpenItem       *systray.MenuItem
+	trayExitItem       *systray.MenuItem
+	trayReady          bool
+	lastTrayNotifyTime time.Time
 }
 
 func NewApp(assets fs.FS) *App {
@@ -360,11 +363,45 @@ func (a *App) UpdateTrayMenuTitles() {
 	}
 }
 
-// HideToTray oculta la ventana al system tray
+// HideToTray oculta la ventana al system tray y envía la notificación nativa
 func (a *App) HideToTray() {
 	if ctx := a.context(); ctx != nil {
 		wailsRuntime.WindowHide(ctx)
+		a.ShowTrayNotification()
 	}
+}
+
+// ShowTrayNotification muestra una notificación nativa del sistema informando que la app sigue en segundo plano
+func (a *App) ShowTrayNotification() {
+	a.mu.Lock()
+	if time.Since(a.lastTrayNotifyTime) < 3*time.Second {
+		a.mu.Unlock()
+		return
+	}
+	a.lastTrayNotifyTime = time.Now()
+	a.mu.Unlock()
+
+	go func() {
+		appName := i18n.T("tray.notificationTitle")
+		body := i18n.T("tray.notificationBody")
+
+		beeep.AppName = appName
+
+		// Notificación nativa con Audio: toast.Default para hacer sonar la alerta nativa del sistema
+		n := toast.Notification{
+			AppID: appName,
+			Title: " ",
+			Body:  body,
+			Icon:  "",
+			Audio: toast.Default,
+		}
+
+		if err := n.Push(); err != nil {
+			if errBeeep := beeep.Alert(" ", body, ""); errBeeep != nil {
+				logbus.Warn(logbus.CatSystem, i18n.T("system.trayNotifyError", errBeeep), errBeeep.Error())
+			}
+		}
+	}()
 }
 
 func (a *App) SetConfig(cfg config.Config) {

@@ -1022,55 +1022,11 @@ const handleRemoteLogin = async (value) => {
   }
 }
 
-// Notificación del Webview e intercepción al minimizar al system tray
-let notifiedOnMinimize = false
-
+// Intercepción al minimizar al system tray
 const handleMinimizeToTray = () => {
   if (!isWailsRuntime() || !settings.minimize_to_tray) return
 
-  const title = t('tray.notificationTitle')
-  const body = t('tray.notificationBody')
-
-  // Emitir notificación del Webview con autocierre a los 5 segundos
-  if (!notifiedOnMinimize) {
-    notifiedOnMinimize = true
-
-    if ('Notification' in window) {
-      const showAndAutoClose = () => {
-        try {
-          const notif = new Notification(title, {
-            body,
-            icon: '/telegramdl-android-icon.svg'
-          })
-          setTimeout(() => {
-            try {
-              notif.close()
-            } catch {
-              // Ignorar si ya se cerró
-            }
-          }, 5000)
-        } catch {
-          // Ignorar si falla la notificación
-        }
-      }
-
-      if (Notification.permission === 'granted') {
-        showAndAutoClose()
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then((perm) => {
-          if (perm === 'granted') {
-            showAndAutoClose()
-          }
-        })
-      }
-    }
-
-    setTimeout(() => {
-      notifiedOnMinimize = false
-    }, 5000)
-  }
-
-  // Ocultar la ventana al tray
+  // Ocultar la ventana al tray (el backend Go maneja la ocultación y la notificación nativa)
   if (window.go?.main?.App?.HideToTray) {
     window.go.main.App.HideToTray()
   } else if (window.runtime && window.runtime.WindowHide) {

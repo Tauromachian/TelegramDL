@@ -20,6 +20,7 @@ var messagesEN = map[string]string{
 	"system.shutdownError":             "Could not shut down the computer",
 	"system.startupURLError":           "Error processing startup URL: %v",
 	"system.logCleared":                "Log cleared",
+	"system.trayNotifyError":           "Error showing native notification: %v",
 
 	// HTTP server (pkg/server)
 	"server.listening":              "Server listening on %s:%d",

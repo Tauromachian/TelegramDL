@@ -28,4 +28,6 @@ export function SetConfig(arg1:config.Config):Promise<void>;
 
 export function SetStartupURL(arg1:string):Promise<void>;
 
+export function ShowTrayNotification():Promise<void>;
+
 export function UpdateTrayMenuTitles():Promise<void>;
