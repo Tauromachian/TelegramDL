@@ -455,7 +455,7 @@ func (a *App) ShowTrayNotification() {
 // ShowQueueFinishedNotification muestra una notificación nativa del sistema informando que la cola de descargas ha finalizado
 func (a *App) ShowQueueFinishedNotification() {
 	go func() {
-		appName := i18n.T("tray.completedTitle")
+		appName := i18n.T("tray.notificationTitle")
 		body := i18n.T("tray.completedBody")
 		iconPath := a.getAppIconPngPath()
 
