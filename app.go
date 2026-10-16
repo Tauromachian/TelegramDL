@@ -350,6 +350,9 @@ func (a *App) initSystemTray() {
 func (a *App) onTrayReady() {
 	systray.SetTitle("Telegram DL")
 	systray.SetTooltip("Telegram DL")
+	if len(trayIcon) > 0 {
+		systray.SetIcon(trayIcon)
+	}
 
 	a.trayOpenItem = systray.AddMenuItem(i18n.T("tray.open"), "")
 	a.trayOpenItem.Click(func() {
@@ -369,8 +372,6 @@ func (a *App) onTrayReady() {
 	})
 
 	a.trayReady = true
-	// Ocultar del tray inicialmente: solo se muestra cuando la app se minimiza
-	systray.SetIcon(nil)
 }
 
 func (a *App) onTrayExit() {
@@ -380,7 +381,6 @@ func (a *App) RestoreWindow() {
 	if ctx := a.context(); ctx != nil {
 		wailsRuntime.WindowShow(ctx)
 		wailsRuntime.WindowUnminimise(ctx)
-		systray.SetIcon(nil)
 	}
 }
 
