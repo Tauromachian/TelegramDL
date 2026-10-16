@@ -597,6 +597,8 @@ export default {
     exit: 'Salir',
     notificationTitle: 'Telegram DL',
     notificationBody:
-      'La aplicación sigue ejecutándose en segundo plano en la bandeja del sistema.'
+      'La aplicación sigue ejecutándose en segundo plano en la bandeja del sistema.',
+    completedTitle: 'Descargas completadas',
+    completedBody: 'Todas las descargas de la cola han finalizado con éxito.'
   }
 }

@@ -587,6 +587,8 @@ export default {
     exit: 'Exit',
     notificationTitle: 'Telegram DL',
     notificationBody:
-      'The application continues running in the background in the system tray.'
+      'The application continues running in the background in the system tray.',
+    completedTitle: 'Downloads completed',
+    completedBody: 'All downloads in the queue have finished successfully.'
   }
 }

@@ -772,9 +772,17 @@ const maybeNotifyQueueFinished = (currentDownloads) => {
   queueNotificationArmed = false
 
   if (successful && settings.sound_notification) {
-    new Audio(`${import.meta.env.BASE_URL}notification.wav`)
-      .play()
-      .catch((e) => console.warn(t('console.audioBlocked'), e))
+    const isHiddenInTray =
+      isWailsRuntime() &&
+      (document.hidden || document.visibilityState === 'hidden')
+
+    if (isHiddenInTray && window.go?.main?.App?.ShowQueueFinishedNotification) {
+      window.go.main.App.ShowQueueFinishedNotification()
+    } else {
+      new Audio(`${import.meta.env.BASE_URL}notification.wav`)
+        .play()
+        .catch((e) => console.warn(t('console.audioBlocked'), e))
+    }
   }
 }
 

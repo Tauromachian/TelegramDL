@@ -452,6 +452,37 @@ func (a *App) ShowTrayNotification() {
 	}()
 }
 
+// ShowQueueFinishedNotification muestra una notificación nativa del sistema informando que la cola de descargas ha finalizado
+func (a *App) ShowQueueFinishedNotification() {
+	go func() {
+		appName := i18n.T("tray.completedTitle")
+		body := i18n.T("tray.completedBody")
+		iconPath := a.getAppIconPngPath()
+
+		beeep.AppName = appName
+
+		// Registrar AppUserModelId para que Windows ponga el ícono PNG en la cabecera (al lado de appName)
+		registerAppUserModelID(appName, iconPath)
+
+		// Construir XML Toast explícito con hint-style="body" para asegurar texto normal sin negritas
+		xml := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<toast duration="short">
+    <visual>
+        <binding template="ToastGeneric">
+            <text hint-style="body" hint-wrap="true">%s</text>
+        </binding>
+    </visual>
+    <audio src="ms-winsoundevent:Notification.Default" />
+</toast>`, body)
+
+		if err := wintoast.Push(appName, xml, wintoast.PowershellFallback); err != nil {
+			if errBeeep := beeep.Notify(appName, body, ""); errBeeep != nil {
+				logbus.Warn(logbus.CatSystem, i18n.T("system.trayNotifyError", errBeeep), errBeeep.Error())
+			}
+		}
+	}()
+}
+
 func (a *App) getAppIconPngPath() string {
 	if len(appIconPng) == 0 {
 		return ""

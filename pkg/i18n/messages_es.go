@@ -184,6 +184,8 @@ var messagesES = map[string]string{
 	"tray.exit":              "Salir",
 	"tray.notificationTitle": "Telegram DL",
 	"tray.notificationBody":  "La aplicación sigue ejecutándose en segundo plano en la bandeja del sistema.",
+	"tray.completedTitle":    "Descargas completadas",
+	"tray.completedBody":     "Todas las descargas de la cola han finalizado con éxito.",
 
 	// Descargas (pkg/downloader y applog.go)
 	"downloads.queued":             "En cola: %s",

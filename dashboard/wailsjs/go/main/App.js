@@ -50,6 +50,10 @@ export function SetStartupURL(arg1) {
   return window['go']['main']['App']['SetStartupURL'](arg1);
 }
 
+export function ShowQueueFinishedNotification() {
+  return window['go']['main']['App']['ShowQueueFinishedNotification']();
+}
+
 export function ShowTrayNotification() {
   return window['go']['main']['App']['ShowTrayNotification']();
 }

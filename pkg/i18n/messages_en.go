@@ -183,6 +183,8 @@ var messagesEN = map[string]string{
 	"tray.exit":              "Exit",
 	"tray.notificationTitle": "Telegram DL",
 	"tray.notificationBody":  "The application continues running in the background in the system tray.",
+	"tray.completedTitle":    "Downloads completed",
+	"tray.completedBody":     "All downloads in the queue have finished successfully.",
 
 	// Downloads (pkg/downloader and applog.go)
 	"downloads.queued":             "Queued: %s",
