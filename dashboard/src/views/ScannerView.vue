@@ -186,6 +186,8 @@ const onResetFilters = () => {
   currentPage.value = 1
   nameSelectionMenus.value = {}
   bulkNameMenuOpen.value = false
+  sortKey.value = 'date'
+  sortOrder.value = 'desc'
 }
 
 // Reactividad instantánea en el cliente al activar/desactivar filtros
@@ -207,14 +209,70 @@ const filteredResults = computed(() => {
   })
 })
 
-// Reiniciar a la página 1 cuando cambian los resultados filtrados o el tamaño de página
-watch([filteredResults, pageSize], () => {
+// Ordenación de columnas en la tabla de resultados
+const sortKey = ref('date')
+const sortOrder = ref('desc')
+
+const mediaKindOrder = {
+  song: 1,
+  file: 2,
+  photo: 3,
+  sticker: 4,
+  video: 5
+}
+
+const toggleSort = (key) => {
+  if (sortKey.value === key) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    if (key === 'date' || key === 'size') {
+      sortOrder.value = 'desc'
+    } else {
+      sortOrder.value = 'asc'
+    }
+  }
+}
+
+const sortedResults = computed(() => {
+  const items = [...filteredResults.value]
+  const isAsc = sortOrder.value === 'asc'
+
+  items.sort((a, b) => {
+    let result = 0
+    if (sortKey.value === 'type') {
+      const rankA = mediaKindOrder[a.kind] || 99
+      const rankB = mediaKindOrder[b.kind] || 99
+      result = rankA - rankB
+    } else if (sortKey.value === 'name') {
+      result = (a.file_name || '').localeCompare(b.file_name || '', undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      })
+    } else if (sortKey.value === 'size') {
+      result = (a.file_size || 0) - (b.file_size || 0)
+    } else if (sortKey.value === 'date') {
+      result = (a.date || 0) - (b.date || 0)
+    }
+
+    if (result !== 0) {
+      return isAsc ? result : -result
+    }
+
+    return (b.date || 0) - (a.date || 0)
+  })
+
+  return items
+})
+
+// Reiniciar a la página 1 cuando cambian los resultados ordenados o el tamaño de página
+watch([sortedResults, pageSize], () => {
   currentPage.value = 1
 })
 
 const paginatedResults = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
-  return filteredResults.value.slice(start, start + pageSize.value)
+  return sortedResults.value.slice(start, start + pageSize.value)
 })
 
 const isAllSelected = computed(() => {
@@ -602,11 +660,31 @@ const getKindIcon = (kind) => {
                   @change="toggleSelectAll"
                 />
               </th>
-              <th class="col-type">{{ t('scanner.type') }}</th>
-              <th class="col-name">{{ t('scanner.fileName') }}</th>
+              <th class="col-type sortable" @click="toggleSort('type')">
+                <span>{{ t('scanner.type') }}</span>
+                <span v-if="sortKey === 'type'" class="sort-icon">{{
+                  sortOrder === 'asc' ? '▲' : '▼'
+                }}</span>
+              </th>
+              <th class="col-name sortable" @click="toggleSort('name')">
+                <span>{{ t('scanner.fileName') }}</span>
+                <span v-if="sortKey === 'name'" class="sort-icon">{{
+                  sortOrder === 'asc' ? '▲' : '▼'
+                }}</span>
+              </th>
               <th class="col-name-mode">{{ t('scanner.nameModeColumn') }}</th>
-              <th class="col-date">{{ t('scanner.date') }}</th>
-              <th class="col-size">{{ t('scanner.size') }}</th>
+              <th class="col-date sortable" @click="toggleSort('date')">
+                <span>{{ t('scanner.date') }}</span>
+                <span v-if="sortKey === 'date'" class="sort-icon">{{
+                  sortOrder === 'asc' ? '▲' : '▼'
+                }}</span>
+              </th>
+              <th class="col-size sortable" @click="toggleSort('size')">
+                <span>{{ t('scanner.size') }}</span>
+                <span v-if="sortKey === 'size'" class="sort-icon">{{
+                  sortOrder === 'asc' ? '▲' : '▼'
+                }}</span>
+              </th>
               <th class="col-action"></th>
             </tr>
           </thead>
@@ -1200,6 +1278,23 @@ html.theme-light .compact-select option {
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
+}
+
+.scanner-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.scanner-table th.sortable:hover {
+  color: var(--user-primary);
+}
+
+.sort-icon {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 9px;
+  color: var(--user-primary);
 }
 
 .scanner-table tr.selected {
