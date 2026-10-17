@@ -1071,6 +1071,7 @@ const sendTestNotification = async () => {
     <!-- Los ajustes se guardan solos; este botón es para forzar el guardado en
          el momento. Va flotando en la esquina para no ocupar sitio dentro del
          panel ahora que las secciones se pliegan. -->
+    <!-- Botón de guardado manual ocultado ya que la vista cuenta con autoguardado:
     <button
       class="save-button save-fab"
       type="button"
@@ -1081,6 +1082,7 @@ const sendTestNotification = async () => {
     >
       <Save :size="19" />
     </button>
+    -->
   </div>
 </template>
 
