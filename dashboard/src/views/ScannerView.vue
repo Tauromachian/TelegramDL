@@ -593,7 +593,11 @@ const getKindIcon = (kind) => {
           <!--   }} -->
           <!-- </span> -->
           <!-- <p v-if="serverMessage" class="server-msg">{{ serverMessage }}</p> -->
-          <AppInput v-model="search" placeholder="Search"></AppInput>
+          <AppInput
+            v-model="search"
+            placeholder="Search"
+            class="input-search"
+          ></AppInput>
         </div>
 
         <div class="results-toolbar">
@@ -1512,5 +1516,9 @@ html.theme-light .compact-select option {
   to {
     transform: rotate(360deg);
   }
+}
+
+.input-search {
+  min-width: 360px;
 }
 </style>
