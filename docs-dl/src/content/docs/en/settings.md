@@ -19,6 +19,7 @@ Controls network engine performance and file organization on disk:
 - **Global speed limit**: Sets a maximum total download rate in `KB/s`, `MB/s`, or `GB/s`. Enter `0` to disable speed limiting.
 - **Download folder**: System destination directory where completed files are saved. Includes an interactive folder picker.
 - **Subfolder per chat (Listener)**: When enabled, files downloaded from the **Listener** tab are automatically organized in subfolders named after the source chat or channel (or its numeric ID if non-printable characters are present).
+- **Minimize to System Tray**: When minimizing the main desktop application window, it hides in the system notification area (near the taskbar clock) to keep downloads running in the background. Shows a native toast with panel audio when the queue completes.
 
 ---
 
@@ -134,5 +135,9 @@ Clearing history **never deletes physical files** from your hard drive.
 ## 7. Additional Sidebar Controls
 
 - **Power off when done**: Toggling «Apagar al terminar» arms automatic PC shutdown 15 seconds after the download queue empties. Displays a live countdown while active. *(Session-only setting)*.
-- **App sound**: Toggles audio alerts when downloads complete.
+- **App sound**: Toggles audio alerts when downloads complete (both in the web panel and in System Tray notifications when minimized).
 - **Log out of Telegram**: Safely closes the active Telegram session without removing local settings or database records.
+
+:::tip[Complete Notifications Guide]
+For detailed information on configuring and toggling bot alerts, panel chimes, or System Tray notifications, check the [Notification System](/TelegramDL/en/notifications) guide.
+:::

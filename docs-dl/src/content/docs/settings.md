@@ -19,6 +19,7 @@ Controla el rendimiento del motor de red y la organización de archivos en disco
 - **Límite global de velocidad**: Establece una velocidad máxima de descarga global en `KB/s`, `MB/s` o `GB/s`. Introduce `0` para quitar el límite de velocidad.
 - **Carpeta de descargas**: Ruta del sistema donde se guardarán los archivos completados. Incluye un explorador integrado de carpetas.
 - **Carpeta por chat (escucha)**: Al activar esta opción, los archivos descargados desde la pestaña **Escucha** se organizan automáticamente en subcarpetas nombradas según el chat o canal de origen (o su ID numérico si contiene caracteres no válidos para el sistema de archivos).
+- **Minimizar al System Tray**: Al minimizar la ventana principal en la aplicación de escritorio, esta se oculta en la bandeja del sistema (área de notificación junto al reloj) para continuar las descargas en segundo plano. Si la cola de trabajo finaliza mientras está minimizada, enviará una notificación nativa con el sonido del panel.
 
 ---
 
@@ -134,5 +135,9 @@ La acción de limpiar historial **nunca elimina los archivos físicos** descarga
 ## 7. Opciones Adicionales de la Barra Lateral
 
 - **Apagar al terminar**: Al activar el interruptor «Apagar al terminar» en la barra lateral, el equipo se apagará automáticamente 15 segundos después de que la cola de descargas quede totalmente vacía. Mientras esté activo, se mostrará una cuenta atrás en vivo. *(Ajuste temporal por sesión)*.
-- **Sonido de la app**: Activa o desactiva las alertas sonoras en la interfaz web/escritorio al finalizar una descarga.
+- **Sonido de la app**: Activa o desactiva las alertas sonoras al finalizar una descarga (tanto en el panel web como en las notificaciones del System Tray al estar minimizado).
 - **Cerrar sesión de Telegram**: Cierra de forma segura la sesión activa de Telegram sin borrar tus ajustes locales ni la base de datos.
+
+:::tip[Guía Completa de Notificaciones]
+Para información detallada sobre cómo configurar y activar/desactivar las alertas del bot, tonos del panel o notificaciones del System Tray, consulta la guía del [Sistema de Notificaciones](/TelegramDL/notifications).
+:::

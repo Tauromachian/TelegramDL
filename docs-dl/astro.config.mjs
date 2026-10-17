@@ -66,6 +66,13 @@ export default defineConfig({
 					link: '/settings',
 				},
 				{
+					label: 'Notificaciones',
+					translations: {
+						en: 'Notifications',
+					},
+					link: '/notifications',
+				},
+				{
 					label: 'Acceso Remoto',
 					translations: {
 						en: 'Remote Access',
