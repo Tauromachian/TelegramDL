@@ -2,8 +2,6 @@
 import { computed, ref, watch } from 'vue'
 import {
   Activity,
-  ArrowLeft,
-  ArrowRight,
   ArrowUpRight,
   CheckCircle2,
   Clock3,
@@ -21,6 +19,7 @@ import { useI18n } from '../i18n'
 
 import AppButton from '../components/AppButton.vue'
 import AppPill from '../components/AppPill.vue'
+import AppPagination from '../components/AppPagination.vue'
 
 const { t, has } = useI18n()
 
@@ -156,10 +155,9 @@ const readSavedPageSize = () => {
 const pageSize = ref(readSavedPageSize())
 const historyPage = ref(1)
 
-// Al cambiar el tamaño, la página en la que estabas ya no significa lo mismo:
-// se vuelve al principio.
+// Al cambiar el tamaño guardado además se persiste en el navegador: el
+// reinicio de página lo hace AppPagination (v-model:size).
 watch(pageSize, (size) => {
-  historyPage.value = 1
   try {
     localStorage.setItem(PAGE_SIZE_KEY, size)
   } catch (e) {
@@ -173,35 +171,10 @@ const historyDownloads = computed(() =>
   )
 )
 
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(historyDownloads.value.length / pageSize.value))
-)
-
-// Al borrar elementos la última página puede desaparecer: si estábamos en ella,
-// retrocedemos para no quedarnos mirando una lista vacía.
-watch(totalPages, (total) => {
-  if (historyPage.value > total) historyPage.value = total
-})
-
 const recentDownloads = computed(() => {
   const start = (historyPage.value - 1) * pageSize.value
   return historyDownloads.value.slice(start, start + pageSize.value)
 })
-
-// Como mucho 5 botones de página alrededor de la actual, para que el paginador
-// no se desborde cuando el historial es largo.
-const visiblePages = computed(() => {
-  const total = totalPages.value
-  const max = 5
-  if (total <= max) return Array.from({ length: total }, (_, i) => i + 1)
-  const end = Math.min(total, Math.max(1, historyPage.value - 2) + max - 1)
-  const start = Math.max(1, end - max + 1)
-  return Array.from({ length: end - start + 1 }, (_, i) => start + i)
-})
-
-const goToPage = (page) => {
-  historyPage.value = Math.min(totalPages.value, Math.max(1, page))
-}
 
 // El estado llega del backend; si apareciera uno sin traducción (p. ej.
 // 'duplicate', que solo sirve para disparar el aviso y nunca se pinta) se
@@ -523,67 +496,15 @@ const allActivePaused = computed(() => {
         </button>
       </div>
 
-      <!-- Paginador del historial. La barra aparece en cuanto hay historial,
-           aunque quepa en una sola página: si no, al elegir 15 elementos con 12
-           en la lista desaparecería junto con el selector y no habría forma de
-           volver a bajarlo. Lo que se oculta con una sola página son los
-           botones de página, que ahí no pintan nada. -->
-      <div v-if="historyDownloads.length" class="history-pager">
-        <template v-if="totalPages > 1">
-          <button
-            class="pager-btn"
-            type="button"
-            :title="t('downloads.prevPage')"
-            :aria-label="t('downloads.prevPage')"
-            :disabled="historyPage === 1"
-            @click="goToPage(historyPage - 1)"
-          >
-            <ArrowLeft :size="14" />
-          </button>
-          <button
-            v-for="page in visiblePages"
-            :key="page"
-            class="pager-btn"
-            :class="{ active: page === historyPage }"
-            type="button"
-            :aria-current="page === historyPage ? 'page' : undefined"
-            @click="goToPage(page)"
-          >
-            {{ page }}
-          </button>
-          <button
-            class="pager-btn"
-            type="button"
-            :title="t('downloads.nextPage')"
-            :aria-label="t('downloads.nextPage')"
-            :disabled="historyPage === totalPages"
-            @click="goToPage(historyPage + 1)"
-          >
-            <ArrowRight :size="14" />
-          </button>
-        </template>
-
-        <div class="pager-side">
-          <span v-if="totalPages > 1" class="pager-info">
-            {{
-              t('downloads.pageOf', {
-                page: historyPage,
-                total: totalPages
-              })
-            }}
-          </span>
-          <select
-            v-model="pageSize"
-            class="pager-select"
-            :title="t('downloads.perPageLabel')"
-            :aria-label="t('downloads.perPageLabel')"
-          >
-            <option v-for="size in PAGE_SIZES" :key="size" :value="size">
-              {{ t('downloads.perPage', { n: size }) }}
-            </option>
-          </select>
-        </div>
-      </div>
+      <!-- Paginador del historial: el estado (`historyPage`/`pageSize`) sigue
+           siendo de la vista; el componente solo lo edita vía v-model. -->
+      <AppPagination
+        v-if="historyDownloads.length"
+        v-model:page="historyPage"
+        v-model:size="pageSize"
+        :total="historyDownloads.length"
+        :sizes="PAGE_SIZES"
+      />
     </section>
   </div>
 </template>
