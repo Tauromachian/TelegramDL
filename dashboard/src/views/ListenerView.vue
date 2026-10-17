@@ -20,6 +20,8 @@ import AppPill from '../components/AppPill.vue'
 import { useAuthToken } from '../composables/useAuthToken'
 import { useI18n } from '../i18n'
 
+import AppButton from '../components/AppButton.vue'
+
 const { authHeaders } = useAuthToken()
 const { t, splitOn, has } = useI18n()
 
@@ -780,9 +782,10 @@ onUnmounted(() => {
             v-model="newChatId"
             @keyup.enter="addChat"
             :placeholder="t('listener.placeholder')"
-          /><button class="save-button" :disabled="saving" @click="addChat">
+          />
+          <AppButton :disabled="saving" @click="addChat">
             <Plus :size="15" /> {{ t('common.add') }}
-          </button>
+          </AppButton>
         </div>
         <div v-if="error" class="listener-error">{{ error }}</div>
         <div v-if="topicPicker.visible" class="topic-picker">
