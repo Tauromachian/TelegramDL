@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gotd/td/tg"
@@ -63,10 +65,23 @@ type ResolvedTargetInfo struct {
 	Username string `json:"username,omitempty"`
 }
 
+type DateRange struct {
+	StartTS int64
+	EndTS   int64
+}
+
+type ChatCache struct {
+	Items        map[int64]ScanItem
+	Ranges       []DateRange
+	ScannedTotal int
+}
+
 type ScannerService struct {
 	clientMgr *telegram.ClientManager
 	storage   *storage.Storage
 	engine    *downloader.Engine
+	cacheMu   sync.RWMutex
+	chatCache map[int64]*ChatCache
 }
 
 func NewScannerService(cm *telegram.ClientManager, st *storage.Storage, eng *downloader.Engine) *ScannerService {
@@ -74,7 +89,68 @@ func NewScannerService(cm *telegram.ClientManager, st *storage.Storage, eng *dow
 		clientMgr: cm,
 		storage:   st,
 		engine:    eng,
+		chatCache: make(map[int64]*ChatCache),
 	}
+}
+
+// GetUnscannedRanges calcula los subrangos de [reqStart, reqEnd] que aún no han sido escaneados.
+func GetUnscannedRanges(covered []DateRange, reqStart, reqEnd int64) []DateRange {
+	if reqEnd == 0 {
+		reqEnd = time.Now().Unix() + 86400
+	}
+	missing := []DateRange{{StartTS: reqStart, EndTS: reqEnd}}
+
+	for _, cov := range covered {
+		var nextMissing []DateRange
+		for _, m := range missing {
+			if cov.EndTS < m.StartTS || cov.StartTS > m.EndTS {
+				nextMissing = append(nextMissing, m)
+				continue
+			}
+			if m.StartTS < cov.StartTS {
+				nextMissing = append(nextMissing, DateRange{
+					StartTS: m.StartTS,
+					EndTS:   cov.StartTS - 1,
+				})
+			}
+			if m.EndTS > cov.EndTS {
+				nextMissing = append(nextMissing, DateRange{
+					StartTS: cov.EndTS + 1,
+					EndTS:   m.EndTS,
+				})
+			}
+		}
+		missing = nextMissing
+	}
+	return missing
+}
+
+// MergeRanges fusiona un nuevo rango escaneado con la lista de rangos existentes.
+func MergeRanges(covered []DateRange, newRange DateRange) []DateRange {
+	if newRange.StartTS > newRange.EndTS && newRange.EndTS > 0 {
+		return covered
+	}
+	all := append(covered, newRange)
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].StartTS < all[j].StartTS
+	})
+
+	var merged []DateRange
+	for _, r := range all {
+		if len(merged) == 0 {
+			merged = append(merged, r)
+			continue
+		}
+		last := &merged[len(merged)-1]
+		if r.StartTS <= last.EndTS+1 {
+			if r.EndTS > last.EndTS {
+				last.EndTS = r.EndTS
+			}
+		} else {
+			merged = append(merged, r)
+		}
+	}
+	return merged
 }
 
 // ResolveTarget identifica un chat, bot o canal ingresado por el usuario.
@@ -215,6 +291,7 @@ func (s *ScannerService) resolveInputPeer(ctx context.Context, chatID int64) (tg
 }
 
 // Scan busca en el historial de Telegram filtrando por fechas, tipo de medio y tamaño.
+// Utiliza una caché en memoria por chat para evitar re-escanear rangos ya consultados.
 func (s *ScannerService) Scan(ctx context.Context, req ScanRequest) (*ScanResponse, error) {
 	if s.clientMgr == nil {
 		return nil, errors.New(i18n.T("scanner.tgClientUnavailable"))
@@ -251,13 +328,31 @@ func (s *ScannerService) Scan(ctx context.Context, req ScanRequest) (*ScanRespon
 	}
 	if req.EndDate != "" {
 		if t, err := time.ParseInLocation("2006-01-02", req.EndDate, time.Local); err == nil {
-			// Ajustar al final del día (23:59:59)
 			endTS = t.Add(23*time.Hour + 59*time.Minute + 59*time.Second).Unix()
 		}
 	}
 	if endTS == 0 {
 		endTS = time.Now().Unix() + 86400
 	}
+
+	// Obtener o inicializar la caché para este chat
+	s.cacheMu.Lock()
+	if s.chatCache == nil {
+		s.chatCache = make(map[int64]*ChatCache)
+	}
+	cache, exists := s.chatCache[chatID]
+	if !exists {
+		cache = &ChatCache{
+			Items: make(map[int64]ScanItem),
+		}
+		s.chatCache[chatID] = cache
+	}
+	s.cacheMu.Unlock()
+
+	// Determinar los subrangos de fechas que aún no se han escaneado para este chat
+	s.cacheMu.RLock()
+	missingRanges := GetUnscannedRanges(cache.Ranges, startTS, endTS)
+	s.cacheMu.RUnlock()
 
 	maxScan := req.MaxScan
 	if maxScan <= 0 || maxScan > 5000 {
@@ -269,142 +364,188 @@ func (s *ScannerService) Scan(ctx context.Context, req ScanRequest) (*ScanRespon
 		batchLimit = maxScan
 	}
 
-	offsetID := 0
-	scannedTotal := 0
-	var items []ScanItem
-	reachedLimit := false
 	var floodMsg string
 
-	for scannedTotal < maxScan {
-		// Pausa preventiva entre peticiones para evitar FLOOD_WAIT
-		if scannedTotal > 0 {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(350 * time.Millisecond):
-			}
-		}
+	// Escanear únicamente los rangos de fechas faltantes en Telegram
+	for _, mRange := range missingRanges {
+		offsetID := 0
+		scannedInRun := 0
+		reachedLimit := false
+		actualStart := mRange.EndTS // Seguimiento de la fecha más antigua alcanzada en este escaneo
 
-		reqBatch := &tg.MessagesGetHistoryRequest{
-			Peer:     peer,
-			OffsetID: offsetID,
-			Limit:    batchLimit,
-		}
-
-		res, err := raw.MessagesGetHistory(ctx, reqBatch)
-		if err != nil {
-			if floodDur, ok := parseFloodWait(err); ok {
-				downloader.SetFloodWait(floodDur)
-				waitSeconds := int(floodDur.Seconds())
-				if waitSeconds > 10 {
-					floodMsg = i18n.T("scanner.floodWaitNotice", waitSeconds)
-					break
+		for scannedInRun < maxScan {
+			// Pausa preventiva entre peticiones para evitar FLOOD_WAIT
+			if scannedInRun > 0 {
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case <-time.After(350 * time.Millisecond):
 				}
-				time.Sleep(floodDur)
-				continue
-			}
-			return nil, fmt.Errorf(i18n.T("scanner.historyFetchErr"), err)
-		}
-
-		var msgClasses []tg.MessageClass
-		switch m := res.(type) {
-		case *tg.MessagesMessages:
-			msgClasses = m.Messages
-		case *tg.MessagesMessagesSlice:
-			msgClasses = m.Messages
-		case *tg.MessagesChannelMessages:
-			msgClasses = m.Messages
-		}
-
-		if len(msgClasses) == 0 {
-			break
-		}
-
-		for _, mc := range msgClasses {
-			msg, ok := mc.(*tg.Message)
-			if !ok {
-				continue
 			}
 
-			scannedTotal++
-			offsetID = msg.ID
-
-			msgDate := int64(msg.Date)
-
-			// Si el mensaje es más reciente que el límite superior (EndDate), omitir
-			if endTS > 0 && msgDate > endTS {
-				continue
+			reqBatch := &tg.MessagesGetHistoryRequest{
+				Peer:     peer,
+				OffsetID: offsetID,
+				Limit:    batchLimit,
 			}
 
-			// Si el mensaje es más antiguo que StartDate, detener búsqueda (historial descendente)
-			if startTS > 0 && msgDate < startTS {
-				reachedLimit = true
+			res, err := raw.MessagesGetHistory(ctx, reqBatch)
+			if err != nil {
+				if floodDur, ok := parseFloodWait(err); ok {
+					downloader.SetFloodWait(floodDur)
+					waitSeconds := int(floodDur.Seconds())
+					if waitSeconds > 10 {
+						floodMsg = i18n.T("scanner.floodWaitNotice", waitSeconds)
+						break
+					}
+					time.Sleep(floodDur)
+					continue
+				}
+				return nil, fmt.Errorf(i18n.T("scanner.historyFetchErr"), err)
+			}
+
+			var msgClasses []tg.MessageClass
+			switch resMsg := res.(type) {
+			case *tg.MessagesMessages:
+				msgClasses = resMsg.Messages
+			case *tg.MessagesMessagesSlice:
+				msgClasses = resMsg.Messages
+			case *tg.MessagesChannelMessages:
+				msgClasses = resMsg.Messages
+			}
+
+			if len(msgClasses) == 0 {
 				break
 			}
 
-			// Extraer información multimedia
-			mediaInfo := downloader.ExtractMediaInfo(msg)
-			if mediaInfo == nil {
-				continue
+			s.cacheMu.Lock()
+			cache.ScannedTotal += len(msgClasses)
+			s.cacheMu.Unlock()
+
+			for _, mc := range msgClasses {
+				msg, ok := mc.(*tg.Message)
+				if !ok {
+					continue
+				}
+
+				scannedInRun++
+				offsetID = msg.ID
+				msgDate := int64(msg.Date)
+
+				if msgDate < actualStart {
+					actualStart = msgDate
+				}
+
+				// Si el mensaje es más reciente que el límite superior del rango faltante, omitir e ir más atrás
+				if mRange.EndTS > 0 && msgDate > mRange.EndTS {
+					continue
+				}
+
+				// Si el mensaje es más antiguo que el límite inferior del rango faltante, detener este sub-escaneo
+				if mRange.StartTS > 0 && msgDate < mRange.StartTS {
+					reachedLimit = true
+					break
+				}
+
+				// Extraer información multimedia y guardarla en la caché del chat
+				mediaInfo := downloader.ExtractMediaInfo(msg)
+				if mediaInfo == nil {
+					continue
+				}
+
+				tMsg := time.Unix(msgDate, 0)
+				dateStr := tMsg.Format("2006-01-02 15:04:05")
+
+				item := ScanItem{
+					ID:               fmt.Sprintf("scanner:%d:%d", chatID, msg.ID),
+					ChatID:           chatID,
+					ChatName:         chatName,
+					MessageID:        int64(msg.ID),
+					FileName:         mediaInfo.FileName,
+					CaptionFileName:  mediaInfo.CaptionFileName,
+					OriginalFileName: mediaInfo.OriginalFileName,
+					Kind:             string(mediaInfo.Kind),
+					FileSize:         mediaInfo.FileSize,
+					FormattedSize:    config.FormatBytes(float64(mediaInfo.FileSize)),
+					Date:             msgDate,
+					DateStr:          dateStr,
+				}
+
+				s.cacheMu.Lock()
+				cache.Items[item.MessageID] = item
+				s.cacheMu.Unlock()
 			}
 
-			// Filtros por tipo
-			allowed := false
-			switch mediaInfo.Kind {
-			case downloader.KindPhoto:
-				allowed = req.FPhotos
-			case downloader.KindVideo:
-				allowed = req.FVideos
-			case downloader.KindSong:
-				allowed = req.FAudios
-			case downloader.KindSticker:
-				allowed = req.FStickers
-			case downloader.KindFile:
-				allowed = req.FDocs
+			if reachedLimit {
+				break
 			}
-			if !allowed {
-				continue
-			}
-
-			// Filtros por tamaño
-			if req.MinSize > 0 && mediaInfo.FileSize < req.MinSize {
-				continue
-			}
-			if req.MaxSize > 0 && mediaInfo.FileSize > req.MaxSize {
-				continue
-			}
-
-			tMsg := time.Unix(msgDate, 0)
-			dateStr := tMsg.Format("2006-01-02 15:04:05")
-
-			item := ScanItem{
-				ID:               fmt.Sprintf("scanner:%d:%d", chatID, msg.ID),
-				ChatID:           chatID,
-				ChatName:         chatName,
-				MessageID:        int64(msg.ID),
-				FileName:         mediaInfo.FileName,
-				CaptionFileName:  mediaInfo.CaptionFileName,
-				OriginalFileName: mediaInfo.OriginalFileName,
-				Kind:             string(mediaInfo.Kind),
-				FileSize:         mediaInfo.FileSize,
-				FormattedSize:    config.FormatBytes(float64(mediaInfo.FileSize)),
-				Date:             msgDate,
-				DateStr:          dateStr,
-			}
-			items = append(items, item)
 		}
 
-		if reachedLimit {
-			break
+		// Registrar en la caché el rango efectivamente escaneado
+		if actualStart <= mRange.EndTS {
+			s.cacheMu.Lock()
+			cache.Ranges = MergeRanges(cache.Ranges, DateRange{StartTS: actualStart, EndTS: mRange.EndTS})
+			s.cacheMu.Unlock()
 		}
 	}
+
+	// Filtrar de la caché todos los elementos que corresponden al rango de fechas, tipos de medio y tamaños solicitados
+	s.cacheMu.RLock()
+	var resultItems []ScanItem
+	for _, item := range cache.Items {
+		// Filtrar por el rango de fechas actual
+		if startTS > 0 && item.Date < startTS {
+			continue
+		}
+		if endTS > 0 && item.Date > endTS {
+			continue
+		}
+
+		// Filtros por tipo de archivo
+		allowed := false
+		switch item.Kind {
+		case string(downloader.KindPhoto):
+			allowed = req.FPhotos
+		case string(downloader.KindVideo):
+			allowed = req.FVideos
+		case string(downloader.KindSong):
+			allowed = req.FAudios
+		case string(downloader.KindSticker):
+			allowed = req.FStickers
+		case string(downloader.KindFile):
+			allowed = req.FDocs
+		}
+		if !allowed {
+			continue
+		}
+
+		// Filtros por tamaño
+		if req.MinSize > 0 && item.FileSize < req.MinSize {
+			continue
+		}
+		if req.MaxSize > 0 && item.FileSize > req.MaxSize {
+			continue
+		}
+
+		resultItems = append(resultItems, item)
+	}
+	scannedTotal := cache.ScannedTotal
+	s.cacheMu.RUnlock()
+
+	// Ordenar los resultados del rango actual por fecha descendente
+	sort.Slice(resultItems, func(i, j int) bool {
+		if resultItems[i].Date == resultItems[j].Date {
+			return resultItems[i].MessageID > resultItems[j].MessageID
+		}
+		return resultItems[i].Date > resultItems[j].Date
+	})
 
 	return &ScanResponse{
 		Status:       "ok",
 		ScannedCount: scannedTotal,
-		MatchCount:   len(items),
-		Items:        items,
-		ReachedLimit: reachedLimit || scannedTotal >= maxScan,
+		MatchCount:   len(resultItems),
+		Items:        resultItems,
+		ReachedLimit: true,
 		Message:      floodMsg,
 	}, nil
 }
@@ -469,4 +610,3 @@ func parseFloodWait(err error) (time.Duration, bool) {
 	}
 	return time.Duration(seconds) * time.Second, true
 }
-
