@@ -778,10 +778,14 @@ html.theme-light select option {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 20px;
   border-top: 1px solid var(--user-border);
-  border-bottom: 1px solid var(--user-border);
-  padding: 17px 0;
+  padding-top: 16px;
   margin-top: 18px;
+}
+.setting-line > div {
+  flex: 1;
+  min-width: 0;
 }
 .setting-line strong {
   display: block;
