@@ -164,9 +164,9 @@ antes de abrir un pull request).
 
 ¡Gracias a todas las personas que contribuyen a **TelegramDL**!
 
-<a href="https://github.com/infinityxgame/TelegramDL/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=infinityxgame/TelegramDL" alt="Colaboradores de TelegramDL" />
-</a>
+<!-- CONTRIBUTORS-START -->
+
+<!-- CONTRIBUTORS-END -->
 
 ## Licencia
 
