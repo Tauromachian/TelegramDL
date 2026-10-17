@@ -17,6 +17,7 @@ import { useAuthToken } from '../composables/useAuthToken'
 import { useI18n } from '../i18n'
 
 import AppPagination from '../components/AppPagination.vue'
+import AppInput from '../components/AppInput.vue'
 
 const { authHeaders } = useAuthToken()
 const { t } = useI18n()
@@ -59,6 +60,7 @@ const fVideos = ref(true)
 const fAudios = ref(true)
 const fDocs = ref(true)
 const fStickers = ref(true)
+const search = ref('')
 
 const minSizeVal = ref('')
 const minSizeUnit = ref('MB')
@@ -192,21 +194,29 @@ const onResetFilters = () => {
 
 // Reactividad instantánea en el cliente al activar/desactivar filtros
 const filteredResults = computed(() => {
+  if (!rawResults.value.length) return []
+
+  const results = []
+
   const minB = parseSizeBytes(minSizeVal.value, minSizeUnit.value)
   const maxB = parseSizeBytes(maxSizeVal.value, maxSizeUnit.value)
 
-  return rawResults.value.filter((item) => {
-    if (item.kind === 'photo' && !fPhotos.value) return false
-    if (item.kind === 'video' && !fVideos.value) return false
-    if (item.kind === 'song' && !fAudios.value) return false
-    if (item.kind === 'file' && !fDocs.value) return false
-    if (item.kind === 'sticker' && !fStickers.value) return false
+  for (const item of rawResults.value) {
+    if (item.kind === 'photo' && !fPhotos.value) continue
+    if (item.kind === 'video' && !fVideos.value) continue
+    if (item.kind === 'song' && !fAudios.value) continue
+    if (item.kind === 'file' && !fDocs.value) continue
+    if (item.kind === 'sticker' && !fStickers.value) continue
 
-    if (minB > 0 && item.file_size < minB) return false
-    if (maxB > 0 && item.file_size > maxB) return false
+    if (minB > 0 && item.file_size < minB) continue
+    if (maxB > 0 && item.file_size > maxB) continue
 
-    return true
-  })
+    if (search.value && !item.file_name.includes(search.value)) continue
+
+    results.push(item)
+  }
+
+  return results
 })
 
 // Ordenación de columnas en la tabla de resultados
@@ -568,21 +578,22 @@ const getKindIcon = (kind) => {
       <div class="panel-heading results-heading">
         <!-- Texto del contador dividido en 2 líneas y más grande -->
         <div class="results-counter-box">
-          <span class="results-count-title">
-            {{
-              t('scanner.resultsCount', {
-                count: filteredResults.length
-              })
-            }}
-          </span>
-          <span class="scanned-count-sub">
-            {{
-              t('scanner.messagesScanned', {
-                scanned: scannedCount
-              })
-            }}
-          </span>
-          <p v-if="serverMessage" class="server-msg">{{ serverMessage }}</p>
+          <!-- <span class="results-count-title"> -->
+          <!--   {{ -->
+          <!--     t('scanner.resultsCount', { -->
+          <!--       count: filteredResults.length -->
+          <!--     }) -->
+          <!--   }} -->
+          <!-- </span> -->
+          <!-- <span class="scanned-count-sub"> -->
+          <!--   {{ -->
+          <!--     t('scanner.messagesScanned', { -->
+          <!--       scanned: scannedCount -->
+          <!--     }) -->
+          <!--   }} -->
+          <!-- </span> -->
+          <!-- <p v-if="serverMessage" class="server-msg">{{ serverMessage }}</p> -->
+          <AppInput v-model="search" placeholder="Search"></AppInput>
         </div>
 
         <div class="results-toolbar">
