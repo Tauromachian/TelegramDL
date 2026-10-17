@@ -160,6 +160,14 @@ El servidor interno escucha por defecto en `127.0.0.1:8000`.
 para la guía de contribución (entorno de desarrollo, convenciones y checklist
 antes de abrir un pull request).
 
+## Colaboradores
+
+¡Gracias a todas las personas que contribuyen a **TelegramDL**!
+
+<a href="https://github.com/infinityxgame/TelegramDL/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=infinityxgame/TelegramDL" alt="Colaboradores de TelegramDL" />
+</a>
+
 ## Licencia
 
 Consulta [LICENSE](LICENSE) para conocer las condiciones de uso y distribución.
