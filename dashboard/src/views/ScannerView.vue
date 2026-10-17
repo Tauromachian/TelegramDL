@@ -865,11 +865,15 @@ const getKindIcon = (kind) => {
 }
 
 /* Visibilidad clara del icono de calendario en temas oscuros (blanco brillante) */
+.scanner-input[type='date'] {
+  color-scheme: dark;
+}
+
 .scanner-input[type='date']::-webkit-calendar-picker-indicator {
   cursor: pointer !important;
-  filter: invert(1) !important;
-  -webkit-filter: invert(1) !important;
-  opacity: 0.95 !important;
+  filter: brightness(0) invert(1) !important;
+  -webkit-filter: brightness(0) invert(1) !important;
+  opacity: 1 !important;
 }
 
 /* Reglas específicas para Temas Claros (Silent Cherry, OSX Light, etc. - html.theme-light) */
@@ -892,11 +896,15 @@ html.theme-light .compact-label {
   color: var(--light-text-dim, #64748b) !important;
 }
 
+html.theme-light .scanner-input[type='date'] {
+  color-scheme: light;
+}
+
 html.theme-light
   .scanner-input[type='date']::-webkit-calendar-picker-indicator {
-  filter: none !important;
-  -webkit-filter: none !important;
-  opacity: 0.8 !important;
+  filter: brightness(0) !important;
+  -webkit-filter: brightness(0) !important;
+  opacity: 0.75 !important;
 }
 
 .search-btn.save-button {
