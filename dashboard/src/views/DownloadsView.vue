@@ -432,23 +432,27 @@ const allActivePaused = computed(() => {
               FLOOD_WAIT ({{ floodWaitCountdown }}s)
             </span>
             <span v-else>{{ statusText(item.status) }}</span>
-            <button
+            <AppButton
               v-if="['downloading', 'queued'].includes(item.status)"
+              variant="text"
+              tone="warning"
               class="pause-action"
               @click="emit('pause-download', item.id)"
             >
               <Gauge :size="12" /> {{ t('downloads.pause') }}
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               v-if="item.status === 'paused'"
+              variant="text"
+              tone="success"
               class="resume-action"
               @click="emit('resume-download', item.id)"
             >
               <ArrowUpRight :size="12" /> {{ t('downloads.resume') }}
-            </button>
-            <button @click="emit('cancel-download', item.id)">
+            </AppButton>
+            <AppButton variant="text" @click="emit('cancel-download', item.id)">
               <X :size="12" /> {{ t('downloads.cancel') }}
-            </button>
+            </AppButton>
           </div>
         </div>
       </section>
