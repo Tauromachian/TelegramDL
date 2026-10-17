@@ -28,9 +28,32 @@ const props = defineProps({
   active: { type: Boolean, default: true }
 })
 
+const formatDateISO = (d) => {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getDefaultDates = () => {
+  const now = new Date()
+  const end = formatDateISO(now)
+
+  const past = new Date(now)
+  past.setMonth(past.getMonth() - 3)
+  if (past.getDate() !== now.getDate()) {
+    past.setDate(0)
+  }
+  const start = formatDateISO(past)
+
+  return { start, end }
+}
+
+const defaultDates = getDefaultDates()
+
 const target = ref('')
-const startDate = ref('')
-const endDate = ref('')
+const startDate = ref(defaultDates.start)
+const endDate = ref(defaultDates.end)
 const fPhotos = ref(true)
 const fVideos = ref(true)
 const fAudios = ref(true)
@@ -141,9 +164,10 @@ const onSearch = async () => {
 }
 
 const onResetFilters = () => {
+  const defaults = getDefaultDates()
   target.value = ''
-  startDate.value = ''
-  endDate.value = ''
+  startDate.value = defaults.start
+  endDate.value = defaults.end
   fPhotos.value = true
   fVideos.value = true
   fAudios.value = true
