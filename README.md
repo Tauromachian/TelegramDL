@@ -17,6 +17,7 @@ TelegramDL es un gestor de descargas de Telegram para escritorio, desarrollado c
 - Pausar, reanudar, cancelar y reintentar descargas.
 - Historial persistente en SQLite.
 - Escucha de canales, grupos y chats con filtros por tipo de contenido.
+- Escáner histórico para buscar y descargar contenido pasado en chats, canales y bots, con rango de fechas de 3 meses por defecto, caché inteligente por rangos e inspección/ordenación interactiva por columnas.
 - Descarga automática o detección para descarga manual.
 - Panel web y aplicación de escritorio mediante Wails.
 - Indicador de velocidad suavizado para evitar picos falsos.

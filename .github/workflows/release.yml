@@ -279,7 +279,7 @@ jobs:
           thread_id: ${{ secrets.TELEGRAM_TOPIC_ID }}
           format: html
           message: |
-            🚀 <b>¡Nueva versión de TGDown publicada!</b>
+            🚀 <b>¡Nueva versión de TelegramDL publicada!</b>
 
             📦 <b>Versión:</b> <code>${{ github.ref_name }}</code>
             🔗 <b>Enlace:</b> https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}

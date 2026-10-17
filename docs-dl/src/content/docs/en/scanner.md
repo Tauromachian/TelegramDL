@@ -47,9 +47,10 @@ In the **"Chat ID, Bot Username or Link"** field, you can enter any valid source
 
 You can refine results using combined filters that process instantly:
 
-### 1. Date Range
-- **Start Date**: Initial date from which to scan messages.
-- **End Date**: Upper date limit for the scan.
+### 1. Default Date Range & Customization
+- **Default Range (3 Months)**: When opening the scanner, date fields default to a **3-month range** (*End Date* is set to today and *Start Date* is set to 3 months ago). This prevents unintended mass scans of entire chat histories and helps avoid `FLOOD_WAIT` rate limits.
+- **Flexible Customization**: You can freely adjust the *Start Date* and *End Date* at any time to match the specific period you wish to inspect.
+- **Smart Date-Range Caching**: The scanner engine caches scanned messages per chat. When extending the date range (e.g., to scan a 4th month prior), the system calculates already cached date segments and **only fetches missing days from Telegram**. Items outside the active date range are hidden from the current view, but remain in session cache.
 
 ### 2. Media Type Filters
 Check or uncheck content types to include in the results:
@@ -65,6 +66,18 @@ Check or uncheck content types to include in the results:
 
 ### Instant Client-side Reactivity
 When modifying date, media type, or size filters after executing a scan, table results update instantly in real time without triggering additional network calls to the server.
+
+---
+
+## Dynamic Column Sorting
+
+The results table allows sorting elements by clicking on column headers:
+
+- **Default**: Displays newest messages first (date descending order).
+- **Media Type**: Clicking the *Type* header sorts items according to the hierarchy: **Audio → Documents → Photos → Stickers → Videos** (and reversed when clicked again).
+- **File Name**: Alphabetical sorting (A-Z / Z-A).
+- **Date**: Toggles between newest first and oldest first.
+- **File Size**: Sorts by file size (largest to smallest / smallest to largest).
 
 ---
 

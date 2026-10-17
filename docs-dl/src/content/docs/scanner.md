@@ -47,9 +47,10 @@ En el campo **"ID de Chat, Bot o Enlace"** puedes introducir cualquier origen v�
 
 Puedes afinar los resultados con filtros combinados que se procesan al instante:
 
-### 1. Rango de Fechas
-- **Desde**: Fecha inicial a partir de la cual buscar mensajes.
-- **Hasta**: Fecha límite superior para la búsqueda.
+### 1. Rango de Fechas por Defecto y Personalización
+- **Rango por Defecto (3 Meses)**: Al abrir el escáner, las fechas se inicializan automáticamente con un rango de **3 meses** (la fecha *Hasta* se fija en el día actual y *Desde* en 3 meses hacia el pasado). Esto previene búsquedas involuntarias del chat completo y evita posibles bloqueos por `FLOOD_WAIT`.
+- **Personalización Libre**: Puedes modificar las fechas *Desde* y *Hasta* en cualquier momento para ajustar el rango de búsqueda según tus necesidades.
+- **Caché Inteligente por Rangos**: El motor del escáner almacena en caché los mensajes ya escaneados por chat. Si amplías el rango (por ejemplo, para inspeccionar un 4.º mes atrás), el sistema únicamente solicita a Telegram los días faltantes. Los elementos fuera del rango seleccionado actualmente se ocultan de la vista, pero se conservan en la caché de la sesión.
 
 ### 2. Filtros por Tipo de Archivo
 Marca o desmarca los tipos de contenido que deseas incluir en los resultados:
@@ -65,6 +66,18 @@ Marca o desmarca los tipos de contenido que deseas incluir en los resultados:
 
 ### Reactividad Instantánea en Cliente
 Al cambiar las opciones de fecha, tipo o tamaño tras realizar una búsqueda, los resultados de la tabla se filtran en tiempo real sin requerir una nueva petición al servidor.
+
+---
+
+## Ordenación Dinámica de Resultados
+
+La tabla de resultados permite ordenar los elementos haciendo clic directamente sobre los encabezados de las columnas:
+
+- **Por Defecto**: Muestra los mensajes más recientes primero (orden por fecha descendente).
+- **Tipo de Archivo**: Al hacer clic en el encabezado *Tipo*, ordena los elementos según la jerarquía: **Audio → Documentos → Fotos → Stickers → Videos** (y en orden inverso al pulsar de nuevo).
+- **Nombre de Archivo**: Ordenación alfabética ascendente (A-Z) y descendente (Z-A).
+- **Fecha**: Alterna entre mensajes más recientes primero y más antiguos primero.
+- **Tamaño**: Ordena de mayor a menor tamaño o de menor a mayor.
 
 ---
 
