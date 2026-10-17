@@ -26,15 +26,18 @@ jobs:
               per_page: 100,
             });
 
-            // Excluir bots e IA
+            // Excluir bots, IA y al dueño del repositorio (owner)
             const humanContributors = contributors.filter(
-              c => c.type === 'User' && !c.login.includes('[bot]') && c.login.toLowerCase() !== 'claude'
+              c => c.type === 'User' &&
+                   !c.login.includes('[bot]') &&
+                   c.login.toLowerCase() !== 'claude' &&
+                   c.login.toLowerCase() !== repo.owner.toLowerCase()
             );
 
-            // Generar avatares pequeños enlazados al perfil individual
+            // Generar avatares pequeños circulares con separación
             const html = humanContributors
               .map(
-                c => `<a href="${c.html_url}" title="${c.login}">\n  <img src="${c.avatar_url}" width="48" height="48" style="border-radius:50%" alt="${c.login}" />\n</a>`
+                c => `<a href="${c.html_url}" title="${c.login}">\n  <img src="${c.avatar_url}" width="48" height="48" style="border-radius: 50%; margin: 3px;" alt="${c.login}" />\n</a>`
               )
               .join('\n');
 
