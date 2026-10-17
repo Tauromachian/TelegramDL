@@ -420,14 +420,11 @@
   position: relative;
 }
 .theme-twilight-comet .sidebar-nav button.selected {
-  box-shadow:
-    inset 3px 0 var(--tc-ribbon),
-    0 6px 20px rgba(0, 0, 0, 0.25);
-  background: color-mix(
-    in srgb,
-    var(--user-icon-bg),
-    transparent 15%
-  ) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  background: color-mix(in srgb, var(--tc-ribbon), transparent 84%) !important;
+}
+.theme-twilight-comet .sidebar-nav button.selected::before {
+  background-color: var(--tc-ribbon);
 }
 .theme-twilight-comet .sidebar-nav button.selected::after {
   content: '';
@@ -549,9 +546,7 @@
       color-mix(in srgb, var(--tc-ribbon), transparent 70%);
   }
   .theme-twilight-comet .sidebar-nav button.selected {
-    box-shadow:
-      inset 0 -3px var(--tc-ribbon),
-      0 6px 20px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
   }
   .theme-twilight-comet .sidebar-nav button.selected::after {
     display: none;
@@ -765,11 +760,24 @@
 /* Las tarjetas de cifras llevan un filo amarillo a la izquierda en vez de
    escuadras: son cuatro seguidas y con escuadras quedaría recargado. */
 .theme-edge-runner .stat-card {
-  box-shadow: inset 2px 0 0 var(--user-primary);
+  position: relative;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+.theme-edge-runner .stat-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  background-color: var(--user-primary);
+  border-radius: 2px;
+  box-shadow: 0 0 8px var(--user-primary);
 }
 .theme-edge-runner .stat-card:hover {
+  border-color: var(--user-primary);
   box-shadow:
-    inset 2px 0 0 var(--user-primary),
+    0 0 16px color-mix(in srgb, var(--user-primary), transparent 80%),
     0 12px 28px rgba(0, 0, 0, 0.45);
 }
 
@@ -825,11 +833,13 @@
   background: color-mix(
     in srgb,
     var(--user-primary),
-    transparent 92%
+    transparent 88%
   ) !important;
-  box-shadow:
-    inset 3px 0 var(--user-primary),
-    0 0 18px color-mix(in srgb, var(--user-primary), transparent 88%);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--user-primary), transparent 85%);
+}
+.theme-edge-runner .sidebar-nav button.selected::before {
+  background-color: var(--user-primary);
+  box-shadow: 0 0 8px var(--user-primary);
 }
 .theme-edge-runner .sidebar-nav button.selected span {
   color: var(--user-primary);
@@ -837,9 +847,8 @@
 
 @media (max-width: 900px) {
   .theme-edge-runner .sidebar-nav button.selected {
-    box-shadow:
-      inset 0 -3px var(--user-primary),
-      0 0 18px color-mix(in srgb, var(--user-primary), transparent 88%);
+    box-shadow: 0 0 16px
+      color-mix(in srgb, var(--user-primary), transparent 85%);
   }
 }
 
@@ -1328,10 +1337,11 @@
 
 .theme-rainy-garden .sidebar-nav button.selected {
   color: var(--rg-mist);
-  background: color-mix(in srgb, var(--rg-moss), transparent 55%) !important;
-  box-shadow:
-    inset 3px 0 var(--rg-rain),
-    0 6px 20px rgba(0, 0, 0, 0.25);
+  background: color-mix(in srgb, var(--rg-moss), transparent 45%) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.theme-rainy-garden .sidebar-nav button.selected::before {
+  background-color: var(--rg-rain);
 }
 .theme-rainy-garden .sidebar-nav button.selected span {
   color: var(--rg-mist);
@@ -1339,9 +1349,7 @@
 
 @media (max-width: 900px) {
   .theme-rainy-garden .sidebar-nav button.selected {
-    box-shadow:
-      inset 0 -3px var(--rg-rain),
-      0 6px 20px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
   }
 }
 
@@ -2241,26 +2249,30 @@ html.theme-silent-cherry .stat-icon.gray {
   color: var(--light-ink-soft);
 }
 
-/* La pestaña activa, en verde agua: es el único sitio donde el menta manda, y
-   deja el rosa para los botones de acción. */
+/* La pestaña activa, en rosa fuerte (sakura-deep / cherry) para destacar en el sidebar. */
 html.theme-silent-cherry .sidebar-nav button.selected {
-  background: color-mix(in srgb, var(--sc-water), transparent 66%) !important;
-  box-shadow:
-    inset 3px 0 var(--sc-mint),
-    0 6px 18px var(--sc-shadow);
+  background: color-mix(
+    in srgb,
+    var(--sc-sakura-deep),
+    transparent 60%
+  ) !important;
+  color: #a94a67;
+  box-shadow: 0 6px 18px var(--sc-shadow);
+}
+html.theme-silent-cherry .sidebar-nav button.selected::before {
+  background-color: #a94a67;
 }
 html.theme-silent-cherry .sidebar-nav button.selected span {
-  color: var(--light-ok);
+  color: #a94a67;
 }
 html.theme-silent-cherry .sidebar-nav button:hover {
-  background: color-mix(in srgb, var(--sc-sakura), transparent 78%);
+  background: color-mix(in srgb, var(--sc-sakura), transparent 70%);
+  color: #a94a67;
 }
 
 @media (max-width: 900px) {
   html.theme-silent-cherry .sidebar-nav button.selected {
-    box-shadow:
-      inset 0 -3px var(--sc-mint),
-      0 6px 18px var(--sc-shadow);
+    box-shadow: 0 6px 18px var(--sc-shadow);
   }
 }
 
@@ -2611,6 +2623,9 @@ html.theme-osx .sidebar-nav button.selected {
   background: rgba(10, 132, 255, 0.22) !important;
   box-shadow: none;
   color: #ffffff;
+}
+html.theme-osx .sidebar-nav button.selected::before {
+  display: none;
 }
 html.theme-osx .sidebar-nav button.selected span {
   color: var(--osx-cyan);
@@ -2968,12 +2983,13 @@ html.theme-herbal-apothecary .sidebar-nav button.selected {
   background: color-mix(
     in srgb,
     var(--ha-cerulean),
-    transparent 55%
+    transparent 45%
   ) !important;
   color: #e8efe9;
-  box-shadow:
-    inset 3px 0 var(--ha-sprout),
-    0 6px 18px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+html.theme-herbal-apothecary .sidebar-nav button.selected::before {
+  background-color: var(--ha-sprout);
 }
 html.theme-herbal-apothecary .sidebar-nav button.selected span {
   color: var(--ha-sprout);
@@ -2981,9 +2997,7 @@ html.theme-herbal-apothecary .sidebar-nav button.selected span {
 
 @media (max-width: 900px) {
   html.theme-herbal-apothecary .sidebar-nav button.selected {
-    box-shadow:
-      inset 0 -3px var(--ha-sprout),
-      0 6px 18px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
   }
 }
 
@@ -3328,9 +3342,12 @@ html.theme-darling-red .sidebar-nav button:hover {
 }
 
 html.theme-darling-red .sidebar-nav button.selected {
-  background: color-mix(in srgb, var(--dr-crimson), transparent 42%) !important;
+  background: color-mix(in srgb, var(--dr-crimson), transparent 32%) !important;
   color: var(--dr-bone);
-  box-shadow: inset 3px 0 var(--dr-cyan);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+html.theme-darling-red .sidebar-nav button.selected::before {
+  background-color: var(--dr-cyan);
 }
 html.theme-darling-red .sidebar-nav button.selected span {
   color: var(--dr-cyan);
@@ -3338,7 +3355,7 @@ html.theme-darling-red .sidebar-nav button.selected span {
 
 @media (max-width: 900px) {
   html.theme-darling-red .sidebar-nav button.selected {
-    box-shadow: inset 0 -3px var(--dr-cyan);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   }
 }
 
