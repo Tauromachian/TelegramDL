@@ -28,7 +28,7 @@ const localId = props.id ?? useId()
   </div>
 </template>
 
-<style lang="scss" scoped>
+<style scoped>
 .wrapper {
   display: flex;
   flex-direction: column;
