@@ -343,6 +343,7 @@ const addResolvedChat = async (chat) => {
 }
 
 const addChat = async () => {
+  if (!newChatId.value.trim()) return
   const parsed = parseChatInput(newChatId.value)
   if (!parsed) {
     error.value = t('listener.errInvalidInput', { link: 'https://t.me/c/...' })
@@ -783,7 +784,7 @@ onUnmounted(() => {
             @keyup.enter="addChat"
             :placeholder="t('listener.placeholder')"
           />
-          <AppButton :disabled="saving" @click="addChat">
+          <AppButton :disabled="saving || !newChatId.trim()" @click="addChat">
             <Plus :size="15" /> {{ t('common.add') }}
           </AppButton>
         </div>
