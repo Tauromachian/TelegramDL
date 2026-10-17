@@ -1,6 +1,8 @@
 <script setup>
 import { useId } from 'vue'
 
+const model = defineModel({ type: String, default: '' })
+
 const props = defineProps({
   label: { type: String, default: '' },
   id: { type: String, default: '' },
@@ -13,7 +15,7 @@ const props = defineProps({
   }
 })
 
-const localId = props.id ?? useId()
+const localId = props.id || useId()
 </script>
 
 <template>
@@ -22,6 +24,7 @@ const localId = props.id ?? useId()
     <input
       v-bind="$attrs"
       :id="localId"
+      v-model="model"
       class="input"
       :class="{ 'input--compact': variant === 'compact' }"
     />
