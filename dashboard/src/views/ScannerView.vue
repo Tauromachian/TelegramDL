@@ -2,8 +2,6 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   AlertCircle,
-  ArrowLeft,
-  ArrowRight,
   Clock3,
   Download,
   FileText,
@@ -17,6 +15,8 @@ import {
 } from '../icons'
 import { useAuthToken } from '../composables/useAuthToken'
 import { useI18n } from '../i18n'
+
+import AppPagination from '../components/AppPagination.vue'
 
 const { authHeaders } = useAuthToken()
 const { t } = useI18n()
@@ -188,27 +188,10 @@ watch([filteredResults, pageSize], () => {
   currentPage.value = 1
 })
 
-const totalPages = computed(() => {
-  return Math.max(1, Math.ceil(filteredResults.value.length / pageSize.value))
-})
-
 const paginatedResults = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   return filteredResults.value.slice(start, start + pageSize.value)
 })
-
-const visiblePages = computed(() => {
-  const total = totalPages.value
-  const maxVis = 5
-  if (total <= maxVis) return Array.from({ length: total }, (_, i) => i + 1)
-  const end = Math.min(total, Math.max(1, currentPage.value - 2) + maxVis - 1)
-  const start = Math.max(1, end - maxVis + 1)
-  return Array.from({ length: end - start + 1 }, (_, i) => start + i)
-})
-
-const goToPage = (page) => {
-  currentPage.value = Math.min(totalPages.value, Math.max(1, page))
-}
 
 const isAllSelected = computed(() => {
   if (filteredResults.value.length === 0) return false
@@ -700,63 +683,14 @@ const getKindIcon = (kind) => {
         </table>
       </div>
 
-      <!-- Paginador de resultados idéntico al del historial de descargas -->
-      <div v-if="filteredResults.length" class="history-pager">
-        <template v-if="totalPages > 1">
-          <button
-            class="pager-btn"
-            type="button"
-            :title="t('downloads.prevPage')"
-            :aria-label="t('downloads.prevPage')"
-            :disabled="currentPage === 1"
-            @click="goToPage(currentPage - 1)"
-          >
-            <ArrowLeft :size="14" />
-          </button>
-          <button
-            v-for="page in visiblePages"
-            :key="page"
-            class="pager-btn"
-            :class="{ active: page === currentPage }"
-            type="button"
-            :aria-current="page === currentPage ? 'page' : undefined"
-            @click="goToPage(page)"
-          >
-            {{ page }}
-          </button>
-          <button
-            class="pager-btn"
-            type="button"
-            :title="t('downloads.nextPage')"
-            :aria-label="t('downloads.nextPage')"
-            :disabled="currentPage === totalPages"
-            @click="goToPage(currentPage + 1)"
-          >
-            <ArrowRight :size="14" />
-          </button>
-        </template>
-
-        <div class="pager-side">
-          <span v-if="totalPages > 1" class="pager-info">
-            {{
-              t('downloads.pageOf', {
-                page: currentPage,
-                total: totalPages
-              })
-            }}
-          </span>
-          <select
-            v-model="pageSize"
-            class="pager-select"
-            :title="t('downloads.perPageLabel')"
-            :aria-label="t('downloads.perPageLabel')"
-          >
-            <option v-for="size in PAGE_SIZES" :key="size" :value="size">
-              {{ t('downloads.perPage', { n: size }) }}
-            </option>
-          </select>
-        </div>
-      </div>
+      <!-- Paginador de resultados (componente compartido con el historial) -->
+      <AppPagination
+        v-if="filteredResults.length"
+        v-model:page="currentPage"
+        v-model:size="pageSize"
+        :total="filteredResults.length"
+        :sizes="PAGE_SIZES"
+      />
     </section>
   </div>
 </template>
